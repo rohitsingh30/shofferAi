@@ -1,0 +1,37 @@
+{
+  "name": "shofferai",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "tunnel": "cloudflared tunnel --url http://localhost:3000",
+    "tunnel:relay": "cloudflared tunnel --url http://localhost:8765",
+    "laptop": "npm run start --workspace=@shofferai/playwright",
+    "deploy": "gcloud builds submit --config cloudbuild.yaml",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.0",
+    "prisma": "^6.5.0",
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0",
+    "vitest-mock-extended": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}

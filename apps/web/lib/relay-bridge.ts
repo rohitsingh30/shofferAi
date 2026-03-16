@@ -1,0 +1,245 @@
+import { randomUUID } from 'crypto';
+import WebSocket from 'ws';
+import {
+  logger,
+  BrowserError,
+  type MCPTool,
+  type AnthropicTool,
+  type MCPHostLike,
+  type MCPToolInfo,
+  type RelayMessage,
+  isToolCallResponse,
+  isToolListResponse,
+  isHeartbeatPong,
+} from '@shofferai/shared';
+
+interface PendingRequest {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timeoutId: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * Server-side relay bridge that accepts incoming WebSocket connections from the laptop.
+ * Replaces the old pattern where Cloud Run connected OUT to the laptop via Cloudflare Tunnel.
+ *
+ * Now: Laptop connects IN to Cloud Run → no tunnel needed.
+ */
+export class RelayBridge implements MCPHostLike {
+  private laptopSocket: WebSocket | null = null;
+  private pending = new Map<string, PendingRequest>();
+  private tools: MCPTool[] = [];
+  private connected = false;
+  private toolCallTimeoutMs = 60000;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Called by the custom server when a laptop WebSocket connects.
+   */
+  setLaptopSocket(ws: WebSocket): void {
+    // Close previous connection if any
+    if (this.laptopSocket) {
+      this.laptopSocket.close();
+    }
+
+    this.laptopSocket = ws;
+    this.connected = true;
+
+    ws.on('message', (data: Buffer) => {
+      try {
+        const msg: RelayMessage = JSON.parse(data.toString());
+        this.handleMessage(msg);
+      } catch (error) {
+        logger.error('RelayBridge: failed to parse message', {
+          error: error instanceof Error ? error.message : 'Unknown',
+        });
+      }
+    });
+
+    ws.on('close', () => {
+      logger.info('RelayBridge: laptop disconnected');
+      this.laptopSocket = null;
+      this.connected = false;
+      this.stopHeartbeat();
+      this.rejectAllPending('Laptop disconnected');
+    });
+
+    ws.on('error', (error) => {
+      logger.error('RelayBridge: WebSocket error', { error: error.message });
+    });
+
+    this.startHeartbeat();
+
+    // Fetch tool list from laptop
+    this.fetchTools().catch((err) => {
+      logger.error('RelayBridge: failed to fetch tools', {
+        error: err instanceof Error ? err.message : 'Unknown',
+      });
+    });
+  }
+
+  private async fetchTools(): Promise<void> {
+    const remoteTools = await this.listToolsRemote();
+    this.tools = remoteTools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    }));
+    logger.info(`RelayBridge: laptop connected, ${this.tools.length} tools available`);
+  }
+
+  private handleMessage(msg: RelayMessage): void {
+    if (isHeartbeatPong(msg)) return;
+
+    if (isToolCallResponse(msg) || isToolListResponse(msg)) {
+      const pending = this.pending.get(msg.id);
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        this.pending.delete(msg.id);
+
+        if (isToolCallResponse(msg) && msg.error) {
+          pending.reject(new BrowserError(`Remote tool failed: ${msg.error}`));
+        } else {
+          const result = isToolCallResponse(msg) ? msg.result : msg.tools;
+          pending.resolve(result);
+        }
+      }
+    }
+  }
+
+  private sendRequest(msg: Record<string, unknown>): Promise<unknown> {
+    if (!this.laptopSocket || !this.connected) {
+      return Promise.reject(new BrowserError('Laptop not connected'));
+    }
+
+    const id = msg.id as string;
+
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new BrowserError(`Relay request timed out after ${this.toolCallTimeoutMs}ms`));
+      }, this.toolCallTimeoutMs);
+
+      this.pending.set(id, { resolve, reject, timeoutId });
+      this.laptopSocket!.send(JSON.stringify(msg));
+    });
+  }
+
+  private async listToolsRemote(): Promise<MCPToolInfo[]> {
+    return this.sendRequest({
+      id: randomUUID(),
+      type: 'tool_list',
+    }) as Promise<MCPToolInfo[]>;
+  }
+
+  // ─── MCPHostLike implementation ───────────────────────────────
+
+  async connect(): Promise<void> {
+    // In bridge mode, the laptop connects to us.
+    // Wait for laptop to connect (up to 30s).
+    if (this.connected && this.tools.length > 0) return;
+
+    const start = Date.now();
+    while ((!this.connected || this.tools.length === 0) && Date.now() - start < 30000) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    if (!this.connected) {
+      throw new BrowserError('Laptop not connected to relay bridge (waited 30s)');
+    }
+  }
+
+  getTools(): MCPTool[] {
+    return this.tools;
+  }
+
+  getToolsAsAnthropicFormat(): AnthropicTool[] {
+    return this.tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.inputSchema,
+    }));
+  }
+
+  isMCPTool(toolName: string): boolean {
+    return this.tools.some((t) => t.name === toolName);
+  }
+
+  async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    return this.callToolWithSession(name, args);
+  }
+
+  async callToolWithSession(
+    name: string,
+    args: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<unknown> {
+    if (!this.connected) {
+      throw new BrowserError('RelayBridge: laptop not connected');
+    }
+
+    logger.debug(`RelayBridge calling tool: ${name}`, { toolArgs: args, sessionId });
+
+    try {
+      return await this.sendRequest({
+        id: randomUUID(),
+        type: 'tool_call',
+        name,
+        args,
+        sessionId,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown relay error';
+      throw new BrowserError(`Remote MCP tool ${name} failed: ${message}`, { tool: name, args });
+    }
+  }
+
+  async releaseSession(sessionId: string): Promise<void> {
+    if (!this.laptopSocket || !this.connected) return; // Best effort
+    this.laptopSocket.send(JSON.stringify({
+      id: randomUUID(),
+      type: 'session_end',
+      sessionId,
+    }));
+    logger.debug('RelayBridge sent session_end', { sessionId });
+  }
+
+  async disconnect(): Promise<void> {
+    this.stopHeartbeat();
+    this.rejectAllPending('Bridge disconnecting');
+    if (this.laptopSocket) {
+      this.laptopSocket.close();
+      this.laptopSocket = null;
+    }
+    this.connected = false;
+    this.tools = [];
+  }
+
+  isConnected(): boolean {
+    return this.connected;
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      if (this.laptopSocket && this.connected) {
+        this.laptopSocket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+      }
+    }, 15000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private rejectAllPending(reason: string): void {
+    for (const [, pending] of this.pending) {
+      clearTimeout(pending.timeoutId);
+      pending.reject(new BrowserError(reason));
+    }
+    this.pending.clear();
+  }
+}

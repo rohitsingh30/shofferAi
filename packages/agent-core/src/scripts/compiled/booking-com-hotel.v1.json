@@ -1,0 +1,32 @@
+{
+  "skillId": "booking-com-hotel",
+  "version": 3,
+  "recordedAt": "2026-03-15T15:00:00.000Z",
+  "requiredParams": ["destination", "checkin", "checkout", "guests"],
+  "format": "playwright-code",
+  "browserProfile": {
+    "chromeProfile": "Profile 3",
+    "account": "rsinghtomar3011@gmail.com",
+    "cdpEndpoint": "http://localhost:9222",
+    "notes": "Requires signed-in Booking.com session via Chrome CDP. Debug Chrome started by LaunchAgent com.shofferai.chrome-debug."
+  },
+  "steps": [
+    {
+      "name": "Navigate to search results",
+      "code": "async (page) => { await page.goto('https://www.booking.com/searchresults.html?ss={{destination}}&checkin={{checkin}}&checkout={{checkout}}&group_adults={{guests}}&no_rooms=1&group_children=0'); await page.waitForLoadState('domcontentloaded'); return { success: true, url: page.url() }; }",
+      "interactive": false
+    },
+    {
+      "name": "Wait for results to load",
+      "code": "async (page) => { await page.waitForTimeout(2000); const title = await page.title(); return { success: true, title }; }",
+      "interactive": false
+    },
+    {
+      "name": "Select hotel",
+      "interactive": true,
+      "question": "I found hotels in {{destination}} for {{checkin}} to {{checkout}}. The search results are loaded in the browser. Please tell me which hotel you'd like, or your preferences (budget, stars, location).",
+      "inputType": "freetext"
+    }
+  ],
+  "skillStepsHash": "playwright-code-v2"
+}

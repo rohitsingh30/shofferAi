@@ -1,0 +1,97 @@
+{
+  "skillId": "booking-com-hotel",
+  "version": 4,
+  "recordedAt": "2026-03-15T18:00:00.000Z",
+  "requiredParams": ["destination", "checkin", "checkout", "guests"],
+  "optionalParams": ["budget_max", "stars_min", "preference"],
+  "format": "playwright-code",
+  "browserProfile": {
+    "chromeProfile": "Profile 3",
+    "account": "rsinghtomar3011@gmail.com",
+    "cdpEndpoint": "http://localhost:9222",
+    "notes": "Requires signed-in Booking.com session via Chrome CDP. Debug Chrome started by LaunchAgent com.shofferai.chrome-debug. Genius Level 2 member — discounts applied automatically."
+  },
+  "steps": [
+    {
+      "name": "Dismiss popups and navigate to search",
+      "code": "async (page) => {\n  // Navigate directly to search results with params\n  const url = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent('{{destination}}')}&checkin={{checkin}}&checkout={{checkout}}&group_adults={{guests}}&no_rooms=1&group_children=0`;\n  await page.goto(url);\n  await page.waitForLoadState('load');\n\n  // Dismiss cookie consent\n  try {\n    const cookieBtn = page.locator('#onetrust-accept-btn-handler');\n    if (await cookieBtn.isVisible({ timeout: 2000 })) await cookieBtn.click();\n  } catch {}\n\n  // Dismiss Genius sign-in popup\n  try {\n    const dismissBtn = page.locator('[aria-label=\"Dismiss sign-in info.\"], [aria-label=\"Dismiss sign in information.\"]').first();\n    if (await dismissBtn.isVisible({ timeout: 2000 })) await dismissBtn.click();\n  } catch {}\n\n  // Dismiss any dialog overlays\n  try {\n    const closeBtn = page.locator('[role=\"dialog\"] button[aria-label=\"Close\"], [role=\"dialog\"] [aria-label=\"Dismiss\"]').first();\n    if (await closeBtn.isVisible({ timeout: 1000 })) await closeBtn.click();\n  } catch {}\n\n  return { success: true, url: page.url() };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Extract hotel search results",
+      "code": "async (page) => {\n  // Wait for property cards to load\n  await page.waitForSelector('[data-testid=\"property-card\"]', { timeout: 15000 });\n\n  // Extract top 5 hotels with details\n  const hotels = await page.$$eval('[data-testid=\"property-card\"]', (cards) => {\n    return cards.slice(0, 5).map((card, i) => {\n      const title = card.querySelector('[data-testid=\"title\"]');\n      const price = card.querySelector('[data-testid=\"price-and-discounted-price\"]');\n      const review = card.querySelector('[data-testid=\"review-score\"]');\n      const distance = card.querySelector('[data-testid=\"distance\"]');\n      const genius = card.querySelector('[class*=\"genius\"], [data-testid*=\"genius\"]');\n      const originalPrice = card.querySelector('[aria-hidden=\"true\"] span[aria-hidden=\"true\"]');\n      const taxInfo = card.querySelector('[data-testid=\"taxes-and-charges\"]');\n\n      return {\n        index: i + 1,\n        name: title?.textContent?.trim() || 'Unknown',\n        price: price?.textContent?.trim() || 'N/A',\n        originalPrice: originalPrice?.textContent?.trim() || null,\n        taxInfo: taxInfo?.textContent?.trim() || null,\n        reviewScore: review?.textContent?.trim() || 'No reviews',\n        distance: distance?.textContent?.trim() || '',\n        hasGeniusDiscount: !!genius,\n      };\n    });\n  });\n\n  return { success: true, hotels, count: hotels.length };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Select hotel",
+      "interactive": true,
+      "question": "I found these hotels in {{destination}} for {{checkin}} to {{checkout}}:\n\n{{#hotels}}\n{{index}}. **{{name}}** — {{price}} {{#hasGeniusDiscount}}(Genius discount!){{/hasGeniusDiscount}}\n   {{reviewScore}} · {{distance}}\n{{/hotels}}\n\nWhich hotel would you like? You can say the number, the name, or describe your preference (e.g., 'cheapest', 'best rated', 'closest to center').",
+      "inputType": "freetext",
+      "inputMapping": "selectedHotelIndex"
+    },
+    {
+      "name": "Click selected hotel",
+      "code": "async (page, context) => {\n  // Determine which hotel to click based on user's response\n  const choice = context.selectedHotelIndex || '1';\n  let idx = parseInt(choice) - 1;\n  if (isNaN(idx) || idx < 0) idx = 0;\n\n  // Click the hotel's 'See availability' link\n  const cards = page.locator('[data-testid=\"property-card\"]');\n  const card = cards.nth(idx);\n  const link = card.locator('a[data-testid=\"title-link\"], a:has-text(\"See availability\"), a:has-text(\"Show prices\")').first();\n  await link.click();\n  await page.waitForLoadState('load');\n  await page.waitForTimeout(2000);\n\n  // Dismiss any popup on hotel page\n  try {\n    const closeBtn = page.locator('[aria-label=\"Close\"], [role=\"dialog\"] button:has-text(\"×\")').first();\n    if (await closeBtn.isVisible({ timeout: 1500 })) await closeBtn.click();\n  } catch {}\n\n  // Extract hotel name from the page\n  const hotelName = await page.locator('h2[class*=\"hotel_name\"], h2#hp_hotel_name, [data-testid=\"header-title\"]').first().textContent().catch(() => 'Hotel');\n\n  return { success: true, hotelName: hotelName?.trim(), url: page.url() };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Extract room options and details",
+      "code": "async (page) => {\n  // Scroll to rooms section\n  const roomsSection = page.locator('#rooms_and_availability, [data-testid=\"room-table\"], table.hprt-table').first();\n  if (await roomsSection.isVisible({ timeout: 5000 })) {\n    await roomsSection.scrollIntoViewIfNeeded();\n  }\n  await page.waitForTimeout(1500);\n\n  // Extract room types\n  const rooms = await page.$$eval('.hprt-table tr.js-rt-block-row, [data-testid=\"room-type\"]', (rows) => {\n    const seen = new Set();\n    return rows.slice(0, 8).reduce((acc, row, i) => {\n      const name = row.querySelector('.hprt-roomtype-icon-link, [data-testid=\"room-name\"]');\n      const price = row.querySelector('.bui-price-display__value, .prco-valign-middle-helper, [data-testid=\"room-price\"]');\n      const occupancy = row.querySelector('.hprt-occupancy-occupancy-info, [data-testid=\"occupancy\"]');\n      const conditions = row.querySelector('.hprt-conditions, [data-testid=\"cancellation-policy\"]');\n      const roomName = name?.textContent?.trim() || '';\n\n      if (roomName && !seen.has(roomName)) {\n        seen.add(roomName);\n        acc.push({\n          index: acc.length + 1,\n          name: roomName,\n          price: price?.textContent?.trim() || 'N/A',\n          occupancy: occupancy?.textContent?.trim() || '',\n          cancellation: conditions?.textContent?.trim()?.substring(0, 80) || 'Check details',\n        });\n      }\n      return acc;\n    }, []);\n  });\n\n  // Get hotel-level info\n  const hotelRating = await page.locator('[data-testid=\"rating-stars\"], [class*=\"star\"]').first().textContent().catch(() => '');\n  const hotelScore = await page.locator('[data-testid=\"review-score-component\"]').first().textContent().catch(() => '');\n\n  return { success: true, rooms, hotelRating: hotelRating?.trim(), hotelScore: hotelScore?.trim() };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Select room",
+      "interactive": true,
+      "question": "Here are the available rooms:\n\n{{#rooms}}\n{{index}}. **{{name}}** — {{price}}\n   {{occupancy}} · {{cancellation}}\n{{/rooms}}\n\nWhich room would you like? (number or name)",
+      "inputType": "freetext",
+      "inputMapping": "selectedRoomIndex"
+    },
+    {
+      "name": "Reserve selected room",
+      "code": "async (page, context) => {\n  const choice = context.selectedRoomIndex || '1';\n  let idx = parseInt(choice) - 1;\n  if (isNaN(idx) || idx < 0) idx = 0;\n\n  // Try to select the room by clicking its row's Reserve/Select button\n  // Booking.com has dropdowns for room count + a Reserve button\n  const roomRows = page.locator('.hprt-table tr.js-rt-block-row, [data-testid=\"room-type\"]');\n  const targetRow = roomRows.nth(idx);\n\n  // Some hotels have a quantity dropdown — select 1 room\n  try {\n    const dropdown = targetRow.locator('select.hprt-nos-select, [data-testid=\"select-room-count\"]').first();\n    if (await dropdown.isVisible({ timeout: 2000 })) {\n      await dropdown.selectOption('1');\n      await page.waitForTimeout(500);\n    }\n  } catch {}\n\n  // Click Reserve/I'll reserve/Book now button\n  const reserveBtn = page.locator(\n    'button:has-text(\"Reserve\"), button:has-text(\"I\\'ll reserve\"), ' +\n    'button:has-text(\"Book now\"), input[value=\"Reserve\"], ' +\n    '[data-testid=\"submit-room-selection\"], .hprt-reservation-cta button'\n  ).first();\n\n  if (await reserveBtn.isVisible({ timeout: 5000 })) {\n    await reserveBtn.click();\n    await page.waitForLoadState('load');\n    await page.waitForTimeout(2000);\n  }\n\n  return { success: true, url: page.url() };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Fill guest details",
+      "code": "async (page, context) => {\n  const currentUrl = page.url();\n  if (!currentUrl.includes('book') && !currentUrl.includes('checkout') && !currentUrl.includes('reservation')) {\n    return { success: true, skipped: true, reason: 'Not on booking form yet' };\n  }\n\n  // Fill first name — use data-testid (discovered from live test)\n  const firstName = page.locator('[data-testid=\"user-details-firstname\"], [name=\"firstname\"], #firstname').first();\n  if (await firstName.isVisible({ timeout: 3000 })) {\n    const val = await firstName.inputValue();\n    if (!val && context.userFirstName) {\n      await firstName.fill(context.userFirstName);\n    }\n  }\n\n  // Fill last name\n  const lastName = page.locator('[data-testid=\"user-details-lastname\"], [name=\"lastname\"], #lastname').first();\n  if (await lastName.isVisible({ timeout: 1000 })) {\n    const val = await lastName.inputValue();\n    if (!val && context.userLastName) {\n      await lastName.fill(context.userLastName);\n    }\n  }\n\n  // Fill email\n  const emailField = page.locator('[data-testid=\"user-details-email\"], [name=\"email\"], #email').first();\n  if (await emailField.isVisible({ timeout: 1000 })) {\n    const val = await emailField.inputValue();\n    if (!val && context.userEmail) {\n      await emailField.fill(context.userEmail);\n    }\n  }\n\n  // Fill phone\n  const phoneField = page.locator('[data-testid=\"phone-number-input\"], [name=\"phone\"], [name=\"cc_phone\"]').first();\n  if (await phoneField.isVisible({ timeout: 1000 })) {\n    const val = await phoneField.inputValue();\n    if (!val && context.userPhone) {\n      await phoneField.fill(context.userPhone);\n    }\n  }\n\n  // Handle \"Are you travelling for work?\" — default No\n  try {\n    const workNo = page.locator('[data-testid=\"booking-travel-purpose-no\"], label:has-text(\"No\"):near(text(\"work\"))').first();\n    if (await workNo.isVisible({ timeout: 1000 })) await workNo.click();\n  } catch {}\n\n  // Handle special requests\n  if (context.specialRequests) {\n    try {\n      const reqField = page.locator('[name=\"special_requests\"], textarea[id*=\"request\"]').first();\n      if (await reqField.isVisible({ timeout: 1000 })) {\n        await reqField.fill(context.specialRequests);\n      }\n    } catch {}\n  }\n\n  return { success: true, filled: true };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Proceed to final step and extract price",
+      "code": "async (page) => {\n  // Click Next/Continue/Final details button\n  const nextBtn = page.locator(\n    'button:has-text(\"Next: Final details\"), button:has-text(\"Final details\"), ' +\n    'button:has-text(\"Continue\"), button:has-text(\"Next step\")'\n  ).first();\n\n  if (await nextBtn.isVisible({ timeout: 3000 })) {\n    await nextBtn.click();\n    await page.waitForLoadState('load');\n    await page.waitForTimeout(2000);\n  }\n\n  // Extract final price including taxes\n  let totalPrice = 'N/A';\n  let geniusDiscount = null;\n  let taxesIncluded = null;\n\n  try {\n    // Try multiple price selectors\n    const priceSelectors = [\n      '[data-testid=\"total-price\"]',\n      '.bui-price-display__value',\n      '.pricebreak-price',\n      '.bp-price-display__value',\n      '[class*=\"total\"] [class*=\"price\"]',\n      '.totalPrice'\n    ];\n    for (const sel of priceSelectors) {\n      const el = page.locator(sel).first();\n      if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {\n        totalPrice = (await el.textContent())?.trim() || totalPrice;\n        break;\n      }\n    }\n  } catch {}\n\n  // Extract Genius discount amount\n  try {\n    const discountEl = page.locator('[class*=\"genius\"] [class*=\"discount\"], [data-testid*=\"genius\"]').first();\n    if (await discountEl.isVisible({ timeout: 1000 })) {\n      geniusDiscount = (await discountEl.textContent())?.trim();\n    }\n  } catch {}\n\n  // Extract tax info\n  try {\n    const taxEl = page.locator('[data-testid=\"taxes-and-charges\"], [class*=\"tax\"]').first();\n    if (await taxEl.isVisible({ timeout: 1000 })) {\n      taxesIncluded = (await taxEl.textContent())?.trim();\n    }\n  } catch {}\n\n  return {\n    success: true,\n    totalPrice,\n    geniusDiscount,\n    taxesIncluded,\n    url: page.url()\n  };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Pause for payment",
+      "interactive": true,
+      "question": "Ready to book! Here's your booking summary:\n\n**Hotel**: {{hotelName}}\n**Dates**: {{checkin}} to {{checkout}}\n**Guests**: {{guests}}\n**Total**: {{totalPrice}}\n{{#geniusDiscount}}**Genius Discount**: {{geniusDiscount}} saved!{{/geniusDiscount}}\n\nPlease complete the payment to confirm your booking.",
+      "inputType": "payment",
+      "paymentEvent": true,
+      "paymentFields": {
+        "bookingSummary": "{{hotelName}} — {{checkin}} to {{checkout}} — {{guests}} guests",
+        "amountField": "totalPrice",
+        "description": "Hotel booking: {{hotelName}}"
+      }
+    },
+    {
+      "name": "Complete booking",
+      "code": "async (page) => {\n  // After payment confirmed, click the final booking button\n  const submitBtn = page.locator(\n    'button:has-text(\"Complete booking\"), button:has-text(\"Complete reservation\"), ' +\n    'button:has-text(\"Book now\"), button:has-text(\"Pay now\"), ' +\n    'button:has-text(\"Confirm booking\"), [data-testid=\"submit-booking\"]'\n  ).first();\n\n  if (await submitBtn.isVisible({ timeout: 5000 })) {\n    await submitBtn.click();\n    await page.waitForTimeout(5000);\n  }\n\n  // Handle 3DS/OTP verification if it appears\n  const otpField = page.locator(\n    'input[name=\"otp\"], input[type=\"tel\"][maxlength=\"6\"], input[type=\"tel\"][maxlength=\"4\"], ' +\n    '[placeholder*=\"OTP\" i], [placeholder*=\"verification\" i], ' +\n    'input[id*=\"otp\"], iframe[src*=\"3ds\"], iframe[name*=\"challenge\"]'\n  ).first();\n\n  const needs3DS = await otpField.isVisible({ timeout: 5000 }).catch(() => false);\n\n  return { success: true, needs3DS, url: page.url() };\n}",
+      "interactive": false
+    },
+    {
+      "name": "Handle OTP if needed",
+      "interactive": true,
+      "conditional": "needs3DS",
+      "question": "Your bank sent a verification code (OTP). Please enter it:",
+      "inputType": "otp",
+      "inputMapping": "otpValue",
+      "postInputCode": "async (page, context) => {\n  if (!context.otpValue) return { success: false };\n\n  const otpField = page.locator(\n    'input[name=\"otp\"], input[type=\"tel\"][maxlength=\"6\"], input[type=\"tel\"][maxlength=\"4\"], ' +\n    '[placeholder*=\"OTP\" i], [placeholder*=\"verification\" i], input[id*=\"otp\"]'\n  ).first();\n\n  if (await otpField.isVisible({ timeout: 3000 })) {\n    await otpField.fill(context.otpValue);\n    const submitBtn = page.locator('button:has-text(\"Submit\"), button:has-text(\"Verify\"), button:has-text(\"Confirm\"), button[type=\"submit\"]').first();\n    if (await submitBtn.isVisible({ timeout: 2000 })) await submitBtn.click();\n    await page.waitForTimeout(5000);\n  }\n\n  return { success: true };\n}"
+    },
+    {
+      "name": "Extract booking confirmation",
+      "code": "async (page) => {\n  await page.waitForTimeout(3000);\n\n  const confirmUrl = page.url();\n  const pageTitle = await page.title();\n\n  // Check if we're on a confirmation page\n  const isConfirmed = confirmUrl.includes('confirmation') ||\n    confirmUrl.includes('success') ||\n    confirmUrl.includes('thank') ||\n    pageTitle.toLowerCase().includes('confirmed') ||\n    pageTitle.toLowerCase().includes('booked');\n\n  // Extract confirmation number\n  let confirmationNumber = '';\n  try {\n    const confSelectors = [\n      '[data-testid=\"confirmation-number\"]',\n      '[class*=\"confirmation\"]',\n      '[class*=\"booking-number\"]',\n      '[class*=\"reference\"]',\n      'span:has-text(\"Confirmation\")',\n      'div:has-text(\"Booking number\")'\n    ];\n    for (const sel of confSelectors) {\n      const el = page.locator(sel).first();\n      if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {\n        const text = await el.textContent();\n        // Extract just the number/code part\n        const numMatch = text?.match(/[A-Z0-9]{6,}/i);\n        if (numMatch) {\n          confirmationNumber = numMatch[0];\n          break;\n        }\n        confirmationNumber = text?.trim() || '';\n        break;\n      }\n    }\n  } catch {}\n\n  // Extract confirmed hotel name\n  let confirmedHotel = '';\n  try {\n    const hotelEl = page.locator('[data-testid=\"hotel-name\"], h1, [class*=\"hotel-name\"]').first();\n    if (await hotelEl.isVisible({ timeout: 1000 })) {\n      confirmedHotel = (await hotelEl.textContent())?.trim() || '';\n    }\n  } catch {}\n\n  // Extract confirmed dates\n  let confirmedDates = '';\n  try {\n    const dateEl = page.locator('[data-testid=\"check-in-date\"], [class*=\"date\"]').first();\n    if (await dateEl.isVisible({ timeout: 1000 })) {\n      confirmedDates = (await dateEl.textContent())?.trim() || '';\n    }\n  } catch {}\n\n  // Extract confirmed price\n  let confirmedPrice = '';\n  try {\n    const priceEl = page.locator('[data-testid=\"total-price\"], [class*=\"total\"] [class*=\"price\"]').first();\n    if (await priceEl.isVisible({ timeout: 1000 })) {\n      confirmedPrice = (await priceEl.textContent())?.trim() || '';\n    }\n  } catch {}\n\n  return {\n    success: true,\n    isConfirmed,\n    confirmationNumber,\n    hotelName: confirmedHotel,\n    dates: confirmedDates,\n    totalPaid: confirmedPrice,\n    url: confirmUrl\n  };\n}",
+      "interactive": false
+    }
+  ],
+  "skillStepsHash": "playwright-code-v4-full-flow"
+}

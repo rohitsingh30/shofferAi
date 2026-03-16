@@ -1,0 +1,178 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile     Profile?
+  credentials Credential[]
+  tasks       Task[]
+  accounts    Account[]
+  sessions    Session[]
+  payments    Payment[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  phone       String?
+  addresses   String   @default("[]")
+  preferences String   @default("{}")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Credential {
+  id            String   @id @default(cuid())
+  userId        String
+  type          String
+  label         String
+  lastFour      String?
+  encryptedData String
+  iv            String
+  authTag       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Task {
+  id           String    @id @default(cuid())
+  userId       String
+  description  String
+  workflowType String?
+  status       String    @default("pending")
+  result       String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  completedAt  DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps        TaskStep[]
+  messages     Message[]
+  payments     Payment[]
+
+  @@index([userId])
+}
+
+model TaskStep {
+  id                   String    @id @default(cuid())
+  taskId               String
+  stepNumber           Int
+  action               String
+  toolCalls            String?
+  status               String    @default("pending")
+  requiresConfirmation Boolean   @default(false)
+  inputNeeded          String?
+  userInput            String?
+  result               String?
+  error                String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  task                 Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  taskId    String
+  role      String
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  taskId            String
+  userId            String
+  status            String    @default("pending")
+  amountCents       Int
+  serviceFeeCents   Int       @default(0)
+  totalCents        Int
+  currency          String    @default("INR")
+  razorpayOrderId   String?   @unique
+  razorpayPaymentId String?
+  bookingSummary    String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  paidAt            DateTime?
+
+  task Task @relation(fields: [taskId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+model TelemetryEvent {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  event     String   // e.g. "llm_call", "tool_call", "api_request", "error", "user_login", "payment"
+  category  String   // e.g. "llm", "tool", "api", "relay", "auth", "payment", "task"
+  userId    String?
+  taskId    String?
+  success   Boolean  @default(true)
+  durationMs Int?
+  metadata  String?  // JSON blob for event-specific data (tokens, tool name, error message, etc.)
+
+  @@index([event])
+  @@index([category])
+  @@index([timestamp])
+  @@index([userId])
+  @@index([taskId])
+}

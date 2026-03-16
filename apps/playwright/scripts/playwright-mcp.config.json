@@ -1,0 +1,6 @@
+{
+  "browser": {
+    "cdpEndpoint": "http://localhost:9222",
+    "cdpTimeout": 30000
+  }
+}

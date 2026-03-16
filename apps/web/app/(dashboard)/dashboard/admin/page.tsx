@@ -1,0 +1,544 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+
+type TimeRange = '1' | '6' | '24' | '72' | '168';
+type Tab = 'overview' | 'errors' | 'llm' | 'tools' | 'relay' | 'users';
+
+interface OverviewData {
+  totalEvents: number;
+  totalErrors: number;
+  errorRate: string;
+  totalTasks: number;
+  completedTasks: number;
+  failedTasks: number;
+  taskSuccessRate: string;
+  totalUsers: number;
+  totalPayments: number;
+  avgTaskDurationMs: number;
+  totalLLMCalls: number;
+  totalToolCalls: number;
+}
+
+interface TimelinePoint {
+  hour: string;
+  count: number;
+  errors: number;
+}
+
+interface ErrorEvent {
+  id: string;
+  timestamp: string;
+  event: string;
+  category: string;
+  userId: string | null;
+  taskId: string | null;
+  metadata: string | null;
+}
+
+interface LLMData {
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  avgLatencyMs: number;
+  recentCalls: Array<{
+    id: string;
+    timestamp: string;
+    durationMs: number | null;
+    taskId: string | null;
+    inputTokens?: number;
+    outputTokens?: number;
+    iteration?: number;
+    skillName?: string;
+    stopReason?: string;
+  }>;
+}
+
+interface ToolData {
+  tool: string;
+  count: number;
+  errors: number;
+  avgMs: number;
+}
+
+interface RelayData {
+  events: Array<{
+    id: string;
+    timestamp: string;
+    event: string;
+    success: boolean;
+    durationMs: number | null;
+    metadata: string | null;
+  }>;
+  avgRelayLatencyMs: number;
+  connections: number;
+  disconnections: number;
+  errors: number;
+}
+
+interface UserData {
+  summary: Array<{ event: string; count: number }>;
+  recentLogins: Array<{ timestamp: string; userId: string | null; metadata: string | null }>;
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60000).toFixed(1)}m`;
+}
+
+function formatNumber(n: number): string {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return n.toString();
+}
+
+function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-2xl font-bold ${color || 'text-foreground'}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+  return (
+    <div className="h-2 w-full rounded-full bg-muted">
+      <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+function TimelineChart({ data }: { data: TimelinePoint[] }) {
+  if (data.length === 0) return <p className="text-sm text-muted-foreground">No data for this period</p>;
+
+  const maxCount = Math.max(...data.map((d) => d.count), 1);
+  const chartHeight = 120;
+
+  return (
+    <div className="flex items-end gap-1" style={{ height: chartHeight }}>
+      {data.map((d, i) => {
+        const totalPx = Math.max((d.count / maxCount) * chartHeight, d.count > 0 ? 4 : 0);
+        const errorPx = d.count > 0 ? Math.max((d.errors / d.count) * totalPx, d.errors > 0 ? 3 : 0) : 0;
+        const successPx = totalPx - errorPx;
+        const hour = new Date(d.hour).getHours();
+        return (
+          <div key={i} className="group relative flex flex-1 flex-col items-center justify-end" style={{ height: '100%' }}>
+            <div className="pointer-events-none absolute -top-8 z-10 hidden rounded bg-popover px-2 py-1 text-xs shadow-lg group-hover:block">
+              {d.count} events, {d.errors} errors
+            </div>
+            {d.count > 0 && (
+              <div className="flex w-full flex-col items-stretch">
+                {errorPx > 0 && (
+                  <div className="w-full rounded-t bg-red-500/80" style={{ height: errorPx }} />
+                )}
+                <div className={`w-full ${errorPx > 0 ? '' : 'rounded-t'} rounded-b bg-primary/60`} style={{ height: successPx }} />
+              </div>
+            )}
+            {i % Math.max(1, Math.floor(data.length / 8)) === 0 && (
+              <span className="absolute -bottom-5 text-[10px] text-muted-foreground">{hour}:00</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function AdminDashboard() {
+  const [tab, setTab] = useState<Tab>('overview');
+  const [hours, setHours] = useState<TimeRange>('24');
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [timeline, setTimeline] = useState<TimelinePoint[]>([]);
+  const [errors, setErrors] = useState<ErrorEvent[]>([]);
+  const [llm, setLlm] = useState<LLMData | null>(null);
+  const [tools, setTools] = useState<ToolData[]>([]);
+  const [relay, setRelay] = useState<RelayData | null>(null);
+  const [users, setUsers] = useState<UserData | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setApiError(null);
+    try {
+      const fetchView = async (view: string) => {
+        const res = await fetch(`/api/admin/telemetry?view=${view}&hours=${hours}`);
+        if (!res.ok) {
+          if (res.status === 403) throw new Error('Access denied. Admin privileges required.');
+          throw new Error(`API error (${res.status})`);
+        }
+        return res.json();
+      };
+
+      if (tab === 'overview') {
+        const [overviewData, timelineData] = await Promise.all([
+          fetchView('overview'),
+          fetchView('timeline'),
+        ]);
+        setOverview(overviewData);
+        setTimeline(timelineData);
+      } else if (tab === 'errors') {
+        setErrors(await fetchView('errors'));
+      } else if (tab === 'llm') {
+        setLlm(await fetchView('llm'));
+      } else if (tab === 'tools') {
+        setTools(await fetchView('tools'));
+      } else if (tab === 'relay') {
+        setRelay(await fetchView('relay'));
+      } else if (tab === 'users') {
+        setUsers(await fetchView('users'));
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to fetch telemetry';
+      setApiError(msg);
+      console.error('Failed to fetch telemetry', e);
+    }
+    setLoading(false);
+  }, [tab, hours]);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000); // Auto-refresh every 30s
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'llm', label: 'LLM Usage' },
+    { key: 'tools', label: 'Tool Calls' },
+    { key: 'relay', label: 'Relay' },
+    { key: 'errors', label: 'Errors' },
+    { key: 'users', label: 'Users' },
+  ];
+
+  const timeRanges: { key: TimeRange; label: string }[] = [
+    { key: '1', label: '1h' },
+    { key: '6', label: '6h' },
+    { key: '24', label: '24h' },
+    { key: '72', label: '3d' },
+    { key: '168', label: '7d' },
+  ];
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+        <div>
+          <h1 className="text-xl font-bold">Telemetry Dashboard</h1>
+          <p className="text-xs text-muted-foreground">Real-time system observability</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Time range selector */}
+          <div className="flex rounded-lg border border-border">
+            {timeRanges.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setHours(t.key)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  hours === t.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {/* Refresh */}
+          <button
+            onClick={fetchData}
+            className="rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:text-foreground"
+            title="Refresh"
+          >
+            <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-border px-6">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+              tab === t.key
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        {apiError ? (
+          <div className="flex h-40 flex-col items-center justify-center gap-2">
+            <svg className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            <p className="text-sm text-red-400">{apiError}</p>
+            <button onClick={fetchData} className="mt-2 rounded-lg bg-primary px-4 py-1.5 text-xs text-primary-foreground hover:bg-primary/90">Retry</button>
+          </div>
+        ) : loading && !overview && !errors.length && !llm && !tools.length && !relay && !users ? (
+          <div className="flex h-40 items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : (
+          <>
+            {/* OVERVIEW TAB */}
+            {tab === 'overview' && overview && (
+              <div className="space-y-6">
+                {/* Stats grid */}
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+                  <StatCard label="Total Events" value={formatNumber(overview.totalEvents)} />
+                  <StatCard label="Tasks" value={overview.totalTasks} sub={`${overview.completedTasks} done, ${overview.failedTasks} failed`} />
+                  <StatCard label="Success Rate" value={`${overview.taskSuccessRate}%`} color={parseFloat(overview.taskSuccessRate) >= 80 ? 'text-green-400' : 'text-red-400'} />
+                  <StatCard label="Avg Task Time" value={formatDuration(overview.avgTaskDurationMs)} />
+                  <StatCard label="Errors" value={overview.totalErrors} sub={`${overview.errorRate}% of events`} color={overview.totalErrors > 0 ? 'text-red-400' : 'text-green-400'} />
+                  <StatCard label="LLM Calls" value={formatNumber(overview.totalLLMCalls)} />
+                  <StatCard label="Tool Calls" value={formatNumber(overview.totalToolCalls)} />
+                  <StatCard label="Payments" value={overview.totalPayments} />
+                  <StatCard label="Users" value={overview.totalUsers} />
+                </div>
+
+                {/* Timeline */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <h3 className="mb-4 text-sm font-semibold">Event Timeline</h3>
+                  <div className="pb-6">
+                    <TimelineChart data={timeline} />
+                  </div>
+                  <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-primary/60" /> Success</span>
+                    <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded bg-red-500/80" /> Errors</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ERRORS TAB */}
+            {tab === 'errors' && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold">{errors.length} Errors (last {hours}h)</h3>
+                {errors.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No errors in this period</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground">Time</th>
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground">Event</th>
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground">Category</th>
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {errors.map((e) => {
+                          let meta: Record<string, unknown> = {};
+                          try { if (e.metadata) meta = JSON.parse(e.metadata); } catch {}
+                          return (
+                            <tr key={e.id} className="border-b border-border/50 hover:bg-muted/20">
+                              <td className="whitespace-nowrap px-4 py-2 text-xs text-muted-foreground">
+                                {new Date(e.timestamp).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2">
+                                <span className="rounded bg-red-500/20 px-2 py-0.5 text-xs text-red-400">{e.event}</span>
+                              </td>
+                              <td className="px-4 py-2 text-xs">{e.category}</td>
+                              <td className="max-w-md truncate px-4 py-2 text-xs text-muted-foreground">
+                                {meta.error ? String(meta.error) : JSON.stringify(meta).slice(0, 150)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LLM TAB */}
+            {tab === 'llm' && llm && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <StatCard label="LLM Calls" value={llm.totalCalls} />
+                  <StatCard label="Total Tokens" value={formatNumber(llm.totalTokens)} sub={`${formatNumber(llm.totalInputTokens)} in / ${formatNumber(llm.totalOutputTokens)} out`} />
+                  <StatCard label="Avg Latency" value={formatDuration(llm.avgLatencyMs)} />
+                  <StatCard
+                    label="Est. Cost"
+                    value={`$${((llm.totalInputTokens * 0.005 + llm.totalOutputTokens * 0.015) / 1000).toFixed(2)}`}
+                    sub="Based on GPT-4o pricing"
+                  />
+                </div>
+
+                {/* Recent LLM calls */}
+                <div className="rounded-xl border border-border">
+                  <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Recent LLM Calls</h3>
+                  <div className="max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-card">
+                        <tr className="border-b border-border">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Time</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Latency</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tokens In</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Tokens Out</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Iter</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Skill</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Stop</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {llm.recentCalls.map((c) => (
+                          <tr key={c.id} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="whitespace-nowrap px-4 py-2 text-xs text-muted-foreground">
+                              {new Date(c.timestamp).toLocaleTimeString()}
+                            </td>
+                            <td className="px-4 py-2 text-xs">{c.durationMs ? formatDuration(c.durationMs) : '-'}</td>
+                            <td className="px-4 py-2 text-xs">{c.inputTokens?.toLocaleString() || '-'}</td>
+                            <td className="px-4 py-2 text-xs">{c.outputTokens?.toLocaleString() || '-'}</td>
+                            <td className="px-4 py-2 text-xs">{c.iteration || '-'}</td>
+                            <td className="px-4 py-2 text-xs">{c.skillName || '-'}</td>
+                            <td className="px-4 py-2 text-xs">
+                              <span className={`rounded px-1.5 py-0.5 ${c.stopReason === 'tool_use' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                {c.stopReason || '-'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TOOLS TAB */}
+            {tab === 'tools' && (
+              <div className="space-y-6">
+                <h3 className="text-sm font-semibold">Tool Usage Breakdown</h3>
+                {tools.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No tool calls in this period</p>
+                ) : (
+                  <div className="space-y-3">
+                    {tools.map((t) => {
+                      const maxCount = Math.max(...tools.map((x) => x.count), 1);
+                      return (
+                        <div key={t.tool} className="rounded-xl border border-border bg-card p-4">
+                          <div className="mb-2 flex items-center justify-between">
+                            <div>
+                              <span className="font-medium">{t.tool || 'unknown'}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">{t.count} calls</span>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>Avg: {formatDuration(t.avgMs)}</span>
+                              {t.errors > 0 && <span className="text-red-400">{t.errors} errors</span>}
+                            </div>
+                          </div>
+                          <MiniBar value={t.count} max={maxCount} color={t.errors > 0 ? 'bg-amber-500' : 'bg-primary'} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RELAY TAB */}
+            {tab === 'relay' && relay && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <StatCard label="Avg Latency" value={formatDuration(relay.avgRelayLatencyMs)} />
+                  <StatCard label="Connections" value={relay.connections} color="text-green-400" />
+                  <StatCard label="Disconnections" value={relay.disconnections} color={relay.disconnections > 0 ? 'text-amber-400' : 'text-green-400'} />
+                  <StatCard label="Errors" value={relay.errors} color={relay.errors > 0 ? 'text-red-400' : 'text-green-400'} />
+                </div>
+
+                <div className="rounded-xl border border-border">
+                  <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Recent Relay Events</h3>
+                  <div className="max-h-80 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-card">
+                        <tr className="border-b border-border">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Time</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Event</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {relay.events.map((e) => (
+                          <tr key={e.id} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="whitespace-nowrap px-4 py-2 text-xs text-muted-foreground">
+                              {new Date(e.timestamp).toLocaleTimeString()}
+                            </td>
+                            <td className="px-4 py-2 text-xs">{e.event}</td>
+                            <td className="px-4 py-2">
+                              <span className={`rounded px-1.5 py-0.5 text-xs ${e.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {e.success ? 'ok' : 'fail'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-xs">{e.durationMs ? formatDuration(e.durationMs) : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* USERS TAB */}
+            {tab === 'users' && users && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                  {users.summary.map((s) => (
+                    <StatCard key={s.event} label={s.event.replace(/_/g, ' ')} value={s.count} />
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-border">
+                  <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">Recent Logins</h3>
+                  <div className="max-h-80 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-card">
+                        <tr className="border-b border-border">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Time</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">User ID</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Provider</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.recentLogins.map((l, i) => {
+                          let provider = 'unknown';
+                          try { if (l.metadata) provider = JSON.parse(l.metadata).provider || 'unknown'; } catch {}
+                          return (
+                            <tr key={i} className="border-b border-border/50 hover:bg-muted/20">
+                              <td className="whitespace-nowrap px-4 py-2 text-xs text-muted-foreground">
+                                {new Date(l.timestamp).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-xs font-mono">{l.userId?.slice(0, 12) || '-'}</td>
+                              <td className="px-4 py-2 text-xs">{provider}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
