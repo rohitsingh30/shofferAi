@@ -9,6 +9,7 @@ const { createServer } = require('http');
 const { WebSocketServer } = require('ws');
 const { parse } = require('url');
 const path = require('path');
+const fs = require('fs');
 
 // ─── Next.js Setup ──────────────────────────────────────────────
 const NextServer = require('next/dist/server/next-server').default;
@@ -31,9 +32,65 @@ const nextApp = new NextServer({
 
 const nextHandler = nextApp.getRequestHandler();
 
+// ─── Static File Serving ────────────────────────────────────────
+// NextServer in standalone+customServer mode does not serve _next/static/* or
+// public/* files. We handle them here before falling through to the Next.js handler.
+const STATIC_DIR = path.join(dir, '.next', 'static');
+const PUBLIC_DIR = path.join(dir, 'public');
+
+const MIME_TYPES = {
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.json': 'application/json',
+  '.map': 'application/json',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.txt': 'text/plain',
+  '.xml': 'application/xml',
+  '.webmanifest': 'application/manifest+json',
+};
+
+function serveStaticFile(filePath, res) {
+  const ext = path.extname(filePath);
+  const mime = MIME_TYPES[ext] || 'application/octet-stream';
+  res.setHeader('Content-Type', mime);
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  fs.createReadStream(filePath).pipe(res);
+}
+
 // ─── HTTP Server ────────────────────────────────────────────────
 const httpServer = createServer((req, res) => {
-  nextHandler(req, res);
+  const parsedUrl = parse(req.url, true);
+  const pathname = parsedUrl.pathname;
+
+  // Serve _next/static/* from .next/static/
+  if (pathname.startsWith('/_next/static/')) {
+    const relPath = pathname.slice('/_next/static/'.length);
+    const filePath = path.join(STATIC_DIR, relPath);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      return serveStaticFile(filePath, res);
+    }
+  }
+
+  // Serve public/* files (favicon.ico, robots.txt, etc.)
+  if (!pathname.startsWith('/_next/') && !pathname.startsWith('/api/')) {
+    const filePath = path.join(PUBLIC_DIR, pathname);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      return serveStaticFile(filePath, res);
+    }
+  }
+
+  nextHandler(req, res, parsedUrl);
 });
 
 // ─── WebSocket Relay ────────────────────────────────────────────
@@ -46,7 +103,8 @@ httpServer.on('upgrade', (request, socket, head) => {
   let parsedUrl;
   try {
     parsedUrl = new URL(request.url || '/', `http://${request.headers.host}`);
-  } catch {
+  } catch (err) {
+    console.error('[relay] Failed to parse upgrade URL:', err);
     socket.destroy();
     return;
   }
@@ -57,6 +115,7 @@ httpServer.on('upgrade', (request, socket, head) => {
       const token =
         parsedUrl.searchParams.get('token') || request.headers['x-relay-token'];
       if (token !== authToken) {
+        console.warn('[relay] Laptop auth failed — token mismatch');
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
