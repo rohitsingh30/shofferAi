@@ -338,13 +338,14 @@ export class TaskManager {
   }
 
   private spawnCopilotCLI(prompt: string, mcpConfig: string, taskId: string): ChildProcess {
+    // Embed system instructions into the prompt (no --system-prompt flag in gh copilot)
+    const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nTASK:\n${prompt}`;
+
     const args = [
       'copilot', '--',
-      '-p', prompt,
-      '-s', SYSTEM_PROMPT,
+      '-p', fullPrompt,
       '--model', this.options.model,
       '--allow-all',
-      '--no-ask-user',
       '--output-format', 'json',
       '--additional-mcp-config', mcpConfig,
     ];
