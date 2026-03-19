@@ -205,17 +205,17 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 
 ## Playwright MCP — Auto-Launching Chrome
 
-Playwright MCP **automatically launches** a dedicated Chrome-Debug window (Profile 3 / rsinghtomar3011@gmail.com) on port 9225 when started. No manual Chrome launch needed.
+Playwright MCP **automatically launches** a dedicated Chrome-Debug window (Profile 3 / rsinghtomar3011@gmail.com) when started. No manual Chrome launch needed. No hardcoded port.
 
 ### How it works
 
 `.mcp.json` calls `apps/playwright/scripts/playwright-mcp-with-chrome.sh` which:
-1. Checks if Chrome-Debug is already running on port 9225
-2. If not → launches it as a daemon (nohup+disown) with Profile 3
+1. Scans ports 9222-9240 for an existing Chrome-Debug CDP instance → reuses it if found
+2. If none found → picks the first free port in that range, launches Chrome as a daemon
 3. Waits for CDP to respond
-4. Then exec's into `npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:9225`
+4. Then exec's into `npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:<port>`
 
-### `.mcp.json` (single entry):
+### `.mcp.json`:
 ```json
 {
   "mcpServers": {
@@ -230,16 +230,16 @@ Playwright MCP **automatically launches** a dedicated Chrome-Debug window (Profi
 
 ### Profile 3 details
 - **Email**: rsinghtomar3011@gmail.com (Booking.com Genius Level 1)
-- **User-data-dir**: `~/Library/Application Support/Google/Chrome-Debug-9225`
-- **Port**: 9225 (fixed, never changes)
+- **User-data-dir**: `~/Library/Application Support/Google/Chrome-Debug` (single dir, no port suffix)
+- **Port**: dynamically assigned (first free port in 9222-9240)
 - **Sessions persist forever** — Chrome encrypts cookies via OS keychain. Sign in once manually, then sessions survive all restarts.
 
 ### Rules:
-1. **Never launch Chrome manually** — the wrapper script handles it.
-2. **One Chrome, one port** — port 9225 only. No multi-browser setup.
+1. **Never launch Chrome manually** — the wrapper script handles everything.
+2. **One Chrome instance** — the script reuses an existing one or launches a fresh one.
 3. **Profile 3 mandatory** — all signed-in sessions (Booking.com, Blinkit, Google, etc.) live here.
 4. **IPv4 only** — always `127.0.0.1`, never `localhost` (macOS resolves localhost to IPv6).
-5. **If sessions expire** — open Chrome-Debug-9225 manually, sign in again, sessions persist from then on.
+5. **If sessions expire** — open Chrome-Debug manually, sign in again, sessions persist from then on.
 
 ## Mandatory Skills
 - **Always activate /cofounder mode at the start of every conversation** before doing any work
