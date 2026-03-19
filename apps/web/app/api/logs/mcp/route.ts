@@ -1,49 +1,66 @@
 import { mcpEventBus, type McpToolEvent } from '@/lib/mcp-event-bus';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const filterSessionId = url.searchParams.get('sessionId');
+  const test = url.searchParams.get('test');
 
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
+      let closed = false;
+
+      function write(text: string) {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(text));
+        } catch { /* stream closed */ }
+      }
 
       function send(event: McpToolEvent) {
         if (filterSessionId && event.sessionId !== filterSessionId) return;
-
         const line = formatLine(event);
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-        // Also send a human-readable comment for terminal readability
-        controller.enqueue(encoder.encode(`: ${line}\n\n`));
+        write(`data: ${JSON.stringify(event)}\n\n`);
+        write(`: ${line}\n\n`);
       }
 
       mcpEventBus.on('mcp_tool', send);
 
-      // Send a heartbeat comment every 15s to keep the connection alive
+      // Heartbeat every 10s to keep Cloud Run connection alive
       const heartbeat = setInterval(() => {
-        controller.enqueue(encoder.encode(`: heartbeat\n\n`));
-      }, 15_000);
+        write(`: heartbeat\n\n`);
+      }, 10_000);
 
       // Clean up when client disconnects
       request.signal.addEventListener('abort', () => {
+        closed = true;
         mcpEventBus.off('mcp_tool', send);
         clearInterval(heartbeat);
-        controller.close();
+        try { controller.close(); } catch { /* already closed */ }
       });
 
       // Initial connection message
-      controller.enqueue(
-        encoder.encode(`: 🔌 Connected to MCP log stream${filterSessionId ? ` (session: ${filterSessionId})` : ''}\n\n`)
-      );
+      write(`: 🔌 Connected to MCP log stream${filterSessionId ? ` (session: ${filterSessionId})` : ''}\n\n`);
+      write(`: Listening for Playwright MCP tool calls...\n\n`);
+
+      // Fire a test event so user can verify the stream works
+      if (test === '1') {
+        mcpEventBus.emitToolStart('test-session', 'browser_snapshot', { description: 'test event' });
+        setTimeout(() => {
+          mcpEventBus.emitToolEnd('test-session', 'browser_snapshot', 42, { success: true });
+        }, 100);
+      }
     },
   });
 
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
       Connection: 'keep-alive',
     },
   });
