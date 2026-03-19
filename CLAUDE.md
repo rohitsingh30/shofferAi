@@ -205,15 +205,19 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 
 ## Playwright MCP — Auto-Launching Chrome
 
-Playwright MCP **automatically launches** a dedicated Chrome-Debug window (Profile 3 / rsinghtomar3011@gmail.com) when started. No manual Chrome launch needed. No hardcoded port.
+Playwright MCP **always launches a BRAND NEW Chrome-Debug window** (Profile 3 / rsinghtomar3011@gmail.com) when started. It **NEVER reuses** an existing Chrome window — existing windows may be running the relay, user tasks, or other automation and must not be hijacked.
 
 ### How it works
 
 `.mcp.json` calls `apps/playwright/scripts/playwright-mcp-with-chrome.sh` which:
-1. Scans ports 9222-9240 for an existing Chrome-Debug CDP instance → reuses it if found
-2. If none found → picks the first free port in that range, launches Chrome as a daemon
-3. Waits for CDP to respond
-4. Then exec's into `npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:<port>`
+1. Finds the first free port in 9222-9260 (skips any port already in use)
+2. **APFS-clones** the entire `Chrome-Debug` user-data-dir → `Chrome-Debug-<port>` (near-instant, preserves ALL signed-in sessions including cookies, login data, Profile 3 account)
+3. Removes stale lock files from the clone
+4. Launches a **new** Chrome window on that port using the cloned dir with `--profile-directory="Profile 3"` (rsinghtomar3011@gmail.com)
+5. Waits for CDP to respond
+6. Then exec's into `npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:<port>`
+
+**Why APFS clone?** Chrome encrypts cookies via macOS Keychain (per-user, NOT per-user-data-dir). So a cloned dir can decrypt all cookies — the new Chrome instance is fully signed in as rsinghtomar3011@gmail.com with all website sessions intact.
 
 ### `.mcp.json`:
 ```json
@@ -230,16 +234,17 @@ Playwright MCP **automatically launches** a dedicated Chrome-Debug window (Profi
 
 ### Profile 3 details
 - **Email**: rsinghtomar3011@gmail.com (Booking.com Genius Level 1)
-- **User-data-dir**: `~/Library/Application Support/Google/Chrome-Debug` (single dir, no port suffix)
-- **Port**: dynamically assigned (first free port in 9222-9240)
-- **Sessions persist forever** — Chrome encrypts cookies via OS keychain. Sign in once manually, then sessions survive all restarts.
+- **Base user-data-dir**: `~/Library/Application Support/Google/Chrome-Debug`
+- **Per-instance user-data-dir**: `Chrome-Debug-<port>` (APFS clone of base, created fresh each time)
+- **Port**: dynamically assigned (first free port in 9222-9260)
+- **Sessions persist forever** — Chrome encrypts cookies via macOS Keychain (per-user key). APFS clones inherit all sessions. Sign in once manually in the base Chrome-Debug, all new instances get the sessions automatically.
 
 ### Rules:
 1. **Never launch Chrome manually** — the wrapper script handles everything.
-2. **One Chrome instance** — the script reuses an existing one or launches a fresh one.
-3. **Profile 3 mandatory** — all signed-in sessions (Booking.com, Blinkit, Google, etc.) live here.
+2. **Always a new window** — the script NEVER reuses an existing Chrome. Every Playwright MCP invocation gets its own dedicated Chrome window on its own port.
+3. **Always signed in** — APFS clone of the base dir guarantees rsinghtomar3011@gmail.com Profile 3 with all cookies/sessions.
 4. **IPv4 only** — always `127.0.0.1`, never `localhost` (macOS resolves localhost to IPv6).
-5. **If sessions expire** — open Chrome-Debug manually, sign in again, sessions persist from then on.
+5. **If sessions expire** — open the base Chrome-Debug manually (`~/Library/Application Support/Google/Chrome-Debug`), sign in again. All future clones will pick up the new sessions.
 
 ## Mandatory Skills
 - **Always activate /cofounder mode at the start of every conversation** before doing any work
