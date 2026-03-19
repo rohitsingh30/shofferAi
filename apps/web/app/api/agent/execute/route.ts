@@ -327,10 +327,8 @@ export async function POST(request: Request) {
             } catch (relayErr) {
               const msg = relayErr instanceof Error ? relayErr.message : 'Relay connection failed';
               console.error('[execute] taskId=%s relay connect failed during handoff: %s', taskId, msg);
-              send('error', { error: `Cannot reach browser agent: ${msg}. Make sure the laptop relay is running.` });
-              await workflowEngine.updateTaskStatus(taskId, 'failed');
-              taskTimer.end({ success: false, metadata: { error: msg } });
-              return;
+              // Throw so the agent knows the handoff failed and can tell the user
+              throw new Error(`Cannot reach browser agent: ${msg}. Make sure the laptop relay is running.`);
             }
 
             const handoffMsg: TaskHandoffMessage = {

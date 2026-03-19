@@ -811,21 +811,32 @@ export class AgentExecutor {
       });
 
       if (callbacks.onTaskHandoff) {
-        await callbacks.onTaskHandoff({
-          description: taskDescription,
-          skill: this.matchedSkill ? {
-            name: this.matchedSkill.name,
-            siteUrl: this.matchedSkill.siteUrl,
-            instructions: this.matchedSkill.instructions,
-            requiresAuth: this.matchedSkill.requiresAuth,
-            params: this.matchedSkill.params,
-          } : undefined,
-          extractedParams,
-          conversationContext: this.conversation.getMessages()
-            .filter((m: { role: string; content: unknown }) => m.role !== 'system')
-            .map((m: { role: string; content: unknown }) => `${m.role}: ${typeof m.content === 'string' ? m.content.slice(0, 200) : '[tool use]'}`)
-            .join('\n'),
-        });
+        try {
+          await callbacks.onTaskHandoff({
+            description: taskDescription,
+            skill: this.matchedSkill ? {
+              name: this.matchedSkill.name,
+              siteUrl: this.matchedSkill.siteUrl,
+              instructions: this.matchedSkill.instructions,
+              requiresAuth: this.matchedSkill.requiresAuth,
+              params: this.matchedSkill.params,
+            } : undefined,
+            extractedParams,
+            conversationContext: this.conversation.getMessages()
+              .filter((m: { role: string; content: unknown }) => m.role !== 'system')
+              .map((m: { role: string; content: unknown }) => `${m.role}: ${typeof m.content === 'string' ? m.content.slice(0, 200) : '[tool use]'}`)
+              .join('\n'),
+          });
+        } catch (handoffErr) {
+          const errMsg = handoffErr instanceof Error ? handoffErr.message : 'Handoff failed';
+          this.trackEvent({
+            event: 'tool_call', category: 'tool',
+            userId: this.config.userContext.userId, taskId: this.taskId,
+            success: false,
+            metadata: { tool: 'handoff_to_browser_agent', error: errMsg },
+          });
+          return { error: `Browser agent handoff failed: ${errMsg}` };
+        }
 
         this.trackEvent({
           event: 'tool_call', category: 'tool',
