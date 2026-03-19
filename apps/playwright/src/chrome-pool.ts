@@ -2,8 +2,24 @@ import { spawn, type ChildProcess } from 'child_process';
 import { cpSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { EventEmitter } from 'events';
 import { logger } from '@shofferai/shared';
 import { MCPHost } from './mcp-host';
+
+export interface McpToolEvent {
+  type: 'tool_start' | 'tool_end' | 'tool_error';
+  timestamp: string;
+  sessionId: string;
+  toolName: string;
+  args?: Record<string, unknown>;
+  durationMs?: number;
+  resultSummary?: string;
+  error?: string;
+  pool?: { busy: number; ready: number; max: number; queued: number };
+}
+
+export const mcpToolEvents = new EventEmitter();
+mcpToolEvents.setMaxListeners(50);
 
 type SlotState = 'idle' | 'starting' | 'ready' | 'busy' | 'resetting' | 'error';
 
@@ -317,18 +333,51 @@ export class ChromePool {
     name: string,
     args: Record<string, unknown>
   ): Promise<unknown> {
-    // No sessionId → use first ready slot or launch one
-    if (!sessionId) {
-      const slot = this.slots.find(s => s.state === 'ready' || s.state === 'busy');
-      if (slot?.mcpHost) return slot.mcpHost.callTool(name, args);
-      // No ready slot — launch one on demand
-      const newSlot = await this.launchSlotOnDemand('__default__');
-      return newSlot.mcpHost!.callTool(name, args);
-    }
+    const sid = sessionId?.slice(0, 12) || '__default__';
+    const poolStatus = this.getStatus();
+    const pool = { busy: poolStatus.busy, ready: poolStatus.ready, max: poolStatus.maxSlots, queued: poolStatus.queueLength };
 
-    const slot = await this.acquireSlot(sessionId);
-    slot.lastActivityAt = Date.now();
-    return slot.mcpHost!.callTool(name, args);
+    mcpToolEvents.emit('mcp_tool', {
+      type: 'tool_start', timestamp: new Date().toISOString(),
+      sessionId: sid, toolName: name,
+      args: truncateArgs(args), pool,
+    } as McpToolEvent);
+
+    const start = Date.now();
+    try {
+      let result: unknown;
+      // No sessionId → use first ready slot or launch one
+      if (!sessionId) {
+        const slot = this.slots.find(s => s.state === 'ready' || s.state === 'busy');
+        if (slot?.mcpHost) {
+          result = await slot.mcpHost.callTool(name, args);
+        } else {
+          const newSlot = await this.launchSlotOnDemand('__default__');
+          result = await newSlot.mcpHost!.callTool(name, args);
+        }
+      } else {
+        const slot = await this.acquireSlot(sessionId);
+        slot.lastActivityAt = Date.now();
+        result = await slot.mcpHost!.callTool(name, args);
+      }
+
+      mcpToolEvents.emit('mcp_tool', {
+        type: 'tool_end', timestamp: new Date().toISOString(),
+        sessionId: sid, toolName: name,
+        durationMs: Date.now() - start,
+        resultSummary: summarizeResult(result),
+      } as McpToolEvent);
+
+      return result;
+    } catch (err) {
+      mcpToolEvents.emit('mcp_tool', {
+        type: 'tool_error', timestamp: new Date().toISOString(),
+        sessionId: sid, toolName: name,
+        durationMs: Date.now() - start,
+        error: err instanceof Error ? err.message : String(err),
+      } as McpToolEvent);
+      throw err;
+    }
   }
 
   private async acquireSlot(sessionId: string): Promise<ChromeSlot> {
@@ -599,4 +648,19 @@ export class ChromePool {
     this.sessionMap.clear();
     logger.info('Chrome Pool shutdown complete');
   }
+}
+
+// ── helpers for event emission ──
+function truncateArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const t: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    t[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v;
+  }
+  return t;
+}
+
+function summarizeResult(result: unknown): string {
+  if (result == null) return 'null';
+  const json = JSON.stringify(result);
+  return json.length > 300 ? json.slice(0, 300) + '…' : json;
 }
