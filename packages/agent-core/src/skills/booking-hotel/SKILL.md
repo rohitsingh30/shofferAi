@@ -45,21 +45,24 @@ Chrome profile: rsinghtomar3011@gmail.com (Genius Level 1 member).
 ## Steps
 
 ### Step 0: Collect booking details
-Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
-1. **destination** (type: "text", required): City or area name
-2. **dates** (type: "calendar", required, mode: "range"): Check-in and check-out dates with shortcuts (This weekend, Next weekend)
-3. **guests** (type: "stepper", required): Counters for Adults (default 2), Children (default 0), Rooms (default 1)
-4. **budget** (type: "slider", collapsed): Per-night budget, min 500, max 30000, presets [1000, 2000, 5000, 10000]
+Parse what the user already said. For "Book hotel in Goa this weekend under 4000":
+- destination = "Goa" ✓
+- checkin = this Saturday ✓  
+- checkout = this Sunday ✓
+- budget = 4000 ✓
+- guests = default 2 adults ✓
 
-**CRITICAL**: Do NOT open the browser without destination and dates. These are mandatory search fields.
+If destination AND dates are both clear → call handoff_to_browser_agent immediately.
+Only call ask_user if destination OR dates are truly missing (not inferable).
 
-### 1. Gather ALL Requirements Upfront
-- Check what the user already provided: destination, check-in date, check-out date, guests, budget.
-- If ANY required params are missing, use ONE SINGLE `ask_user` call to collect ALL missing info at once.
-  Example (if destination + dates missing): "I need a few details to search for hotels:\n• Destination (city or area, e.g. Goa, Mumbai)\n• Check-in date (e.g. 22 March)\n• Check-out date (e.g. 24 March)\n• Number of guests (default: 2 adults)\n• Max budget per night (optional, e.g. under ₹4000)"
-- Do NOT ask one question at a time. Ask everything in a single prompt.
-- Default guests to 2 adults if not specified. Skip budget filtering if not specified.
-- Parse natural dates: "this weekend" = upcoming Saturday + Sunday, "tomorrow" = next day.
+**Resolve dates before handoff**: "this weekend" = Saturday-Sunday, "tomorrow" = next day.
+
+### 1. Gather Missing Info (only if needed)
+- Check what the user already provided from their initial message.
+- Default guests to 2 adults. Default budget to none (no filter).
+- Only ask_user for truly missing REQUIRED fields (destination, approximate dates).
+- Ask ONE question at a time. Do NOT use layout type.
+- After at most 2 ask_user calls, call handoff_to_browser_agent with whatever you have.
 
 ### 2. Navigate & Dismiss Popups
 - Open a NEW tab and navigate to `https://www.booking.com`

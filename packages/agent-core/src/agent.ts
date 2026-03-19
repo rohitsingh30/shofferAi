@@ -344,6 +344,10 @@ export class AgentExecutor {
   private toolCallSequence: string[] = [];
   private readonly loopDetectionWindow = 6; // check last N calls for repeating pattern
   private readonly maxLoopCycles = 3; // break after this many repeated cycles
+  // ask_user tracking: prevent re-asking the same questions
+  private askUserCount = 0;
+  private readonly maxAskUserCalls = 3; // hard limit on ask_user before forcing handoff
+  private collectedParams: Record<string, string> = {}; // accumulated user responses
 
   constructor(private config: AgentConfig) {
     this.claude = config.llmClient || createLLMClient();
@@ -733,6 +737,18 @@ export class AgentExecutor {
     }
 
     if (name === 'ask_user') {
+      this.askUserCount++;
+      logger.info('ask_user call', { count: this.askUserCount, max: this.maxAskUserCalls });
+
+      // Enforce ask_user limit — force handoff if exceeded
+      if (this.askUserCount > this.maxAskUserCalls) {
+        logger.warn('ask_user limit exceeded, forcing handoff', { count: this.askUserCount });
+        return {
+          userResponse: '[SYSTEM: You have asked too many questions. Call handoff_to_browser_agent NOW with whatever info you have. Use defaults for missing fields. Collected so far: ' +
+            JSON.stringify(this.collectedParams) + ']',
+        };
+      }
+
       callbacks.onStepUpdate({ action: args.question as string, status: 'paused_for_input' });
       const inputStart = Date.now();
       const response = await callbacks.onInputRequired({
@@ -758,11 +774,16 @@ export class AgentExecutor {
         format_hint: args.format_hint as string | undefined,
         sections: args.sections as UserInputRequest['sections'],
       });
+
+      // Track the collected response so we can pass it to forced handoff
+      const question = (args.question as string) || 'unknown';
+      this.collectedParams[question.slice(0, 50)] = response.value;
+
       this.trackEvent({
         event: 'tool_call', category: 'tool',
         userId: this.config.userContext.userId, taskId: this.taskId,
         durationMs: Date.now() - inputStart, success: true,
-        metadata: { tool: 'ask_user', inputType: args.input_type },
+        metadata: { tool: 'ask_user', inputType: args.input_type, askCount: this.askUserCount },
       });
       return { userResponse: response.value };
     }
