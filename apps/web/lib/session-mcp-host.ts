@@ -1,4 +1,5 @@
 import type { MCPTool, AnthropicTool, MCPHostLike } from '@shofferai/shared';
+import { mcpEventBus } from './mcp-event-bus';
 
 /**
  * Inner host must support session-aware tool calls and session release.
@@ -52,12 +53,17 @@ export class SessionMCPHost implements MCPHostLike {
   async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     console.log('[mcp] session=%s callTool(%s) args=%s', this.sessionId, name, JSON.stringify(args).slice(0, 200));
     const start = Date.now();
+    mcpEventBus.emitToolStart(this.sessionId, name, args);
     try {
       const result = await this.inner.callToolWithSession(name, args, this.sessionId);
-      console.log('[mcp] session=%s callTool(%s) OK in %dms', this.sessionId, name, Date.now() - start);
+      const duration = Date.now() - start;
+      console.log('[mcp] session=%s callTool(%s) OK in %dms', this.sessionId, name, duration);
+      mcpEventBus.emitToolEnd(this.sessionId, name, duration, result);
       return result;
     } catch (err) {
-      console.error('[mcp] session=%s callTool(%s) FAILED in %dms:', this.sessionId, name, Date.now() - start, err);
+      const duration = Date.now() - start;
+      console.error('[mcp] session=%s callTool(%s) FAILED in %dms:', this.sessionId, name, duration, err);
+      mcpEventBus.emitToolError(this.sessionId, name, duration, err);
       throw err;
     }
   }
