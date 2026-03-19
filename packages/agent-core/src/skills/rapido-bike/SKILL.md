@@ -30,6 +30,14 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect ride details
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **pickup** (type: "address", required): Pickup location. Show saved addresses + current location option.
+2. **drop** (type: "address", required): Drop-off location
+3. **when** (type: "chip_bar"): Now (default), Schedule for later
+
+**CRITICAL**: Do NOT open the browser without pickup and drop locations.
 ### 1. Gather Ride Details
 - Confirm pickup location and drop location. If any missing, use `ask_user`.
 - Ask for ride type preference: Bike (cheapest), Auto, or Cab.

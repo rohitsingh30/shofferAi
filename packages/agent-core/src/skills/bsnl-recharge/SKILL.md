@@ -32,6 +32,13 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect recharge/bill details
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **number** (type: "text", required): Account number or mobile number
+2. **plan** (type: "text", collapsed): Specific plan or amount (optional — can browse plans on site)
+
+**CRITICAL**: Do NOT open the browser without the account/mobile number.
 ### 1. Gather Requirements
 - Get the BSNL number or account to recharge/pay.
 - Determine type: prepaid mobile recharge, postpaid mobile bill, landline bill, BSNL Bharat Fiber broadband bill.

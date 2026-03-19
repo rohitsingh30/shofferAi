@@ -36,6 +36,13 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect search preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **product** (type: "text", required): What product to search for
+2. **budget** (type: "slider", collapsed): Budget range, min 100, max 50000, presets [500, 1000, 2000, 5000]
+
+**CRITICAL**: Do NOT open the browser without knowing what product to search for.
 ### 1. Gather Requirements
 - Confirm what the user wants: skincare (creams, serums, oils, cleansers), haircare (oils, shampoos), body care (lotions, oils, soaps), or gifting.
 - Use `ask_user` to clarify: specific skin concern (anti-aging, brightening, hydration), skin type, preferred ingredients (kumkumadi, saffron, sandalwood).

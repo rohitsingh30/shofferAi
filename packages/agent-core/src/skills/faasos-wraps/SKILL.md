@@ -32,6 +32,14 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+### Step 0: Collect order preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **address** (type: "address", required): Ask for delivery address. Show saved addresses.
+2. **cuisine** (type: "carousel", required): Show cuisine options as scrollable cards (🥘 Biryani, 🍕 Pizza, 🍔 Burger, 🍱 Thali, 🥡 Chinese, 🥞 South Indian, 🌯 Rolls, 🍰 Dessert). Allow typing specific restaurant/dish.
+3. **dietary** (type: "chip_bar", collapsed): Dietary preferences — 🟢 Veg only, 🔴 Non-veg OK, Jain, No onion, No garlic.
+
+**CRITICAL**: Do NOT open the browser until you have the delivery address. Without it, the site cannot show relevant restaurants.
+
 ### 1. Get Delivery Address
 - BEFORE opening the browser, check if user provided an address.
 - If not, use `ask_user` (input_type "freetext"): "What's your delivery address or area name for Faasos/EatSure delivery?"

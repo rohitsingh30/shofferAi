@@ -36,6 +36,13 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect search preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **product** (type: "text", required): What product to search for
+2. **budget** (type: "slider", collapsed): Budget range, min 100, max 50000, presets [500, 1000, 2000, 5000]
+
+**CRITICAL**: Do NOT open the browser without knowing what product to search for.
 ### 1. Clarify Requirements
 - Confirm what the user wants: furniture type, room it is for, dimensions if relevant.
 - Use `ask_user` to clarify: material (solid wood, engineered wood, metal), color/finish, style (modern, traditional, minimalist), budget.

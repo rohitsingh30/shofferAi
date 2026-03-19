@@ -37,6 +37,14 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect service details
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **service** (type: "text", required): What service is needed
+2. **address** (type: "address", required): Service location. Show saved addresses.
+3. **date** (type: "calendar", collapsed, mode: "single"): Preferred date
+
+**CRITICAL**: Do NOT open the browser without knowing the service type and address.
 ### 1. Gather Requirements
 - Identify the appliance and issue:
   - **Washing Machine**: not spinning, not draining, leaking, noise, drum issue, display error, door lock

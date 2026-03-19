@@ -8,11 +8,50 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../lib/theme';
+import { CardGridInput, type CardItem } from './inputs/CardGridInput';
+import { CarouselInput } from './inputs/CarouselInput';
+import { ChipBarInput } from './inputs/ChipBarInput';
+import { AddressInput } from './inputs/AddressInput';
+import { CalendarInput } from './inputs/CalendarInput';
+import { StepperInput } from './inputs/StepperInput';
+import { SliderInput } from './inputs/SliderInput';
+import { RichTextInput } from './inputs/RichTextInput';
+import { LayoutInput, type SectionConfig } from './inputs/LayoutInput';
 
 interface InputPromptProps {
   question: string;
-  inputType: 'text' | 'otp' | 'confirmation' | 'choice' | 'freetext';
+  inputType:
+    | 'text'
+    | 'otp'
+    | 'confirmation'
+    | 'choice'
+    | 'freetext'
+    | 'card_grid'
+    | 'carousel'
+    | 'chip_bar'
+    | 'address'
+    | 'calendar'
+    | 'stepper'
+    | 'slider'
+    | 'rich_text'
+    | 'layout';
   options?: string[];
+  // Rich input props
+  cards?: CardItem[];
+  showQuantity?: boolean;
+  allowCustom?: boolean;
+  multiSelect?: boolean;
+  savedAddresses?: Array<{ label: string; address: string }>;
+  calendarMode?: 'single' | 'range';
+  shortcuts?: string[];
+  counters?: Array<{ label: string; min?: number; max?: number; default?: number }>;
+  min?: number;
+  max?: number;
+  step?: number;
+  presets?: number[];
+  placeholder?: string;
+  formatHint?: string;
+  sections?: SectionConfig[];
   onSubmit: (value: string) => void;
 }
 
@@ -20,6 +59,21 @@ export function InputPrompt({
   question,
   inputType,
   options,
+  cards,
+  showQuantity,
+  allowCustom,
+  multiSelect,
+  savedAddresses,
+  calendarMode,
+  shortcuts,
+  counters,
+  min,
+  max,
+  step,
+  presets,
+  placeholder,
+  formatHint,
+  sections,
   onSubmit,
 }: InputPromptProps) {
   const [value, setValue] = useState('');
@@ -116,6 +170,80 @@ export function InputPrompt({
             <Text style={styles.sendBtnText}>Verify</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {inputType === 'card_grid' && cards && (
+        <CardGridInput
+          cards={cards}
+          showQuantity={showQuantity}
+          allowCustom={allowCustom}
+          multiSelect={multiSelect}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'carousel' && cards && (
+        <CarouselInput
+          cards={cards}
+          multiSelect={multiSelect}
+          allowCustom={allowCustom}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'chip_bar' && options && (
+        <ChipBarInput
+          options={options}
+          multiSelect={multiSelect}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'address' && (
+        <AddressInput
+          saved={savedAddresses}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'calendar' && (
+        <CalendarInput
+          mode={calendarMode}
+          shortcuts={shortcuts}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'stepper' && counters && (
+        <StepperInput
+          counters={counters}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'slider' && (
+        <SliderInput
+          min={min}
+          max={max}
+          step={step}
+          presets={presets}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'rich_text' && (
+        <RichTextInput
+          placeholder={placeholder}
+          formatHint={formatHint}
+          onSubmit={submit}
+        />
+      )}
+
+      {inputType === 'layout' && sections && (
+        <LayoutInput
+          sections={sections}
+          onSubmit={submit}
+        />
       )}
     </View>
   );

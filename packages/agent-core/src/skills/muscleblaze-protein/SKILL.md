@@ -36,6 +36,13 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect search preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **product** (type: "text", required): What product to search for
+2. **budget** (type: "slider", collapsed): Budget range, min 100, max 50000, presets [500, 1000, 2000, 5000]
+
+**CRITICAL**: Do NOT open the browser without knowing what product to search for.
 ### 1. Gather Requirements
 - Confirm what the user wants: whey protein, isolate, mass gainer, BCAA, creatine, pre-workout, or vitamins.
 - Use `ask_user` to clarify: flavor preference, pack size (1kg, 2kg, 5kg), brand sub-line (Biozyme, Raw, etc.).

@@ -34,6 +34,14 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect booking preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **what** (type: "text", required): Movie name, event, or "what's showing"
+2. **date** (type: "chip_bar"): Today, Tomorrow, This Weekend
+3. **tickets** (type: "stepper"): Number of tickets, counter with default 2, min 1, max 10
+
+**CRITICAL**: Do NOT open the browser without knowing what to book.
 ### 1. Gather Movie Details
 - Confirm movie name. If user said "latest movie" or genre, will browse what's playing.
 - Get: city (if not set), date preference, number of seats, seat class preference.

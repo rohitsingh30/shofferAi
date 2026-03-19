@@ -37,6 +37,13 @@ Chrome profile: rsinghtomar3011@gmail.com. Operator phone: 8109137158.
 
 ## Steps
 
+### Step 0: Collect delivery address and shopping list
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **address** (type: "address", required): Ask for delivery address. Show saved addresses if available.
+2. **items** (type: "card_grid", required): Ask what items to buy. Show common grocery items as cards with emoji (🥛 Milk, 🍞 Bread, 🥚 Eggs, 🍚 Rice, 🌾 Atta, 🫒 Oil, 🍬 Sugar, 🫘 Dal, 🧈 Butter, 🍌 Banana, 🧅 Onion, 🥔 Potato). Enable quantity steppers and custom item input.
+
+**CRITICAL**: Do NOT open the browser until you have both the delivery address and at least one item. Without a delivery location, these sites show ZERO products.
+
 ### 1. Gather ALL Requirements Upfront
 - BEFORE opening the browser, check what the user already provided: items to order, delivery address.
 - If ANY info is missing, use ONE SINGLE `ask_user` call to collect ALL missing info at once.

@@ -33,6 +33,14 @@ Chrome profile: rsinghtomar3011@gmail.com. Operator Paytm account logged in.
 
 ## Steps
 
+
+### Step 0: Collect booking preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **what** (type: "text", required): Movie name, event, or "what's showing"
+2. **date** (type: "chip_bar"): Today, Tomorrow, This Weekend
+3. **tickets** (type: "stepper"): Number of tickets, counter with default 2, min 1, max 10
+
+**CRITICAL**: Do NOT open the browser without knowing what to book.
 ### 1. Gather Requirements
 - Check if user specified movie name, city, date, and number of seats.
 - If movie not specified, use `ask_user` (input_type "freetext"): "Which movie do you want to watch?"

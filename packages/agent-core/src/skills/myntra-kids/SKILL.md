@@ -30,6 +30,14 @@ Chrome profile: rsinghtomar3011@gmail.com. Operator account logged in.
 
 ## Steps
 
+
+### Step 0: Collect search preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **product** (type: "text", required): What item to search for
+2. **size** (type: "chip_bar", collapsed): Size — XS, S, M, L, XL, XXL
+3. **budget** (type: "slider", collapsed): Budget range, min 200, max 10000, presets [500, 1000, 2000, 5000]
+
+**CRITICAL**: Do NOT open the browser without knowing what product to search for.
 ### 1. Gather Requirements
 - Check if user specified items, sizes, age group, and gender.
 - If missing critical info, use `ask_user` (input_type "freetext"): "What kids items are you looking for? Please mention age/size, gender, and any brand preference."

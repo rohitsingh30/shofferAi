@@ -39,6 +39,14 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+
+### Step 0: Collect search preferences
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **product** (type: "text", required): What item to search for
+2. **size** (type: "chip_bar", collapsed): Size — XS, S, M, L, XL, XXL
+3. **budget** (type: "slider", collapsed): Budget range, min 200, max 10000, presets [500, 1000, 2000, 5000]
+
+**CRITICAL**: Do NOT open the browser without knowing what product to search for.
 ### 1. Clarify Requirements
 - Confirm what the user wants: formal shirts, suits, blazers, trousers, casual shirts, polos, accessories (ties, belts, wallets), or footwear.
 - Use `ask_user` to clarify: occasion (boardroom, wedding, formal event, smart casual), fit (slim, regular, tailored), fabric preference (Egyptian cotton, Italian cotton, linen, wool blend), size, color, budget.
