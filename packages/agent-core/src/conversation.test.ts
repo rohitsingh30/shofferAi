@@ -45,26 +45,26 @@ describe('ConversationManager', () => {
     expect(cm.getMessages()).toHaveLength(0);
   });
 
-  it('prune keeps first message + last 19 when exceeding 20', () => {
+  it('prune keeps first message + last 29 when exceeding 30', () => {
     const cm = new ConversationManager();
-    // Add 25 messages
-    for (let i = 0; i < 25; i++) {
+    // Add 35 messages
+    for (let i = 0; i < 35; i++) {
       cm.addUserMessage(`msg-${i}`);
     }
     const msgs = cm.getMessages();
-    expect(msgs).toHaveLength(20);
+    expect(msgs).toHaveLength(30);
     // First message preserved
     expect(msgs[0].content).toBe('msg-0');
     // Last message preserved
-    expect(msgs[19].content).toBe('msg-24');
+    expect(msgs[29].content).toBe('msg-34');
   });
 
-  it('messages under 20 are not pruned', () => {
+  it('messages under 30 are not pruned', () => {
     const cm = new ConversationManager();
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 25; i++) {
       cm.addUserMessage(`msg-${i}`);
     }
-    expect(cm.getMessages()).toHaveLength(15);
+    expect(cm.getMessages()).toHaveLength(25);
   });
 
   it('preserves message order', () => {

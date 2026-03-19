@@ -216,7 +216,11 @@ export class AgentExecutor {
   private taskId: string | undefined;
   private consecutiveBrowseFailures = 0;
   private readonly maxConsecutiveBrowseFailures = 3;
+  private totalBrowseFailures = 0;
+  private readonly maxTotalBrowseFailures = 8;
   private lastBrowseError: string | null = null;
+  private browseInstructionHistory: string[] = [];
+  private readonly maxSameInstructionAttempts = 2;
   private activeLessons: LessonEntry[] = [];
 
   constructor(private config: AgentConfig) {
@@ -226,7 +230,7 @@ export class AgentExecutor {
     this.systemPrompt = buildSystemPrompt(config.userContext, this.allSkills);
     this.mcpHost = config.mcpHost;
     this.injector = config.credentialInjector;
-    this.maxIterations = config.maxIterations || 50;
+    this.maxIterations = config.maxIterations || 25;
     this.trackEvent = config.trackEvent || (() => {});
     this.taskId = config.taskId;
   }
@@ -370,21 +374,36 @@ export class AgentExecutor {
         if (response.stopReason === 'end_turn' && toolUseBlocks.length === 0) {
           const fullText = textBlocks.map((b) => b.text).join('\n').trim();
 
-          // Detect if the LLM asked a question instead of calling ask_user
-          const looksLikeQuestion = fullText.includes('?') &&
-            (fullText.toLowerCase().includes('address') ||
-             fullText.toLowerCase().includes('phone') ||
-             fullText.toLowerCase().includes('which') ||
-             fullText.toLowerCase().includes('what') ||
-             fullText.toLowerCase().includes('please') ||
-             fullText.toLowerCase().includes('enter') ||
-             fullText.toLowerCase().includes('choose') ||
-             fullText.toLowerCase().includes('select') ||
-             fullText.toLowerCase().includes('deliver') ||
-             fullText.toLowerCase().includes('location') ||
-             fullText.toLowerCase().includes('pincode') ||
-             fullText.toLowerCase().includes('would you like') ||
-             fullText.toLowerCase().includes('prefer'));
+          // Detect if the LLM asked a question instead of calling ask_user.
+          // Exclude error/failure messages to avoid converting "Should I retry?" into
+          // a loop-perpetuating input prompt.
+          const lowerText = fullText.toLowerCase();
+          const looksLikeError = lowerText.includes('timeout') ||
+            lowerText.includes('timed out') ||
+            lowerText.includes('failed to') ||
+            lowerText.includes('not loading') ||
+            lowerText.includes('unable to') ||
+            lowerText.includes('error') ||
+            lowerText.includes('retry') ||
+            lowerText.includes('try again') ||
+            lowerText.includes('not responding') ||
+            lowerText.includes('stuck') ||
+            lowerText.includes('not rendering') ||
+            (lowerText.includes('browser') && lowerText.includes('fail'));
+          const looksLikeQuestion = !looksLikeError && fullText.includes('?') &&
+            (lowerText.includes('address') ||
+             lowerText.includes('phone') ||
+             lowerText.includes('which') ||
+             lowerText.includes('what') ||
+             lowerText.includes('please') ||
+             lowerText.includes('enter') ||
+             lowerText.includes('choose') ||
+             lowerText.includes('select') ||
+             lowerText.includes('deliver') ||
+             lowerText.includes('location') ||
+             lowerText.includes('pincode') ||
+             lowerText.includes('would you like') ||
+             lowerText.includes('prefer'));
 
           if (looksLikeQuestion) {
             // Don't send question text as a chat message — the InputPrompt shows it.
@@ -517,6 +536,26 @@ export class AgentExecutor {
         throw new Error(failMsg);
       }
 
+      // Total failure cap: stop if too many browse actions have failed overall
+      if (this.totalBrowseFailures >= this.maxTotalBrowseFailures) {
+        const failMsg = `Too many browser failures (${this.totalBrowseFailures} total). The website may be down or the connection is unstable. Please try again later.`;
+        callbacks.onError(failMsg);
+        throw new Error(failMsg);
+      }
+
+      // Loop detection: block the same instruction from being retried too many times
+      const normalizedInstruction = instruction.toLowerCase().replace(/\s+/g, ' ').trim();
+      const sameInstructionCount = this.browseInstructionHistory
+        .filter(h => h === normalizedInstruction).length;
+      if (sameInstructionCount >= this.maxSameInstructionAttempts) {
+        logger.warn('Loop detected: same browse instruction repeated', {
+          instruction: instruction.slice(0, 100),
+          attempts: sameInstructionCount,
+        });
+        return { error: `This action has already been attempted ${sameInstructionCount} times and failed. Try a completely different approach or give up on this specific action.` };
+      }
+      this.browseInstructionHistory.push(normalizedInstruction);
+
       // Suppress ALL browse_website step_updates — these are low-level actions.
       // Only report_step milestones and ask_user/confirm_action pauses are shown to user.
       const toolStart = Date.now();
@@ -553,6 +592,7 @@ export class AgentExecutor {
         return result;
       } catch (error) {
         this.consecutiveBrowseFailures++;
+        this.totalBrowseFailures++;
         const msg = error instanceof Error ? error.message : 'Browser action failed';
         this.lastBrowseError = msg;
         this.trackEvent({

@@ -1,9 +1,9 @@
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 
 // Keep conversation tight to manage context window
-const MAX_MESSAGES = 20;
+const MAX_MESSAGES = 30;
 // Truncate large tool results (browser_snapshot returns huge accessibility trees)
-const MAX_TOOL_RESULT_LENGTH = 4000;
+const MAX_TOOL_RESULT_LENGTH = 3000;
 
 export class ConversationManager {
   private messages: MessageParam[] = [];
