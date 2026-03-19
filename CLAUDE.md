@@ -79,11 +79,11 @@ docs/                  → PRD, Architecture, Pitch, Workflows + Mermaid diagram
 # Start chat interface (web)
 cd apps/web && npx next dev
 
-# Start playwright interface (laptop relay)
-CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 RELAY_AUTH_TOKEN=<token> npm run laptop
-
-# Expose relay via Cloudflare Tunnel
-cloudflared tunnel --url http://localhost:8765
+# Start playwright interface (laptop relay — connects directly to Cloud Run)
+CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 \
+RELAY_CLOUD_URL=wss://shofferai-27188185100.asia-south1.run.app/api/relay/ws \
+RELAY_AUTH_TOKEN=shofferai-relay-2026 \
+npm run laptop
 
 # Database
 npx prisma migrate dev      # Run migrations
@@ -117,7 +117,7 @@ graph TB
 
 **Two Relay Modes:**
 - **Dev** (`RELAY_MODE=local`): `RemoteMCPHost` in Cloud Run connects OUT to `ws://localhost:8765`
-- **Prod** (`RELAY_MODE=cloud`): `RelayBridge` accepts incoming WS from laptop — no Cloudflare Tunnel needed
+- **Prod** (`RELAY_MODE=cloud`): `RelayBridge` accepts incoming WS from laptop. Laptop runs `RelayOutbound` which connects directly to Cloud Run — **no tunnel needed**
 
 **LLM's role**: Chat with user, reason about steps, call MCP tools via relay. The LLM NEVER touches the browser directly — it sends tool calls that get relayed to the laptop's Playwright MCP.
 
@@ -201,54 +201,45 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 - **Auto-ask_user**: If the LLM outputs a question as text instead of calling the `ask_user` tool, the agent auto-converts it to an interactive input prompt
 - **Payment before booking**: Agent pauses via `PauseResumeManager`, L2 panel collects Razorpay payment, agent resumes
 - **SSE streaming**: Real-time agent progress updates to the UI
-- **Cloudflare Tunnel**: Free, encrypted, no port forwarding — connects laptop to cloud
+- **Direct relay**: Laptop connects OUT to Cloud Run via WSS (`RelayOutbound`) — no Cloudflare Tunnel needed
 
-## Playwright MCP — Single Chrome Window
+## Playwright MCP — Auto-Launching Chrome
 
-There is **ONE** Playwright MCP instance connected to **ONE** dedicated Chrome-Debug window on **port 9225**, signed in as `rsinghtomar3011@gmail.com` (Profile 3). This is the only browser config in `.mcp.json`.
+Playwright MCP **automatically launches** a dedicated Chrome-Debug window (Profile 3 / rsinghtomar3011@gmail.com) on port 9225 when started. No manual Chrome launch needed.
 
-### Before any Playwright MCP usage — verify Chrome is running:
-```bash
-curl -sf http://127.0.0.1:9225/json/version && echo "Chrome OK" || bash apps/playwright/scripts/launch-chrome-cdp.sh
-```
+### How it works
 
-### Manual launch (if needed):
-```bash
-# MUST use nohup+disown so Chrome survives shell exit
-# MUST use --remote-debugging-address=127.0.0.1 (IPv4 only — "localhost" resolves to IPv6 ::1)
-if ! curl -sf http://127.0.0.1:9225/json/version >/dev/null 2>&1; then
-  nohup /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-    --remote-debugging-port=9225 \
-    --remote-debugging-address=127.0.0.1 \
-    --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug-9225" \
-    --profile-directory="Profile 3" \
-    --no-first-run --no-default-browser-check \
-    >/tmp/chrome-cdp-9225.log 2>&1 &
-  disown
-  sleep 3
-fi
-```
+`.mcp.json` calls `apps/playwright/scripts/playwright-mcp-with-chrome.sh` which:
+1. Checks if Chrome-Debug is already running on port 9225
+2. If not → launches it as a daemon (nohup+disown) with Profile 3
+3. Waits for CDP to respond
+4. Then exec's into `npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:9225`
 
-### `.mcp.json` (single entry — no extra browsers):
+### `.mcp.json` (single entry):
 ```json
 {
   "mcpServers": {
     "playwright": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9225", "--output-dir", "/tmp/playwright-mcp-output"]
+      "command": "bash",
+      "args": ["apps/playwright/scripts/playwright-mcp-with-chrome.sh"]
     }
   }
 }
 ```
 
+### Profile 3 details
+- **Email**: rsinghtomar3011@gmail.com (Booking.com Genius Level 1)
+- **User-data-dir**: `~/Library/Application Support/Google/Chrome-Debug-9225`
+- **Port**: 9225 (fixed, never changes)
+- **Sessions persist forever** — Chrome encrypts cookies via OS keychain. Sign in once manually, then sessions survive all restarts.
+
 ### Rules:
-1. **Port 9225 only** — one Chrome, one Playwright MCP, one port.
-2. **Profile 3 mandatory** — `--profile-directory="Profile 3"` (rsinghtomar3011@gmail.com). This Chrome has signed-in sessions for Booking.com, Blinkit, etc.
-3. **Daemon mode** — always `nohup` + `disown`. Plain `&` jobs die when the shell exits.
-4. **IPv4 only** — always `127.0.0.1`, never `localhost`.
-5. **Reuse existing tabs** — the Chrome window preserves signed-in sessions. Don't open new tabs unnecessarily; check existing tabs first.
-6. **No multi-browser** — removed browser1/browser2/browser3. All browsing goes through the single `playwright` MCP server.
+1. **Never launch Chrome manually** — the wrapper script handles it.
+2. **One Chrome, one port** — port 9225 only. No multi-browser setup.
+3. **Profile 3 mandatory** — all signed-in sessions (Booking.com, Blinkit, Google, etc.) live here.
+4. **IPv4 only** — always `127.0.0.1`, never `localhost` (macOS resolves localhost to IPv6).
+5. **If sessions expire** — open Chrome-Debug-9225 manually, sign in again, sessions persist from then on.
 
 ## Mandatory Skills
 - **Always activate /cofounder mode at the start of every conversation** before doing any work
@@ -266,15 +257,11 @@ fi
 
 **Before testing, ensure laptop relay is running:**
 ```bash
-# Terminal 1: Start relay server
-CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 RELAY_AUTH_TOKEN=<token> npm run laptop
-
-# Terminal 2: Start Cloudflare Tunnel
-cloudflared tunnel --url http://localhost:8765
-
-# Update Cloud Run with the tunnel URL
-gcloud run services update shofferai --region=asia-south1 \
-  --update-env-vars='RELAY_LAPTOP_URL=wss://<tunnel-url>.trycloudflare.com'
+# Start relay (connects directly to Cloud Run — no tunnel needed)
+CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 \
+RELAY_CLOUD_URL=wss://shofferai-27188185100.asia-south1.run.app/api/relay/ws \
+RELAY_AUTH_TOKEN=shofferai-relay-2026 \
+npm run laptop
 ```
 
 **UI Development**: Use `localhost:3000` only for frontend iteration. After UI changes, deploy and verify on prod.
