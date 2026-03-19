@@ -79,11 +79,8 @@ docs/                  → PRD, Architecture, Pitch, Workflows + Mermaid diagram
 # Start chat interface (web)
 cd apps/web && npx next dev
 
-# Start playwright interface (laptop relay — connects directly to Cloud Run)
-CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 \
-RELAY_CLOUD_URL=wss://shofferai-27188185100.asia-south1.run.app/api/relay/ws \
-RELAY_AUTH_TOKEN=shofferai-relay-2026 \
-npm run laptop
+# Start laptop relay (ChromePool + relay — connects to Cloud Run)
+./apps/playwright/scripts/start-laptop.sh
 
 # Database
 npx prisma migrate dev      # Run migrations
@@ -104,13 +101,13 @@ graph TB
         RB["RelayBridge<br/>Accepts laptop WS connections"]
     end
     subgraph Laptop["Operator Laptop"]
-        RS["Relay Server :8765"]
-        Pool["ChromePool"]
+        RS["RelayOutbound"]
+        Pool["ChromePool (lazy)"]
         MCP["MCPHost → Playwright MCP"]
-        Chrome["Chrome Debug :9222<br/>Profile 3"]
-        RS --> MCP
-        MCP --> Pool
-        Pool --> Chrome
+        Chrome["Chrome (OS port)<br/>Profile 3"]
+        RS --> Pool
+        Pool --> MCP
+        MCP --> Chrome
     end
     Cloud -->|"WSS"| RS
 ```
@@ -121,35 +118,32 @@ graph TB
 
 **LLM's role**: Chat with user, reason about steps, call MCP tools via relay. The LLM NEVER touches the browser directly — it sends tool calls that get relayed to the laptop's Playwright MCP.
 
-**Laptop's role**: Execute ALL browser actions. Chrome Debug with Profile 3 (signed-in sessions). The relay server receives tool calls from Cloud Run and executes them via Playwright MCP. `ChromePool` isolates each task into a separate Chrome tab.
+**Laptop's role**: Execute ALL browser actions. ChromePool launches Chrome on demand with Profile 3 (signed-in sessions). Chrome gets an OS-assigned ephemeral port — no hardcoded ports. `ChromePool` isolates each task into a separate Chrome instance.
 
-## Chrome CDP Setup (Operator Laptop)
+## Chrome Profile (One-Time Setup)
 
-The operator's laptop runs a persistent Chrome debug instance that Playwright MCP connects to via CDP.
+ChromePool and Playwright MCP both clone the base `Chrome-Debug` profile directory automatically. You only need to set up the base profile once:
 
 **Profile**: `Profile 3` → `rsinghtomar3011@gmail.com` (Booking.com Genius account)
 
-```
-LaunchAgent (com.shofferai.chrome-debug) starts on login:
-  → scripts/start-debug-chrome.sh
-    → Chrome --remote-debugging-port=9222
-              --user-data-dir=~/Library/Application Support/Google/Chrome-Debug
-              --profile-directory="Profile 3"
-  → Playwright MCP connects via --cdp-endpoint http://127.0.0.1:9222
-```
+**Base user-data-dir**: `~/Library/Application Support/Google/Chrome-Debug`
 
-**Key insight**: Chrome encrypts cookies per OS keychain profile. Copying a Chrome profile directory does NOT copy active sessions. The debug Chrome must be signed in manually once — after that the session persists forever across restarts.
-
-**Critical**: Always launch Chrome-Debug with `--profile-directory="Profile 3"`. Without this flag, Chrome defaults to `Default` profile (no account). The profiles in Chrome-Debug are:
+**Profiles in Chrome-Debug:**
 - `Default` — empty, no account
 - `Profile 1` — rsinghtomar54@gmail.com
 - `Profile 3` — rsinghtomar3011@gmail.com (Booking.com Genius Level 1) ← **USE THIS**
 - `Profile 4` — rohit30.iitkgp@gmail.com (wrong account, do not use)
 
-**Verify CDP is live:**
-```bash
-curl -s http://127.0.0.1:9222/json/version
-```
+**How Chrome launching works (both paths):**
+1. Clone the base Chrome-Debug user-data-dir (APFS instant clone or session file copy)
+2. Remove singleton lock files from the clone
+3. Launch Chrome with `--remote-debugging-port=0` — OS assigns a free ephemeral port
+4. Parse actual port from Chrome's stderr (`DevTools listening on ws://127.0.0.1:PORT/...`)
+5. Connect Playwright MCP via CDP to that port
+
+**Why this works:** Chrome encrypts cookies via macOS Keychain (per-user, NOT per-user-data-dir). So cloned dirs can decrypt all cookies — the new Chrome instance is fully signed in.
+
+**If sessions expire:** Open the base Chrome-Debug manually, sign in again. All future clones pick up the new sessions.
 
 ## Booking.com Skill (v2)
 
@@ -203,21 +197,28 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 - **SSE streaming**: Real-time agent progress updates to the UI
 - **Direct relay**: Laptop connects OUT to Cloud Run via WSS (`RelayOutbound`) — no Cloudflare Tunnel needed
 
-## Playwright MCP — Auto-Launching Chrome
+## Playwright MCP — Chrome Launching
 
-Playwright MCP **always launches a BRAND NEW Chrome-Debug window** (Profile 3 / rsinghtomar3011@gmail.com) when started. It **NEVER reuses** an existing Chrome window — existing windows may be running the relay, user tasks, or other automation and must not be hijacked.
+Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) launch Chrome the same way: clone the profile, `--remote-debugging-port=0`, parse the actual port from stderr.
 
-### How it works
+### Path A: `.mcp.json` (local Copilot / Claude Desktop)
 
 `.mcp.json` calls `apps/playwright/scripts/playwright-mcp-with-chrome.sh` which:
-1. Finds the first free port in 9222-9260 (skips any port already in use)
-2. **APFS-clones** the entire `Chrome-Debug` user-data-dir → `Chrome-Debug-<port>` (near-instant, preserves ALL signed-in sessions including cookies, login data, Profile 3 account)
+1. Generates a unique instance ID (`mcp-$$-timestamp`)
+2. **APFS-clones** the entire `Chrome-Debug` user-data-dir
 3. Removes stale lock files from the clone
-4. Launches a **new** Chrome window on that port using the cloned dir with `--profile-directory="Profile 3"` (rsinghtomar3011@gmail.com)
-5. Waits for CDP to respond
-6. Then exec's into `npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:<port>`
+4. Launches Chrome with `--remote-debugging-port=0` — OS assigns a free port
+5. Parses actual port from Chrome's stderr (`DevTools listening on ws://127.0.0.1:PORT/...`)
+6. `exec`s into `npx @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:<port>`
+7. Cleanup trap kills Chrome + removes clone on exit
 
-**Why APFS clone?** Chrome encrypts cookies via macOS Keychain (per-user, NOT per-user-data-dir). So a cloned dir can decrypt all cookies — the new Chrome instance is fully signed in as rsinghtomar3011@gmail.com with all website sessions intact.
+### Path B: ChromePool (relay / production)
+
+`ChromePool` in `apps/playwright/src/chrome-pool.ts`:
+1. **Lazy mode** — starts with 1 warm slot (for tool discovery), rest launch on demand
+2. Each slot: copies session files → launches Chrome with `port=0` → parses port from stderr → connects MCPHost
+3. Slots auto-release after 15 min idle, Chrome torn down after 30 min unused
+4. Max concurrent slots controlled by `POOL_SIZE` env var (default: 3)
 
 ### `.mcp.json`:
 ```json
@@ -232,19 +233,12 @@ Playwright MCP **always launches a BRAND NEW Chrome-Debug window** (Profile 3 / 
 }
 ```
 
-### Profile 3 details
-- **Email**: rsinghtomar3011@gmail.com (Booking.com Genius Level 1)
-- **Base user-data-dir**: `~/Library/Application Support/Google/Chrome-Debug`
-- **Per-instance user-data-dir**: `Chrome-Debug-<port>` (APFS clone of base, created fresh each time)
-- **Port**: dynamically assigned (first free port in 9222-9260)
-- **Sessions persist forever** — Chrome encrypts cookies via macOS Keychain (per-user key). APFS clones inherit all sessions. Sign in once manually in the base Chrome-Debug, all new instances get the sessions automatically.
-
 ### Rules:
-1. **Never launch Chrome manually** — the wrapper script handles everything.
-2. **Always a new window** — the script NEVER reuses an existing Chrome. Every Playwright MCP invocation gets its own dedicated Chrome window on its own port.
-3. **Always signed in** — APFS clone of the base dir guarantees rsinghtomar3011@gmail.com Profile 3 with all cookies/sessions.
+1. **Never launch Chrome manually** — ChromePool and the wrapper script handle everything.
+2. **Always a new instance** — every invocation gets its own Chrome window on an OS-assigned port.
+3. **Always signed in** — profile clone guarantees rsinghtomar3011@gmail.com Profile 3 with all cookies/sessions.
 4. **IPv4 only** — always `127.0.0.1`, never `localhost` (macOS resolves localhost to IPv6).
-5. **If sessions expire** — open the base Chrome-Debug manually (`~/Library/Application Support/Google/Chrome-Debug`), sign in again. All future clones will pick up the new sessions.
+5. **No hardcoded ports** — `--remote-debugging-port=0` lets the OS pick. No port conflicts ever.
 
 ## Mandatory Skills
 - **Always activate /cofounder mode at the start of every conversation** before doing any work
@@ -262,11 +256,7 @@ Playwright MCP **always launches a BRAND NEW Chrome-Debug window** (Profile 3 / 
 
 **Before testing, ensure laptop relay is running:**
 ```bash
-# Start relay (connects directly to Cloud Run — no tunnel needed)
-CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 \
-RELAY_CLOUD_URL=wss://shofferai-27188185100.asia-south1.run.app/api/relay/ws \
-RELAY_AUTH_TOKEN=shofferai-relay-2026 \
-npm run laptop
+./apps/playwright/scripts/start-laptop.sh
 ```
 
 **UI Development**: Use `localhost:3000` only for frontend iteration. After UI changes, deploy and verify on prod.

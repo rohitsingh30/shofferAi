@@ -2,23 +2,25 @@
 # playwright-mcp-with-chrome.sh — Self-contained Playwright MCP launcher
 #
 # ALWAYS launches a BRAND NEW Chrome-Debug window (Profile 3 / rsinghtomar3011@gmail.com)
-# on a free port BEFORE starting Playwright MCP.
+# before starting Playwright MCP.
 #
 # NEVER reuses an existing Chrome window — existing windows may be running
 # other tasks (relay, user browsing, etc.) and must not be hijacked.
 #
 # How it works:
-#   1. Find a free port in 9222-9260 (skips ports already in use)
-#   2. APFS-clone the entire Chrome-Debug user-data-dir so the new Chrome
-#      instance has the FULL signed-in Profile 3 (rsinghtomar3011@gmail.com)
-#      including cookies, sessions, login data — everything.
-#   3. Launch a new Chrome window on that port using the cloned dir
-#   4. Wait for CDP to respond
-#   5. Start Playwright MCP connected to the new window
+#   1. Generate a unique instance ID (PID-based)
+#   2. APFS-clone the Chrome-Debug user-data-dir (preserves all signed-in sessions)
+#   3. Launch Chrome with --remote-debugging-port=0 (OS picks a free port)
+#   4. Parse the actual port from Chrome's "DevTools listening on..." stderr line
+#   5. Start Playwright MCP connected to the new Chrome window
 #
-# The APFS clone (`cp -c`) is near-instant regardless of profile size and
-# preserves all signed-in sessions (cookies are encrypted via macOS Keychain,
-# which is per-user, not per-user-data-dir — so clones can decrypt them).
+# Why port=0?
+#   The OS kernel assigns a guaranteed-free ephemeral port. No scanning, no
+#   conflicts, no race conditions. Works every time regardless of what else
+#   is running (relay, pool, other MCP instances, dev-loop).
+#
+# APFS clone (`cp -c`) is near-instant and preserves all signed-in sessions
+# (cookies are encrypted via macOS Keychain per-user, not per-dir).
 #
 # Called by .mcp.json — no manual Chrome launch needed.
 
@@ -28,48 +30,35 @@ CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 PROFILE="Profile 3"
 BASE_USER_DATA_DIR="$HOME/Library/Application Support/Google/Chrome-Debug"
 TIMEOUT=15
+INSTANCE_ID="mcp-$$-$(date +%s)"
 
-# --- Find a free port starting from 9222 ---
-find_free_port() {
-  for port in $(seq 9222 9260); do
-    if ! lsof -ti :$port >/dev/null 2>&1; then
-      echo "$port"
-      return 0
-    fi
-  done
-  echo "ERROR: No free port in 9222-9260 range" >&2
-  return 1
-}
+# --- APFS-clone the profile for this instance ---
+USER_DATA_DIR="${BASE_USER_DATA_DIR}-${INSTANCE_ID}"
+LOG_FILE="/tmp/chrome-mcp-${INSTANCE_ID}.log"
 
-# --- Always launch a new Chrome-Debug on a free port ---
-PORT=$(find_free_port)
-CDP_URL="http://127.0.0.1:$PORT"
-LOG_FILE="/tmp/chrome-cdp-${PORT}.log"
-
-# Port 9222 uses the base dir (for backward compat with relay/pool).
-# All other ports get an APFS clone of the base dir.
-if [ "$PORT" -eq 9222 ]; then
-  USER_DATA_DIR="$BASE_USER_DATA_DIR"
-else
-  USER_DATA_DIR="${BASE_USER_DATA_DIR}-${PORT}"
-
-  # Always clone fresh from the base dir to get latest signed-in sessions.
-  # Remove stale clone if it exists, then APFS-clone the entire dir.
-  if [ -d "$USER_DATA_DIR" ]; then
-    rm -rf "$USER_DATA_DIR"
+# Clean up on exit (Chrome process + cloned dir)
+cleanup() {
+  if [ -n "${CHROME_PID:-}" ] && kill -0 "$CHROME_PID" 2>/dev/null; then
+    kill "$CHROME_PID" 2>/dev/null || true
   fi
+  rm -rf "$USER_DATA_DIR" 2>/dev/null || true
+}
+trap cleanup EXIT
 
-  echo "📋 Cloning Chrome-Debug → Chrome-Debug-${PORT} (APFS instant clone)..." >&2
-  cp -cR "$BASE_USER_DATA_DIR" "$USER_DATA_DIR"
+echo "📋 Cloning Chrome-Debug → ${INSTANCE_ID} (APFS instant clone)..." >&2
+cp -cR "$BASE_USER_DATA_DIR" "$USER_DATA_DIR"
 
-  # Remove lock files from the clone so Chrome doesn't think another instance owns it
-  rm -f "$USER_DATA_DIR/SingletonLock" "$USER_DATA_DIR/SingletonSocket" "$USER_DATA_DIR/SingletonCookie" 2>/dev/null || true
-fi
+# Remove lock files so Chrome doesn't think another instance owns the profile
+rm -f "$USER_DATA_DIR/SingletonLock" \
+      "$USER_DATA_DIR/SingletonSocket" \
+      "$USER_DATA_DIR/SingletonCookie" 2>/dev/null || true
 
-echo "🚀 Launching NEW Chrome-Debug (Profile 3 / rsinghtomar3011@gmail.com) on port $PORT..." >&2
+echo "🚀 Launching Chrome-Debug (Profile 3 / rsinghtomar3011@gmail.com) — OS picks port..." >&2
 
-nohup "$CHROME" \
-  --remote-debugging-port=$PORT \
+# Launch Chrome with port=0 — OS assigns a free ephemeral port.
+# Chrome prints "DevTools listening on ws://127.0.0.1:PORT/..." to stderr.
+"$CHROME" \
+  --remote-debugging-port=0 \
   --remote-debugging-address=127.0.0.1 \
   --user-data-dir="$USER_DATA_DIR" \
   --profile-directory="$PROFILE" \
@@ -79,18 +68,41 @@ nohup "$CHROME" \
   --disable-backgrounding-occluded-windows \
   --disable-renderer-backgrounding \
   >"$LOG_FILE" 2>&1 &
-disown $! 2>/dev/null || true
+CHROME_PID=$!
 
-# Wait for CDP
+# Parse the actual port Chrome chose from its stderr output
 ELAPSED=0
+PORT=""
 while [ $ELAPSED -lt $TIMEOUT ]; do
-  if curl -sf "$CDP_URL/json/version" >/dev/null 2>&1; then
-    echo "✅ Chrome-Debug ready on port $PORT — signed in as rsinghtomar3011@gmail.com (Profile 3)" >&2
-    exec npx -y @playwright/mcp@latest --cdp-endpoint "$CDP_URL" --output-dir /tmp/playwright-mcp-output
+  # Chrome writes: "DevTools listening on ws://127.0.0.1:PORT/devtools/browser/..."
+  if [ -f "$LOG_FILE" ]; then
+    PORT=$(grep -oE 'ws://127\.0\.0\.1:[0-9]+' "$LOG_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true)
+    if [ -n "$PORT" ]; then
+      break
+    fi
   fi
-  sleep 1
+  sleep 0.5
   ELAPSED=$((ELAPSED + 1))
 done
 
-echo "ERROR: Chrome CDP not responding after ${TIMEOUT}s. Check $LOG_FILE" >&2
+if [ -z "$PORT" ]; then
+  echo "ERROR: Chrome didn't report a CDP port after ${TIMEOUT}s. Check $LOG_FILE" >&2
+  exit 1
+fi
+
+CDP_URL="http://127.0.0.1:$PORT"
+
+# Verify CDP is actually responding
+ELAPSED=0
+while [ $ELAPSED -lt 5 ]; do
+  if curl -sf "$CDP_URL/json/version" >/dev/null 2>&1; then
+    echo "✅ Chrome-Debug ready on port $PORT — signed in as rsinghtomar3011@gmail.com (Profile 3)" >&2
+    # exec replaces this shell — when Playwright MCP exits, cleanup trap fires
+    exec npx -y @playwright/mcp@latest --cdp-endpoint "$CDP_URL" --output-dir /tmp/playwright-mcp-output
+  fi
+  sleep 0.5
+  ELAPSED=$((ELAPSED + 1))
+done
+
+echo "ERROR: Chrome CDP on port $PORT not responding. Check $LOG_FILE" >&2
 exit 1

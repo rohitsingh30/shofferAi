@@ -137,7 +137,7 @@ export class RelayServer {
         logger.debug(`Relay executing tool: ${msg.name}`, {
           id: msg.id,
           sessionId: msg.sessionId,
-          pool: `${poolStatus.busy}/${poolStatus.total} busy, ${poolStatus.queueLength} queued`,
+          pool: `${poolStatus.busy}/${poolStatus.maxSlots} busy, ${poolStatus.queueLength} queued`,
         });
 
         const result = await this.chromePool.callTool(msg.sessionId, msg.name, msg.args);

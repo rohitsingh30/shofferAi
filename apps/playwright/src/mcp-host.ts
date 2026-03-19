@@ -4,12 +4,8 @@ import { logger, BrowserError, type MCPTool, type AnthropicTool, type MCPHostLik
 
 /**
  * MCPHost connects to Playwright MCP via a running Chrome CDP instance.
- *
- * IMPORTANT: This class ONLY supports CDP connection mode.
- * It never launches a new browser — Chrome Debug must already be running
- * with --remote-debugging-port=9222 and --profile-directory="Profile 3".
- *
- * Start Chrome Debug first: ./apps/playwright/scripts/start-debug-chrome.sh
+ * Chrome must already be running with --remote-debugging-port on the given endpoint.
+ * ChromePool handles launching Chrome — this class only connects to it.
  */
 export class MCPHost implements MCPHostLike {
   private client: Client | null = null;

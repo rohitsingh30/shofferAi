@@ -5,11 +5,11 @@ import { homedir } from 'os';
 import { logger } from '@shofferai/shared';
 import { MCPHost } from './mcp-host';
 
-type SlotState = 'starting' | 'ready' | 'busy' | 'resetting' | 'error';
+type SlotState = 'idle' | 'starting' | 'ready' | 'busy' | 'resetting' | 'error';
 
 interface ChromeSlot {
   index: number;
-  port: number;
+  port: number; // 0 until Chrome reports actual port via stderr
   userDataDir: string;
   chromeProcess: ChildProcess | null;
   mcpHost: MCPHost | null;
@@ -26,8 +26,7 @@ interface QueueEntry {
 }
 
 export interface ChromePoolOptions {
-  poolSize: number;
-  basePort: number;
+  maxSlots: number;
   profileSourceDir: string;
   poolDataDir: string;
   slotTtlMs: number;
@@ -36,8 +35,7 @@ export interface ChromePoolOptions {
 }
 
 const DEFAULT_OPTIONS: ChromePoolOptions = {
-  poolSize: parseInt(process.env.POOL_SIZE || '3', 10),
-  basePort: parseInt(process.env.POOL_BASE_PORT || '9222', 10),
+  maxSlots: parseInt(process.env.POOL_SIZE || '3', 10),
   profileSourceDir: process.env.CHROME_PROFILE_SOURCE ||
     join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome-Debug'),
   poolDataDir: process.env.POOL_DATA_DIR ||
@@ -47,7 +45,7 @@ const DEFAULT_OPTIONS: ChromePoolOptions = {
   queueTimeoutMs: 30_000, // 30s
 };
 
-// Session files to copy from the source profile (same as setup-chrome-profile.sh)
+// Session files to copy from the source profile
 const SESSION_FILES = [
   'Cookies',
   'Cookies-journal',
@@ -68,6 +66,11 @@ const SESSION_DIRS = [
   'Accounts',
 ];
 
+/**
+ * Lazy Chrome Pool — starts with 0 Chrome instances.
+ * Chrome only launches when a task actually needs one.
+ * `maxSlots` is the concurrency limit, not a pre-launch count.
+ */
 export class ChromePool {
   private slots: ChromeSlot[] = [];
   private sessionMap = new Map<string, number>(); // sessionId → slot index
@@ -75,56 +78,59 @@ export class ChromePool {
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private options: ChromePoolOptions;
   private tools: ReturnType<MCPHost['getTools']> = [];
+  private nextSlotIndex = 0;
 
   constructor(options: Partial<ChromePoolOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
   }
 
+  /**
+   * Initialize the pool — just creates the data dir and starts cleanup timer.
+   * No Chrome instances are launched until a task arrives.
+   * One temporary Chrome is launched to discover available Playwright MCP tools,
+   * then immediately shut down.
+   */
   async initialize(): Promise<void> {
-    logger.info('Initializing Chrome Pool', {
-      poolSize: this.options.poolSize,
-      basePort: this.options.basePort,
+    logger.info('Initializing Chrome Pool (lazy mode)', {
+      maxSlots: this.options.maxSlots,
       poolDataDir: this.options.poolDataDir,
     });
 
     mkdirSync(this.options.poolDataDir, { recursive: true });
 
-    // Initialize all slots in parallel
-    const initPromises: Promise<void>[] = [];
-    for (let i = 0; i < this.options.poolSize; i++) {
-      const slot: ChromeSlot = {
-        index: i,
-        port: this.options.basePort + i,
-        userDataDir: join(this.options.poolDataDir, `slot-${i}`),
-        chromeProcess: null,
-        mcpHost: null,
-        assignedSessionId: null,
-        lastActivityAt: 0,
-        state: 'starting',
-      };
-      this.slots.push(slot);
-      initPromises.push(this.initSlot(slot));
+    // Bootstrap: launch one temporary Chrome to discover tool list
+    const bootstrapSlot = this.createSlot();
+    try {
+      await this.initSlot(bootstrapSlot);
+      this.tools = bootstrapSlot.mcpHost!.getTools();
+      logger.info(`Discovered ${this.tools.length} Playwright MCP tools`);
+      // Keep this slot warm — it's ready for the first task
+      this.slots.push(bootstrapSlot);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown';
+      throw new Error(`Chrome Pool bootstrap failed (cannot discover tools): ${msg}`);
     }
 
-    await Promise.all(initPromises);
-
-    const readyCount = this.slots.filter(s => s.state === 'ready').length;
-    if (readyCount === 0) {
-      throw new Error('Chrome Pool: no slots initialized successfully');
-    }
-
-    // Cache tools from the first ready slot (all slots have identical Playwright MCP tools)
-    const firstReady = this.slots.find(s => s.state === 'ready');
-    if (firstReady?.mcpHost) {
-      this.tools = firstReady.mcpHost.getTools();
-    }
-
-    logger.info(`Chrome Pool ready: ${readyCount}/${this.options.poolSize} slots`, {
+    logger.info('Chrome Pool ready (lazy mode — Chrome launches on demand)', {
       tools: this.tools.length,
+      warmSlots: 1,
     });
 
-    // Start idle cleanup timer
     this.cleanupInterval = setInterval(() => this.cleanupIdleSlots(), 60_000);
+  }
+
+  private createSlot(): ChromeSlot {
+    const index = this.nextSlotIndex++;
+    return {
+      index,
+      port: 0,
+      userDataDir: join(this.options.poolDataDir, `slot-${index}`),
+      chromeProcess: null,
+      mcpHost: null,
+      assignedSessionId: null,
+      lastActivityAt: 0,
+      state: 'idle',
+    };
   }
 
   private async initSlot(slot: ChromeSlot): Promise<void> {
@@ -139,7 +145,7 @@ export class ChromePool {
       await this.waitForCDP(slot);
 
       // 4. Connect MCP host
-      slot.mcpHost = new MCPHost({ cdpEndpoint: `http://localhost:${slot.port}` });
+      slot.mcpHost = new MCPHost({ cdpEndpoint: `http://127.0.0.1:${slot.port}` });
       await slot.mcpHost.connect();
 
       slot.state = 'ready';
@@ -195,11 +201,10 @@ export class ChromePool {
   }
 
   private async launchChrome(slot: ChromeSlot): Promise<void> {
-    // Kill any existing Chrome on this port
-    await this.killChromeOnPort(slot.port);
-
+    // Launch Chrome with port=0 — OS assigns a guaranteed-free ephemeral port.
+    // Chrome prints "DevTools listening on ws://127.0.0.1:PORT/..." to stderr.
     const args = [
-      `--remote-debugging-port=${slot.port}`,
+      '--remote-debugging-port=0',
       '--remote-debugging-address=127.0.0.1',
       `--user-data-dir=${slot.userDataDir}`,
       '--profile-directory=Profile 3',
@@ -210,15 +215,39 @@ export class ChromePool {
     ];
 
     slot.chromeProcess = spawn(this.options.chromePath, args, {
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'pipe'], // capture stderr for port parsing
       detached: false,
     });
+
+    // Parse the actual port from Chrome's stderr
+    const port = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`Slot ${slot.index}: Chrome didn't report a CDP port within 15s`));
+      }, 15_000);
+
+      let stderrData = '';
+      slot.chromeProcess!.stderr!.on('data', (chunk: Buffer) => {
+        stderrData += chunk.toString();
+        // Chrome writes: "DevTools listening on ws://127.0.0.1:PORT/devtools/browser/..."
+        const match = stderrData.match(/ws:\/\/127\.0\.0\.1:(\d+)\//);
+        if (match) {
+          clearTimeout(timeout);
+          resolve(parseInt(match[1], 10));
+        }
+      });
+
+      slot.chromeProcess!.on('exit', (code) => {
+        clearTimeout(timeout);
+        reject(new Error(`Slot ${slot.index}: Chrome exited with code ${code} before reporting port`));
+      });
+    });
+
+    slot.port = port;
 
     slot.chromeProcess.on('exit', (code) => {
       logger.warn(`Slot ${slot.index} Chrome process exited`, { code, port: slot.port });
       if (slot.state === 'busy' || slot.state === 'ready') {
         slot.state = 'error';
-        // Auto-recover: try to restart
         this.recoverSlot(slot).catch(err => {
           logger.error(`Slot ${slot.index} recovery failed`, { error: String(err) });
         });
@@ -228,29 +257,8 @@ export class ChromePool {
     logger.debug(`Slot ${slot.index} Chrome launched`, { pid: slot.chromeProcess.pid, port: slot.port });
   }
 
-  private async killChromeOnPort(port: number): Promise<void> {
-    try {
-      const res = await fetch(`http://localhost:${port}/json/version`, {
-        signal: AbortSignal.timeout(2000),
-      });
-      if (res.ok) {
-        // Chrome is running on this port — find and kill it
-        const { execSync } = await import('child_process');
-        try {
-          execSync(`lsof -ti :${port} | xargs kill -9 2>/dev/null`, { encoding: 'utf-8' });
-          // Wait a moment for the port to free
-          await new Promise(r => setTimeout(r, 1000));
-        } catch {
-          // Process might already be gone
-        }
-      }
-    } catch {
-      // Port not in use, good
-    }
-  }
-
   private async waitForCDP(slot: ChromeSlot, maxRetries = 30): Promise<void> {
-    const url = `http://localhost:${slot.port}/json/version`;
+    const url = `http://127.0.0.1:${slot.port}/json/version`;
     for (let i = 0; i < maxRetries; i++) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
@@ -304,17 +312,17 @@ export class ChromePool {
     name: string,
     args: Record<string, unknown>
   ): Promise<unknown> {
-    // No sessionId → use first ready slot (legacy/testing)
+    // No sessionId → use first ready slot or launch one
     if (!sessionId) {
       const slot = this.slots.find(s => s.state === 'ready' || s.state === 'busy');
-      if (!slot?.mcpHost) throw new Error('No Chrome slots available');
-      return slot.mcpHost.callTool(name, args);
+      if (slot?.mcpHost) return slot.mcpHost.callTool(name, args);
+      // No ready slot — launch one on demand
+      const newSlot = await this.launchSlotOnDemand('__default__');
+      return newSlot.mcpHost!.callTool(name, args);
     }
 
-    // Find or acquire a slot for this session
     const slot = await this.acquireSlot(sessionId);
     slot.lastActivityAt = Date.now();
-
     return slot.mcpHost!.callTool(name, args);
   }
 
@@ -326,11 +334,10 @@ export class ChromePool {
       if (slot.state === 'busy' && slot.mcpHost) {
         return slot;
       }
-      // Slot died, remove stale mapping
       this.sessionMap.delete(sessionId);
     }
 
-    // Find a free slot
+    // Find a free ready slot
     const freeSlot = this.slots.find(s => s.state === 'ready' && s.assignedSessionId === null);
     if (freeSlot) {
       freeSlot.assignedSessionId = sessionId;
@@ -343,8 +350,14 @@ export class ChromePool {
       return freeSlot;
     }
 
-    // All slots busy — queue with timeout
-    logger.info(`All slots busy, queueing session ${sessionId.slice(0, 8)}...`, {
+    // No free slot — can we launch a new one?
+    const activeSlots = this.slots.filter(s => s.state !== 'error' && s.state !== 'idle');
+    if (activeSlots.length < this.options.maxSlots) {
+      return this.launchSlotOnDemand(sessionId);
+    }
+
+    // All slots busy and at capacity — queue with timeout
+    logger.info(`All ${this.options.maxSlots} slots busy, queueing session ${sessionId.slice(0, 8)}...`, {
       queueLength: this.waitQueue.length,
     });
 
@@ -357,6 +370,25 @@ export class ChromePool {
 
       this.waitQueue.push({ sessionId, resolve, reject, timeoutId });
     });
+  }
+
+  /** Launch a new Chrome slot on demand and assign it to a session */
+  private async launchSlotOnDemand(sessionId: string): Promise<ChromeSlot> {
+    const slot = this.createSlot();
+    this.slots.push(slot);
+
+    logger.info(`Launching Chrome on demand for session ${sessionId.slice(0, 8)}...`);
+    await this.initSlot(slot);
+
+    if (slot.state !== 'ready') {
+      throw new Error(`Failed to launch Chrome for session ${sessionId.slice(0, 8)}`);
+    }
+
+    slot.assignedSessionId = sessionId;
+    slot.state = 'busy';
+    slot.lastActivityAt = Date.now();
+    this.sessionMap.set(sessionId, slot.index);
+    return slot;
   }
 
   async releaseSlot(sessionId: string): Promise<void> {
@@ -409,13 +441,14 @@ export class ChromePool {
   private async cleanupIdleSlots(): Promise<void> {
     const now = Date.now();
     for (const slot of this.slots) {
+      // Release sessions that have been idle too long
       if (
         slot.state === 'busy' &&
         slot.assignedSessionId &&
         slot.lastActivityAt > 0 &&
         now - slot.lastActivityAt > this.options.slotTtlMs
       ) {
-        logger.info(`Slot ${slot.index} idle timeout, releasing`, {
+        logger.info(`Slot ${slot.index} idle timeout, releasing session`, {
           sessionId: slot.assignedSessionId.slice(0, 8),
           idleMs: now - slot.lastActivityAt,
         });
@@ -423,7 +456,40 @@ export class ChromePool {
           logger.error(`Idle cleanup failed for slot ${slot.index}`, { error: String(err) });
         });
       }
+
+      // Tear down ready slots that have been unused for 2x TTL (save resources)
+      if (
+        slot.state === 'ready' &&
+        !slot.assignedSessionId &&
+        slot.lastActivityAt > 0 &&
+        now - slot.lastActivityAt > this.options.slotTtlMs * 2
+      ) {
+        logger.info(`Slot ${slot.index} unused, tearing down Chrome to save resources`);
+        await this.teardownSlot(slot);
+      }
     }
+  }
+
+  /** Fully tear down a slot — kill Chrome, disconnect MCP, remove from slots */
+  private async teardownSlot(slot: ChromeSlot): Promise<void> {
+    if (slot.assignedSessionId) {
+      this.sessionMap.delete(slot.assignedSessionId);
+      slot.assignedSessionId = null;
+    }
+    if (slot.mcpHost) {
+      try { await slot.mcpHost.disconnect(); } catch { /* ignore */ }
+      slot.mcpHost = null;
+    }
+    if (slot.chromeProcess && !slot.chromeProcess.killed) {
+      slot.chromeProcess.kill('SIGTERM');
+      slot.chromeProcess = null;
+    }
+    slot.state = 'idle';
+    slot.port = 0;
+    // Remove from active slots
+    const idx = this.slots.indexOf(slot);
+    if (idx !== -1) this.slots.splice(idx, 1);
+    logger.debug(`Slot ${slot.index} torn down`);
   }
 
   getTools(): ReturnType<MCPHost['getTools']> {
@@ -431,14 +497,16 @@ export class ChromePool {
   }
 
   getStatus(): {
-    total: number;
+    maxSlots: number;
+    active: number;
     ready: number;
     busy: number;
     error: number;
     queueLength: number;
   } {
     return {
-      total: this.slots.length,
+      maxSlots: this.options.maxSlots,
+      active: this.slots.length,
       ready: this.slots.filter(s => s.state === 'ready' && !s.assignedSessionId).length,
       busy: this.slots.filter(s => s.state === 'busy').length,
       error: this.slots.filter(s => s.state === 'error').length,

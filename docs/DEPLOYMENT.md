@@ -23,11 +23,11 @@ graph LR
     end
 
     subgraph LAPTOP["💻 Your Laptop (must start manually)"]
-        CHROME["Chrome Debug<br/>CDP :9222<br/>Profile 3"]
-        POOL["ChromePool<br/>Tab management"]
+        POOL["ChromePool<br/>(lazy — launches on demand)"]
         MCP["Playwright MCP<br/>20+ browser tools"]
+        CHROME["Chrome (OS port)<br/>Profile 3 — signed in"]
         RELAY["RelayOutbound<br/>Connects to Cloud Run"]
-        CHROME --> POOL
+        POOL --> CHROME
         POOL --> MCP
         MCP --> RELAY
     end
@@ -65,6 +65,8 @@ ENV RELAY_MODE=cloud             # Uses RelayBridge, not RemoteMCPHost
 CMD ["node", "apps/web/server.js"]  # custom-server.js with WS support
 ```
 
+**Deploying:** `gcloud builds submit --config cloudbuild.yaml` — runs entirely in GCP Cloud Build (no local Docker needed). Uploads source, builds remotely, pushes to Artifact Registry, deploys to Cloud Run.
+
 **What's NOT on Cloud Run:** Chrome, Playwright, CDP, any browser automation.
 
 ---
@@ -75,11 +77,12 @@ Everything browser-related. **This is where the actual web tasks happen.**
 
 | Component | What It Does | How to Start |
 |-----------|-------------|-------------|
-| **Chrome Debug** | Persistent Chrome with signed-in profiles | LaunchAgent (auto) or `scripts/start-debug-chrome.sh` |
-| **ChromePool** | Manages Chrome instances + per-task tab isolation | Started by `npm run laptop` |
-| **Playwright MCP** | 20+ browser tools (click, type, navigate, snapshot...) | Started by `npm run laptop` |
-| **RelayOutbound** | Connects OUT to Cloud Run via WSS | Started by `npm run laptop` (when `RELAY_CLOUD_URL` is set) |
-| **RelayServer** | Accepts connections from local dev (port 8765) | Started by `npm run laptop` (when `RELAY_CLOUD_URL` is NOT set) |
+| **ChromePool** | Launches Chrome instances on demand (lazy) with signed-in Profile 3 | Started by `start-laptop.sh` |
+| **Playwright MCP** | 20+ browser tools (click, type, navigate, snapshot...) | Started by `start-laptop.sh` |
+| **RelayOutbound** | Connects OUT to Cloud Run via WSS | Started by `start-laptop.sh` (when `RELAY_CLOUD_URL` is set) |
+| **RelayServer** | Accepts connections from local dev (port 8765) | Started by `start-laptop.sh` (when `RELAY_CLOUD_URL` is NOT set) |
+
+> **No manual Chrome launch needed.** ChromePool handles everything — it clones the Chrome-Debug profile, launches Chrome with an OS-assigned port, and connects Playwright MCP automatically.
 
 ---
 
@@ -87,9 +90,9 @@ Everything browser-related. **This is where the actual web tasks happen.**
 
 ```mermaid
 sequenceDiagram
-    participant Chrome as Chrome Debug :9222
-    participant Pool as ChromePool
+    participant Pool as ChromePool (Laptop)
     participant MCP as Playwright MCP
+    participant Chrome as Chrome (OS port)
     participant Relay as RelayOutbound (Laptop)
     participant Bridge as RelayBridge (Cloud Run)
     participant Agent as AgentExecutor
@@ -104,6 +107,7 @@ sequenceDiagram
     Agent->>Bridge: callToolWithSession("browser_navigate", {url, sessionId})
     Bridge->>Relay: ToolCallRequest {id, name, args}
     Relay->>Pool: route by sessionId
+    Pool->>Pool: Launch Chrome on demand (if no slot for this session)
     Pool->>MCP: callTool("browser_navigate", {url})
     MCP->>Chrome: CDP → navigate
     Chrome-->>MCP: Page loaded
@@ -130,40 +134,30 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    A["1️⃣ Chrome Debug starts<br/>(LaunchAgent on login)"] --> B["2️⃣ Verify CDP is live<br/>curl localhost:9222/json/version"]
-    B --> C["3️⃣ Start laptop relay<br/>npm run laptop"]
-    C --> D{"RELAY_CLOUD_URL set?"}
-    D -->|"Yes"| E["RelayOutbound connects<br/>to wss://cloud-run-url"]
-    D -->|"No"| F["RelayServer listens<br/>on ws://localhost:8765"]
-    E --> G["✅ Cloud Run logs:<br/>'laptop connected, N tools'"]
+    A["1️⃣ Start laptop relay<br/>./apps/playwright/scripts/start-laptop.sh"] --> B{"RELAY_CLOUD_URL set?"}
+    B -->|"Yes"| C["RelayOutbound connects<br/>to wss://cloud-run-url"]
+    B -->|"No"| D["RelayServer listens<br/>on ws://localhost:8765"]
+    C --> E["ChromePool bootstraps<br/>(1 warm slot, rest on demand)"]
+    E --> F["✅ Cloud Run logs:<br/>'laptop connected, N tools'"]
     
-    style A fill:#fff3e0,stroke:#e65100
-    style C fill:#e8f5e9,stroke:#2e7d32
-    style G fill:#e3f2fd,stroke:#1565c0
+    style A fill:#e8f5e9,stroke:#2e7d32
+    style F fill:#e3f2fd,stroke:#1565c0
 ```
 
 **Step-by-step:**
 
 ```bash
-# ── Step 1: Chrome Debug (usually auto-starts on login) ──
-# Verify it's running:
-curl -s http://localhost:9222/json/version | head -5
+# ── Just run the start script — it handles everything ──
+./apps/playwright/scripts/start-laptop.sh
 
-# If not running, start manually:
-bash apps/playwright/scripts/start-debug-chrome.sh
-
-# ── Step 2: Start the laptop relay ──
-# Set these env vars (or put in .env):
-export RELAY_CLOUD_URL=wss://shofferai-27188185100.asia-south1.run.app/api/relay/ws
-export RELAY_AUTH_TOKEN=<your-token>
-
-# Start:
-npm run laptop
-# → Initializes ChromePool
+# What happens automatically:
+# → ChromePool launches 1 bootstrap Chrome (Profile 3, OS-assigned port)
+# → Discovers 22 Playwright MCP tools
 # → Connects to Cloud Run via WSS
-# → Logs: "Connected to Cloud Run — ready for tool calls."
+# → Chrome launches on demand when tasks arrive
+# → Chrome is torn down when idle (15 min)
 
-# ── Step 3: Verify connection ──
+# ── Verify connection ──
 # Check Cloud Run logs for:
 #   "[relay-bridge] Laptop connected, 20+ tools available"
 ```
@@ -171,14 +165,11 @@ npm run laptop
 ### For Local Development
 
 ```bash
-# Terminal 1: Start Chrome Debug
-bash apps/playwright/scripts/start-debug-chrome.sh
-
-# Terminal 2: Start laptop relay (server mode — no RELAY_CLOUD_URL)
-npm run laptop
+# Terminal 1: Start laptop relay (server mode — no RELAY_CLOUD_URL)
+./apps/playwright/scripts/start-laptop.sh
 # → RelayServer listens on ws://localhost:8765
 
-# Terminal 3: Start Next.js dev server
+# Terminal 2: Start Next.js dev server
 cd apps/web && npx next dev
 # → RemoteMCPHost connects OUT to ws://localhost:8765
 ```
@@ -212,9 +203,7 @@ cd apps/web && npx next dev
 | `RELAY_CLOUD_URL` | For prod | `wss://shofferai-xxx.run.app/api/relay/ws` |
 | `RELAY_AUTH_TOKEN` | ✅ | Shared secret — **must match Cloud Run** |
 | `RELAY_PORT` | No | Local server port (default: `8765`) |
-| `CHROME_CDP_ENDPOINT` | No | CDP URL (default: `http://localhost:9222`) |
-| `POOL_SIZE` | No | Number of Chrome slots (default: `3`) |
-| `PLAYWRIGHT_HEADLESS` | No | Set `true` for headless (default: headed) |
+| `POOL_SIZE` | No | Max concurrent Chrome slots (default: `3`) |
 
 > ⚠️ **RELAY_AUTH_TOKEN must be identical** on Cloud Run and laptop. Mismatched tokens = silent connection failures.
 
@@ -236,11 +225,11 @@ cd apps/web && npx next dev
 
 ## Chrome Profile Setup (One-Time)
 
+ChromePool automatically clones the Chrome-Debug profile directory for each Chrome instance it launches. You only need to set up the base profile once:
+
 ```bash
-# The debug Chrome must use Profile 3 for signed-in sessions
-# Launch with specific profile:
+# Launch the base Chrome-Debug with Profile 3:
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 \
   --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug" \
   --profile-directory="Profile 3"
 
@@ -251,7 +240,7 @@ cd apps/web && npx next dev
 # Profile 4 — rohit30.iitkgp@gmail.com (wrong account)
 ```
 
-**First-time setup:** Open Chrome Debug, manually sign into booking.com, blinkit.com, etc. Sessions persist across restarts (cookies stored in OS keychain).
+**First-time setup:** Open Chrome Debug, manually sign into booking.com, blinkit.com, etc. Sessions persist across restarts (cookies encrypted via macOS Keychain, per-user — so cloned profiles inherit all sessions automatically).
 
 ---
 
@@ -264,11 +253,11 @@ cd apps/web && npx next dev
 │                                                              │
 │  ☁️ CLOUD RUN (auto)          💻 LAPTOP (manual)             │
 │  ─────────────────           ───────────────────             │
-│  ✅ Next.js App               ☐ Chrome Debug on :9222        │
-│  ✅ API Routes                ☐ Profile 3 signed in          │
-│  ✅ RelayBridge               ☐ npm run laptop               │
-│  ✅ Cloud SQL                 ☐ RELAY_CLOUD_URL set          │
-│  ✅ Azure OpenAI              ☐ RELAY_AUTH_TOKEN matches      │
+│  ✅ Next.js App               ☐ ./start-laptop.sh            │
+│  ✅ API Routes                  (launches Chrome + relay     │
+│  ✅ RelayBridge                  automatically)              │
+│  ✅ Cloud SQL                 ☐ RELAY_AUTH_TOKEN matches      │
+│  ✅ Azure OpenAI                                             │
 │                                                              │
 │  VERIFY: Cloud Run logs show "laptop connected"              │
 │                                                              │
@@ -276,9 +265,8 @@ cd apps/web && npx next dev
 │                    LOCAL DEV CHECKLIST                         │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│  Terminal 1: start-debug-chrome.sh    → Chrome :9222         │
-│  Terminal 2: npm run laptop           → RelayServer :8765    │
-│  Terminal 3: cd apps/web && npx next dev → Next.js :3000     │
+│  Terminal 1: ./start-laptop.sh       → RelayServer :8765     │
+│  Terminal 2: cd apps/web && npx next dev → Next.js :3000     │
 │                                                              │
 │  No RELAY_CLOUD_URL needed for local dev                     │
 └──────────────────────────────────────────────────────────────┘

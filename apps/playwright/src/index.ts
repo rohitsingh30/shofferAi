@@ -9,7 +9,7 @@ const RELAY_CLOUD_URL = process.env.RELAY_CLOUD_URL; // e.g. wss://shofferai-xxx
 async function main() {
   logger.info('Starting ShofferAI Playwright Runner...');
 
-  // Step 1: Initialize Chrome Pool (launches N Chrome instances + MCP hosts)
+  // Initialize Chrome Pool (lazy — only 1 bootstrap Chrome, rest launch on demand)
   const chromePool = new ChromePool();
   await chromePool.initialize();
 
@@ -28,11 +28,11 @@ async function main() {
     await outbound.connect();
 
     logger.info('');
-    logger.info('=== ShofferAI Playwright Runner (Outbound) ===');
-    logger.info(`Pool:    ${poolStatus.ready} Chrome instances ready`);
+    logger.info('=== ShofferAI Laptop Relay ===');
     logger.info(`Cloud:   ${RELAY_CLOUD_URL}`);
+    logger.info(`Pool:    lazy (max ${poolStatus.maxSlots} Chrome slots, ${poolStatus.active} warm)`);
     logger.info(`Tools:   ${tools.length} Playwright MCP tools`);
-    logger.info('Connected to Cloud Run — ready for tool calls.');
+    logger.info('Chrome launches on demand when tasks arrive.');
     logger.info('Press Ctrl+C to stop.');
     logger.info('');
 
@@ -47,11 +47,11 @@ async function main() {
     await relayServer.start();
 
     logger.info('');
-    logger.info('=== ShofferAI Playwright Runner (Server) ===');
-    logger.info(`Pool:  ${poolStatus.ready} Chrome instances ready`);
+    logger.info('=== ShofferAI Laptop Relay (Dev) ===');
     logger.info(`Relay: ws://localhost:${RELAY_PORT}`);
+    logger.info(`Pool:  lazy (max ${poolStatus.maxSlots} Chrome slots, ${poolStatus.active} warm)`);
     logger.info(`Tools: ${tools.length} Playwright MCP tools`);
-    logger.info('Waiting for connections...');
+    logger.info('Chrome launches on demand when tasks arrive.');
     logger.info('Press Ctrl+C to stop.');
     logger.info('');
 
