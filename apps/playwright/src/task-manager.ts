@@ -6,6 +6,7 @@ import { createInterface } from 'readline';
 import { randomUUID } from 'crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createServer, type Server as HttpServer } from 'http';
+import { mcpToolEvents } from './chrome-pool';
 import {
   logger,
   type TaskHandoffMessage,
@@ -446,6 +447,17 @@ export class TaskManager {
       }
     } else if (type === 'assistant.tool_call') {
       const toolName = (data.toolName || data.name || 'tool') as string;
+      const toolArgs = (data.input || data.arguments || {}) as Record<string, unknown>;
+
+      // Emit to MCP log stream for real-time visibility
+      mcpToolEvents.emit('mcp_tool', {
+        type: 'tool_start',
+        timestamp: new Date().toISOString(),
+        sessionId: taskId.slice(0, 12),
+        toolName: toolName.replace('mcp__playwright__', '').replace('playwright__', ''),
+        args: truncateToolArgs(toolArgs),
+      });
+
       // Don't forward bridge tool calls as progress (Bridge MCP handles those)
       if (!toolName.includes('bridge') && !toolName.includes('ask_user')
         && !toolName.includes('request_payment') && !toolName.includes('send_progress')
@@ -709,4 +721,12 @@ export class TaskManager {
     }
     return 0;
   }
+}
+
+function truncateToolArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const t: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    t[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v;
+  }
+  return t;
 }
