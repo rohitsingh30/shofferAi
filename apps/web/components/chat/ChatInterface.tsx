@@ -95,7 +95,8 @@ function ChatInterfaceInner() {
 
         // Only show milestone steps (completed report_step) and pause states.
         // Hide low-level "running" browser actions to reduce noise.
-        if (status === 'running') break;
+        // Allow specific running statuses that are meaningful (skill activation, mode switches).
+        if (status === 'running' && !action.startsWith('Using skill:') && !action.includes('instant mode') && !action.includes('AI mode')) break;
 
         setCurrentSteps((prev) => {
           const step: StepInfo = { action, status };

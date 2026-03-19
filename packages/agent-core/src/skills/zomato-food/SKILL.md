@@ -27,9 +27,12 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### 1. Get Delivery Address
-- BEFORE opening the browser, check if user provided an address.
-- If not, use `ask_user` (input_type "freetext"): "What's your delivery address or area name?"
+### 1. Gather ALL Requirements Upfront
+- BEFORE opening the browser, check what the user already provided: food/dish, delivery address, payment preference.
+- If ANY info is missing, use ONE SINGLE `ask_user` call to collect ALL missing info at once.
+  Example: "I need a couple of details to order from Zomato:\n• Delivery address or area name\n• Any payment preference? (UPI, card, COD — default: UPI)"
+- Do NOT ask questions one at a time. Batch everything into a single prompt.
+- If user provided both food and address already, skip straight to Step 2.
 
 ### 2. Open Zomato & Set Location
 - Open a NEW tab and navigate to `https://www.zomato.com`.
