@@ -9,9 +9,9 @@ PORT=9223
 PROFILE="Profile 1"
 
 # Check if already running
-if curl -s "http://localhost:$PORT/json/version" > /dev/null 2>&1; then
+if curl -s "http://127.0.0.1:$PORT/json/version" > /dev/null 2>&1; then
   echo "Chrome-Claude already running on port $PORT"
-  curl -s "http://localhost:$PORT/json/version" | python3 -m json.tool
+  curl -s "http://127.0.0.1:$PORT/json/version" | python3 -m json.tool
   exit 0
 fi
 
@@ -21,6 +21,7 @@ echo "Profile: $PROFILE"
 
 "$CHROME" \
   --remote-debugging-port=$PORT \
+  --remote-debugging-address=127.0.0.1 \
   --user-data-dir="$USER_DATA_DIR" \
   --profile-directory="$PROFILE" \
   --no-first-run \
@@ -32,7 +33,7 @@ echo "Profile: $PROFILE"
 
 sleep 2
 
-if curl -s "http://localhost:$PORT/json/version" > /dev/null 2>&1; then
+if curl -s "http://127.0.0.1:$PORT/json/version" > /dev/null 2>&1; then
   echo "Chrome-Claude started successfully!"
   echo "Sign into rsinghtomar3011@gmail.com if this is the first run."
 else

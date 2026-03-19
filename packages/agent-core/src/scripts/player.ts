@@ -223,7 +223,7 @@ export class ScriptPlayer {
         env: {
           ...process.env,
           NODE_PATH: nodeModules,
-          CHROME_CDP_ENDPOINT: process.env.CHROME_CDP_ENDPOINT || 'http://localhost:9222',
+          CHROME_CDP_ENDPOINT: process.env.CHROME_CDP_ENDPOINT || 'http://127.0.0.1:9222',
         },
       });
 

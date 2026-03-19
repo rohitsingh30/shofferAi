@@ -80,8 +80,7 @@ docs/                  → PRD, Architecture, Pitch, Workflows + Mermaid diagram
 cd apps/web && npx next dev
 
 # Start playwright interface (laptop relay)
-CHROME_CDP_ENDPOINT=http://localhost:9222 RELAY_AUTH_TOKEN=<token> npm run laptop
-# Or directly: cd apps/playwright && npm start
+CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 RELAY_AUTH_TOKEN=<token> npm run laptop
 
 # Expose relay via Cloudflare Tunnel
 cloudflared tunnel --url http://localhost:8765
@@ -136,7 +135,7 @@ LaunchAgent (com.shofferai.chrome-debug) starts on login:
     → Chrome --remote-debugging-port=9222
               --user-data-dir=~/Library/Application Support/Google/Chrome-Debug
               --profile-directory="Profile 3"
-  → Playwright MCP connects via --cdp-endpoint http://localhost:9222
+  → Playwright MCP connects via --cdp-endpoint http://127.0.0.1:9222
 ```
 
 **Key insight**: Chrome encrypts cookies per OS keychain profile. Copying a Chrome profile directory does NOT copy active sessions. The debug Chrome must be signed in manually once — after that the session persists forever across restarts.
@@ -149,7 +148,7 @@ LaunchAgent (com.shofferai.chrome-debug) starts on login:
 
 **Verify CDP is live:**
 ```bash
-curl -s http://localhost:9222/json/version
+curl -s http://127.0.0.1:9222/json/version
 ```
 
 ## Booking.com Skill (v2)
@@ -204,6 +203,48 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 - **SSE streaming**: Real-time agent progress updates to the UI
 - **Cloudflare Tunnel**: Free, encrypted, no port forwarding — connects laptop to cloud
 
+## Playwright MCP — Chrome Window Requirements
+
+**Every use of Playwright MCP** (dev-loop, compile-skills, e2e-flow, or any direct `mcp__playwright__*` tool call) **MUST launch a dedicated Chrome window** signed in as `rsinghtomar3011@gmail.com`. Never reuse an existing Chrome window — always find an empty port and start fresh.
+
+### Launch command (run before any Playwright MCP usage):
+```bash
+# Find an empty port starting from 9225
+PORT=9225
+while lsof -ti :$PORT >/dev/null 2>&1; do PORT=$((PORT + 1)); done
+echo "Using port $PORT"
+
+# Launch a NEW Chrome window with Profile 3 (rsinghtomar3011@gmail.com)
+# IMPORTANT: --remote-debugging-address=127.0.0.1 forces IPv4-only binding.
+# Never use "localhost" for CDP — it can resolve to IPv6 ::1 and cause ECONNREFUSED.
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=$PORT \
+  --remote-debugging-address=127.0.0.1 \
+  --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug-$PORT" \
+  --profile-directory="Profile 3" \
+  --no-first-run --no-default-browser-check &
+
+# Wait for Chrome to boot
+sleep 3
+curl -s http://127.0.0.1:$PORT/json/version | python3 -c "import sys,json; print('Chrome OK on port $PORT:', json.load(sys.stdin)['Browser'])"
+```
+
+**Important**: Each Chrome instance needs its own `--user-data-dir` (appending `-$PORT`) to avoid lock conflicts. All instances share Profile 3 data via the same underlying Google account.
+
+### Then connect Playwright MCP to it:
+```bash
+npx -y @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:$PORT
+```
+Or update `.mcp.json` to point the `playwright` server at the chosen port.
+
+### Rules:
+1. **New window every time** — find an empty port (starting at 9225), launch fresh Chrome, then use Playwright MCP
+2. **Profile 3 mandatory** — must use `--profile-directory="Profile 3"` (rsinghtomar3011@gmail.com)
+3. **Unique user-data-dir** — use `Chrome-Debug-$PORT` to avoid lock conflicts between concurrent windows
+4. **Verify signed-in** — after navigating to any site, take a snapshot and confirm the profile icon/name shows `rsinghtomar3011@gmail.com`
+5. **Never hardcode port 9225** — always scan for an empty port; other sessions may already be using 9225+
+6. **Pool Chromes are separate** — ports 9222/9223/9224 are managed by ChromePool for agent tasks; 9225+ are for Playwright MCP direct usage
+
 ## Mandatory Skills
 - **Always activate /cofounder mode at the start of every conversation** before doing any work
 - **After ANY UI change, run /dev-loop** to self-test with Playwright MCP — no exceptions
@@ -221,7 +262,7 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 **Before testing, ensure laptop relay is running:**
 ```bash
 # Terminal 1: Start relay server
-CHROME_CDP_ENDPOINT=http://localhost:9222 RELAY_AUTH_TOKEN=<token> npm run laptop
+CHROME_CDP_ENDPOINT=http://127.0.0.1:9222 RELAY_AUTH_TOKEN=<token> npm run laptop
 
 # Terminal 2: Start Cloudflare Tunnel
 cloudflared tunnel --url http://localhost:8765

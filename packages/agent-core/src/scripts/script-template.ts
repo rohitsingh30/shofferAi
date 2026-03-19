@@ -74,7 +74,7 @@ const fs = require('fs');
   }
 
   // ── Connect to operator's Chrome via CDP ─────────────────────────
-  const cdpEndpoint = process.env.CHROME_CDP_ENDPOINT || 'http://localhost:9222';
+  const cdpEndpoint = process.env.CHROME_CDP_ENDPOINT || 'http://127.0.0.1:9222';
   log({ step: 'Connecting to Chrome via CDP (' + cdpEndpoint + ')...', status: 'running' });
 
   let browser;

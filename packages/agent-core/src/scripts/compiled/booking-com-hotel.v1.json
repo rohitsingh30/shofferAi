@@ -7,7 +7,7 @@
   "browserProfile": {
     "chromeProfile": "Profile 3",
     "account": "rsinghtomar3011@gmail.com",
-    "cdpEndpoint": "http://localhost:9222",
+    "cdpEndpoint": "http://127.0.0.1:9222",
     "notes": "Requires signed-in Booking.com session via Chrome CDP. Debug Chrome started by LaunchAgent com.shofferai.chrome-debug."
   },
   "steps": [

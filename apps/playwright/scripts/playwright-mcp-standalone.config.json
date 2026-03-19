@@ -1,5 +1,5 @@
 {
   "browser": {
-    "cdpEndpoint": "http://localhost:9225"
+    "cdpEndpoint": "http://127.0.0.1:9225"
   }
 }
