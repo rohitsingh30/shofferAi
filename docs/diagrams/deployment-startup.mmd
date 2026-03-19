@@ -1,0 +1,11 @@
+graph TD
+    A["1️⃣ Chrome Debug starts<br/>(LaunchAgent on login)"] --> B["2️⃣ Verify CDP is live<br/>curl localhost:9222/json/version"]
+    B --> C["3️⃣ Start laptop relay<br/>npm run laptop"]
+    C --> D{"RELAY_CLOUD_URL set?"}
+    D -->|"Yes"| E["RelayOutbound connects<br/>to wss://cloud-run-url"]
+    D -->|"No"| F["RelayServer listens<br/>on ws://localhost:8765"]
+    E --> G["✅ Cloud Run logs:<br/>'laptop connected, N tools'"]
+    
+    style A fill:#fff3e0,stroke:#e65100
+    style C fill:#e8f5e9,stroke:#2e7d32
+    style G fill:#e3f2fd,stroke:#1565c0

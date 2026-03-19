@@ -1,0 +1,41 @@
+sequenceDiagram
+    actor User
+    participant UI as Chat UI + L2 Panel
+    participant Agent as AgentExecutor
+    participant PM as PauseResumeManager
+    participant PayAPI as /api/payments/*
+    participant RP as Razorpay
+
+    Agent->>Agent: Hotel found, ready to book
+    Agent->>PM: Tool: collect_payment({summary, amount})
+    PM->>PM: waitForInput(taskId, "payment", 5min timeout)
+    
+    Note over Agent: ⏸️ Agent BLOCKED
+
+    PM-->>UI: SSE: {type: "payment_required", payload: {summary, amount}}
+    UI->>UI: Open L2 split-view panel (300ms slide-in)
+    
+    Note over UI: Desktop: 60% chat / 40% payment<br/>Mobile: full-screen overlay
+
+    UI->>UI: Show BookingSummaryCard<br/>+ Tip selector (₹0/100/200/500)<br/>+ "Pay Now" button
+
+    User->>UI: Select tip ₹200, click "Pay Now"
+    UI->>PayAPI: POST /api/payments/create-order<br/>{amount: 13200, taskId}
+    PayAPI->>RP: razorpay.orders.create()
+    RP-->>PayAPI: {orderId, amount}
+    PayAPI-->>UI: {orderId, keyId}
+
+    UI->>RP: Open Razorpay Checkout Modal
+    User->>RP: Pay via UPI / Card / Wallet
+    RP-->>UI: {razorpay_payment_id, razorpay_signature}
+
+    UI->>PayAPI: POST /api/payments/verify<br/>{orderId, paymentId, signature}
+    PayAPI->>PayAPI: Verify HMAC SHA256 signature
+    PayAPI->>PM: provideInput(taskId, "payment", "confirmed")
+    
+    Note over Agent: ▶️ Agent RESUMES
+
+    PM-->>Agent: Payment confirmed
+    Agent->>Agent: Click "Confirm Booking" on website
+    Agent-->>UI: SSE: {type: "complete", summary: "Booking confirmed!"}
+    UI->>UI: Close L2 panel (300ms slide-out)

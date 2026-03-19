@@ -1,0 +1,39 @@
+graph TB
+    subgraph MATCH["🎯 Skill Matching"]
+        MSG["User Message"] --> SCORE["Score Skills<br/>+1 per trigger match<br/>+3 for domain mention"]
+        SCORE --> BEST["Select Best Skill<br/>threshold ≥ 1"]
+        BEST --> LOAD["Load Lessons<br/>from SkillLesson DB"]
+    end
+
+    subgraph LESSONS["📚 Lesson System"]
+        LOAD --> FILTER["Filter: confidence ≥ 0.3<br/>Sort: confidence DESC<br/>Limit: top 10"]
+        FILTER --> INJECT["Inject into System Prompt:<br/>## LESSONS LEARNED<br/>1. When X → Y (confidence: 85%)<br/>2. When Z → W (confidence: 60%)"]
+    end
+
+    subgraph EXEC["⚡ Execution"]
+        INJECT --> LLM["LLM reads lessons<br/>applies proactively"]
+        LLM --> BROWSE["Execute browser actions"]
+        BROWSE --> SUCCESS{"Success?"}
+    end
+
+    subgraph LEARN["🧠 Auto-Learn"]
+        SUCCESS -->|"Yes (after error)"| SAVE["Auto-save Lesson<br/>errorPattern: first 200 chars<br/>resolution: what worked<br/>confidence: 0.5<br/>source: 'auto'"]
+        SUCCESS -->|"Yes (lesson used)"| BUMP["recordOutcome(lessonId, true)<br/>confidence += 0.05<br/>successCount++"]
+        SUCCESS -->|"No"| RETRY["Retry with LLM<br/>Track lastBrowseError"]
+        RETRY --> BROWSE
+        SAVE --> DB["SkillLesson Table<br/>PostgreSQL"]
+        BUMP --> DB
+    end
+
+    subgraph LIFECYCLE["📈 Lesson Lifecycle"]
+        NEW["New Lesson<br/>confidence: 0.5"] --> GROWING["Growing<br/>confidence: 0.6-0.8"]
+        GROWING --> TRUSTED["Trusted<br/>confidence: 0.8+"]
+        GROWING --> DECAYING["Decaying (failures)<br/>confidence < 0.3"]
+        DECAYING --> HIDDEN["Hidden from prompt<br/>(below threshold)"]
+    end
+
+    style MATCH fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style LESSONS fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style EXEC fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style LEARN fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style LIFECYCLE fill:#fce4ec,stroke:#c62828,stroke-width:2px

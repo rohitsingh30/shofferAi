@@ -1,0 +1,40 @@
+sequenceDiagram
+    actor User
+    participant UI as Next.js Chat UI
+    participant API as POST /api/agent/execute
+    participant Agent as AgentExecutor
+    participant LLM as Azure OpenAI
+    participant SMCP as SessionMCPHost
+    participant Relay as RemoteMCPHost / RelayBridge
+    participant Laptop as RelayServer + MCPHost
+    participant Chrome as Chrome Debug (CDP)
+
+    User->>UI: "Book hotel in Mumbai"
+    UI->>API: POST {message, taskId}
+    API->>API: Create Task + SessionMCPHost(mcpHost, taskId)
+    API-->>UI: SSE stream opens
+
+    API->>Agent: execute(message, callbacks)
+    Agent->>Agent: matchSkill() → BookingComHotel
+    Agent->>Agent: loadLessons(skillId, top 10)
+    Agent->>Agent: buildSystemPrompt(user, skills, lessons)
+
+    loop LLM Tool Loop (max 50 iterations)
+        Agent->>LLM: chat.completions.create(messages)
+        LLM-->>Agent: tool_call: browse_website(url, instruction)
+        Agent-->>UI: SSE: {type: "step", content: "Searching hotels..."}
+        Agent->>SMCP: callTool("browser_snapshot", {sessionId})
+        SMCP->>SMCP: Inject sessionId into args
+        SMCP->>Relay: callTool(name, args + sessionId)
+        Relay->>Laptop: ToolCallRequest {id, name, args}
+        Laptop->>Chrome: Playwright MCP action
+        Chrome-->>Laptop: DOM snapshot / result
+        Laptop-->>Relay: ToolCallResponse {id, result}
+        Relay-->>SMCP: result
+        SMCP-->>Agent: result (truncated to 4000 chars)
+        Agent->>Agent: addToolResult → ConversationManager
+    end
+
+    Agent-->>UI: SSE: {type: "complete", summary: "Booking confirmed!"}
+    Agent->>SMCP: releaseSession(taskId)
+    SMCP->>Relay: SessionEndRequest → release Chrome slot

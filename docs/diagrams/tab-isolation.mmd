@@ -1,0 +1,37 @@
+sequenceDiagram
+    participant API as Execute Route
+    participant SMCP as SessionMCPHost
+    participant MCP as RemoteMCPHost / RelayBridge
+    participant RS as RelayServer (Laptop)
+    participant Pool as ChromePool
+    participant Tab1 as Chrome Tab 1 (Task A)
+    participant Tab2 as Chrome Tab 2 (Task B)
+
+    Note over API,Pool: Two concurrent tasks arrive
+
+    API->>SMCP: new SessionMCPHost(mcpHost, "task-A")
+    API->>SMCP: new SessionMCPHost(mcpHost, "task-B")
+
+    Note over SMCP: Each wrapper injects unique sessionId
+
+    SMCP->>MCP: callTool("browser_navigate", {url, sessionId: "task-A"})
+    MCP->>RS: ToolCallRequest {args: {sessionId: "task-A"}}
+    RS->>Pool: getOrCreateTab("task-A")
+    Pool->>Tab1: Create new tab for task-A
+    Tab1-->>RS: Navigate result
+    RS-->>MCP: ToolCallResponse
+
+    SMCP->>MCP: callTool("browser_click", {ref, sessionId: "task-B"})
+    MCP->>RS: ToolCallRequest {args: {sessionId: "task-B"}}
+    RS->>Pool: getOrCreateTab("task-B")
+    Pool->>Tab2: Create new tab for task-B
+    Tab2-->>RS: Click result
+    RS-->>MCP: ToolCallResponse
+
+    Note over Pool: Each sessionId maps to isolated Chrome tab
+    Note over Pool: Tab released on SessionEndRequest
+
+    SMCP->>MCP: SessionEndRequest {sessionId: "task-A"}
+    MCP->>RS: Release session
+    RS->>Pool: releaseTab("task-A")
+    Pool->>Tab1: Close tab

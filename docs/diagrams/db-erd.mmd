@@ -1,0 +1,113 @@
+erDiagram
+    User {
+        string id PK
+        string name
+        string email UK
+        string hashedPassword
+        string image
+        datetime createdAt
+        datetime updatedAt
+    }
+    
+    Account {
+        string id PK
+        string userId FK
+        string type
+        string provider
+        string providerAccountId
+    }
+    
+    Session {
+        string id PK
+        string sessionToken UK
+        string userId FK
+        datetime expires
+    }
+    
+    Credential {
+        string id PK
+        string userId FK
+        string siteDomain
+        string encryptedData
+        string iv
+        string tag
+        datetime createdAt
+        datetime updatedAt
+    }
+    
+    Task {
+        string id PK
+        string userId FK
+        string status
+        string skillName
+        string summary
+        datetime createdAt
+        datetime updatedAt
+    }
+    
+    TaskStep {
+        string id PK
+        string taskId FK
+        int stepNumber
+        string status
+        string description
+        string result
+        datetime createdAt
+    }
+    
+    Message {
+        string id PK
+        string taskId FK
+        string role
+        string content
+        json toolCalls
+        datetime createdAt
+    }
+    
+    Payment {
+        string id PK
+        string taskId FK
+        string userId FK
+        string status
+        int amountCents
+        int serviceFeeCents
+        int totalCents
+        string currency
+        string razorpayOrderId UK
+        string razorpayPaymentId
+        string bookingSummary
+        datetime paidAt
+    }
+    
+    SkillLesson {
+        string id PK
+        string skillId
+        string errorPattern
+        string resolution
+        string source
+        float confidence
+        int successCount
+        int failureCount
+        datetime lastUsedAt
+        datetime expiresAt
+    }
+    
+    TelemetryEvent {
+        string id PK
+        string userId FK
+        string taskId FK
+        string eventType
+        json payload
+        datetime createdAt
+    }
+
+    User ||--o{ Account : has
+    User ||--o{ Session : has
+    User ||--o{ Credential : stores
+    User ||--o{ Task : creates
+    User ||--o{ Payment : makes
+    User ||--o{ TelemetryEvent : generates
+    Task ||--o{ TaskStep : contains
+    Task ||--o{ Message : has
+    Task ||--o| Payment : "paid via"
+    Task ||--o{ TelemetryEvent : tracks

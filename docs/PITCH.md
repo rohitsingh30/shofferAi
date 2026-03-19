@@ -207,12 +207,12 @@ And it gets done. For real.
 │                     Voice Interface (Web Speech API) │
 │                     Real-time WebSocket Connection    │
 │                                                      │
-│   AI ENGINE         Claude API (Anthropic)           │
+│   AI ENGINE         Azure OpenAI (via openai npm)    │
 │                     Task Planning & Reasoning        │
 │                     Natural Language Understanding    │
 │                                                      │
 │   AUTOMATION        Playwright MCP (Microsoft)       │
-│                     Headless Browser Control          │
+│                     Headed Browser Control            │
 │                     Multi-site Workflow Execution     │
 │                                                      │
 │   SECURITY          AES-256-GCM Encryption           │
@@ -228,7 +228,7 @@ And it gets done. For real.
 
 **Why this stack?**
 
-- **Claude API** — best-in-class reasoning for complex, multi-step task planning. Outperforms GPT-4 on agentic benchmarks.
+- **Claude API** — best-in-class reasoning for complex, multi-step task planning. Currently using Azure OpenAI as the primary LLM provider with Anthropic format translation layer.
 - **Playwright MCP** — Microsoft-backed, enterprise-grade browser automation. Reliable, fast, and battle-tested.
 - **Next.js** — full-stack React framework for a responsive, production-ready web app.
 - **AES-256-GCM** — military-grade encryption standard. Your payment data is encrypted at rest and in transit, never exposed to the AI model.

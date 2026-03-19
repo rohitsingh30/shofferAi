@@ -1,0 +1,49 @@
+graph TB
+    subgraph CLOUD["☁️ GCP Cloud Run"]
+        direction TB
+        UI["🖥️ Next.js 15<br/>Chat UI + Auth + L2 Payment"]
+        API["📡 API Routes<br/>/api/agent/execute<br/>/api/payments/*<br/>/api/auth/*"]
+        AGENT["🤖 AgentExecutor<br/>Azure OpenAI LLM Loop<br/>Skill Matching + Lessons"]
+        DB["🗄️ Cloud SQL<br/>PostgreSQL"]
+        PAY["💳 Razorpay<br/>UPI / Card / Wallet"]
+        
+        subgraph RELAY_CLOUD["Relay Layer"]
+            SMCP["SessionMCPHost<br/>Per-task tab isolation"]
+            RMCP["RemoteMCPHost<br/>WS Client (dev)"]
+            RB["RelayBridge<br/>Accepts WS IN (prod)"]
+        end
+        
+        UI --> API
+        API --> AGENT
+        AGENT --> SMCP
+        SMCP --> RMCP
+        SMCP --> RB
+        API --> DB
+        API --> PAY
+    end
+
+    subgraph TUNNEL["🔒 WebSocket Tunnel"]
+        CF["Cloudflare Tunnel<br/>Encrypted WSS"]
+    end
+
+    subgraph LAPTOP["💻 Operator Laptop"]
+        direction TB
+        RS["📡 RelayServer<br/>Port 8765"]
+        MCP["🎭 MCPHost<br/>Playwright MCP (stdio)"]
+        POOL["🏊 ChromePool<br/>Tab Management"]
+        CHROME["🌐 Chrome Debug<br/>CDP Port 9222<br/>Profile 3 (signed-in)"]
+        
+        RS --> MCP
+        MCP --> POOL
+        POOL --> CHROME
+    end
+
+    USER["👤 User<br/>Browser"] -->|"HTTPS + SSE"| UI
+    RMCP -->|"WSS (dev mode)"| CF
+    CF -->|"WS"| RS
+    RB <-->|"WS (prod mode)"| RS
+
+    style CLOUD fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style LAPTOP fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style TUNNEL fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style RELAY_CLOUD fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px

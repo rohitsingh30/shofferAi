@@ -1,0 +1,30 @@
+graph TB
+    subgraph DEV["🔧 Dev Mode (RELAY_MODE=local)"]
+        direction LR
+        C1["Cloud Run<br/>RemoteMCPHost"] -->|"1. Connects OUT<br/>ws://localhost:8765"| L1["Laptop<br/>RelayServer"]
+        L1 -->|"2. Accepts connection"| M1["MCPHost<br/>Playwright"]
+        
+        note1["Cloud initiates connection<br/>Auto-reconnect: 1s, 2s, 4s... max 30s<br/>Heartbeat: 15s ping, 45s timeout"]
+    end
+    
+    subgraph PROD["🚀 Prod Mode (RELAY_MODE=cloud)"]
+        direction LR
+        L2["Laptop<br/>RelayServer"] -->|"1. Connects IN<br/>wss://cloud-run-url"| C2["Cloud Run<br/>RelayBridge"]
+        C2 -->|"2. setLaptopSocket()"| A2["AgentExecutor<br/>callToolWithSession()"]
+        
+        note2["Laptop initiates connection<br/>No Cloudflare Tunnel needed<br/>RelayBridge accepts incoming WS"]
+    end
+    
+    subgraph PROTO["📋 Shared Relay Protocol"]
+        direction TB
+        REQ1["ToolCallRequest<br/>{id, type, name, args, sessionId}"]
+        REQ2["ToolListRequest<br/>{id, type}"]
+        RES1["ToolCallResponse<br/>{id, type, result, error}"]
+        RES2["ToolListResponse<br/>{id, type, tools[]}"]
+        HB["Heartbeat<br/>{type: ping|pong, timestamp}"]
+        SE["SessionEndRequest<br/>{sessionId} → release Chrome slot"]
+    end
+
+    style DEV fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style PROD fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style PROTO fill:#fff8e1,stroke:#f57f17,stroke-width:2px

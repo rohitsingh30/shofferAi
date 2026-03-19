@@ -47,7 +47,7 @@ Unlike traditional SaaS where each user brings their own credentials, ShofferAI 
  USER (Browser)                    GCP CLOUD RUN                         OPERATOR LAPTOP
 ┌──────────┐    HTTPS    ┌──────────────────────────┐    WSS Tunnel    ┌──────────────────────┐
 │  Next.js  │◄──────────►│  Next.js App (SSR+API)   │◄────────────────►│  Laptop Agent Runner │
-│  Chat UI  │            │  ├─ Claude Agent Core     │  (Cloudflare)   │  ├─ Relay Server (WS) │
+│  Chat UI  │            │  ├─ Azure OpenAI Agent    │  (Cloudflare)   │  ├─ Relay Server (WS) │
 │  L2 Pay   │            │  ├─ RemoteMCPHost ────────┼─────────────────┤  ├─ MCPHost (local)   │
 │           │            │  ├─ Razorpay Payments     │                 │  └─ Playwright MCP    │
 │           │            │  └─ PostgreSQL (Cloud SQL)│                 │     (headed, signed in)│
@@ -152,23 +152,27 @@ CLOSED ──► OPENING (300ms slide-in) ──► OPEN (user interacts) ──
 
 ## 5. Technical Requirements
 
-### 5.1 Relay Package (`packages/relay/`)
+### 5.1 Relay Layer (`apps/web/lib/relay-client.ts` + `relay-bridge.ts`, `packages/shared/src/relay.ts`)
 
 | Requirement | Detail |
 |-------------|--------|
-| Protocol | WebSocket with JSON messages. Request/response matching via unique message IDs |
-| Message types | `ToolCallRequest`, `ToolCallResponse`, `ToolListRequest`, `ToolListResponse`, `Heartbeat` |
+| Protocol | WebSocket with JSON messages. Request/response matching via unique message IDs (UUID) |
+| Message types | `ToolCallRequest`, `ToolCallResponse`, `ToolListRequest`, `ToolListResponse`, `SessionEndRequest`, `Heartbeat` |
+| Dev mode | `RemoteMCPHost` (`relay-client.ts`) — cloud connects OUT to `ws://localhost:8765` |
+| Prod mode | `RelayBridge` (`relay-bridge.ts`) — laptop connects IN, no Cloudflare Tunnel needed |
 | Reconnection | Auto-reconnect with exponential backoff (1s, 2s, 4s, max 30s) |
-| Timeout | Tool calls timeout after 60s. Heartbeat every 15s |
-| Concurrency | Support multiple concurrent tool calls (each tracked by ID) |
+| Timeout | Tool calls timeout after 60s. Heartbeat every 15s, dead at 45s |
+| Concurrency | Support multiple concurrent tool calls (each tracked by UUID) |
+| Tab isolation | `SessionMCPHost` (`session-mcp-host.ts`) injects `sessionId` per task |
 | Auth | Shared secret token in WS handshake header (RELAY_AUTH_TOKEN) |
 
-### 5.2 RemoteMCPHost (`packages/browser-engine/`)
+### 5.2 MCPHostLike Interface (`packages/shared/src/mcp.ts`)
 
 | Requirement | Detail |
 |-------------|--------|
-| Interface | Identical to `MCPHost`: `connect()`, `getTools()`, `callTool()`, `disconnect()` |
-| Drop-in | AgentExecutor takes either MCPHost or RemoteMCPHost — zero changes to agent-core |
+| Interface | `MCPHostLike`: `callTool()`, `getTools()`, `isMCPTool()`, `disconnect()` |
+| Implementations | `MCPHost` (local), `RemoteMCPHost` (dev relay), `RelayBridge` (prod relay), `SessionMCPHost` (per-task wrapper) |
+| Drop-in | AgentExecutor accepts any MCPHostLike — zero changes when switching relay modes |
 | Error handling | On WS disconnect: throw `BrowserError("Browser relay disconnected")` |
 | Tool caching | Cache tool list after first `getTools()` call, refresh on reconnect |
 

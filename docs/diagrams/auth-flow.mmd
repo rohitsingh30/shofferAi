@@ -1,0 +1,39 @@
+sequenceDiagram
+    actor User
+    participant UI as Login / Register Page
+    participant Auth as NextAuth v5
+    participant DB as PostgreSQL
+    participant Session as JWT Session
+
+    alt Credentials Login
+        User->>UI: Enter email + password
+        UI->>Auth: signIn("credentials", {email, password})
+        Auth->>DB: Find user by email
+        DB-->>Auth: User record
+        Auth->>Auth: bcrypt.compare(password, hash)
+        Auth-->>Session: Create JWT {userId, email, name}
+        Session-->>UI: Set cookie + redirect to /dashboard
+    end
+
+    alt Google OAuth
+        User->>UI: Click "Sign in with Google"
+        UI->>Auth: signIn("google")
+        Auth->>Auth: Redirect to Google OAuth
+        User->>Auth: Authorize on Google
+        Auth->>DB: Find or create User + Account
+        DB-->>Auth: User record
+        Auth-->>Session: Create JWT {userId, email, name}
+        Session-->>UI: Set cookie + redirect to /dashboard
+    end
+
+    alt New User Registration
+        User->>UI: Enter name + email + password
+        UI->>Auth: POST /api/auth/register
+        Auth->>Auth: bcrypt.hash(password, 12)
+        Auth->>DB: Create User {name, email, hashedPassword}
+        DB-->>Auth: New user created
+        Auth-->>Session: Auto sign-in → JWT
+        Session-->>UI: Redirect to /onboarding
+    end
+
+    Note over Session: JWT contains: userId, email, name<br/>Used by API routes via getServerSession()
