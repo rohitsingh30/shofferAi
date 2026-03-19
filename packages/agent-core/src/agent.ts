@@ -516,6 +516,38 @@ export class AgentExecutor {
             lowerText.includes('stuck') ||
             lowerText.includes('not rendering') ||
             (lowerText.includes('browser') && lowerText.includes('fail'));
+          // Detect if the LLM described a handoff instead of calling the tool
+          const looksLikeHandoff = !looksLikeError &&
+            (lowerText.includes('hand off') || lowerText.includes('handoff') ||
+             lowerText.includes('handing off') || lowerText.includes('start the booking') ||
+             lowerText.includes('start the search') || lowerText.includes('start searching') ||
+             lowerText.includes('i will now search') || lowerText.includes('i\'ll now search') ||
+             lowerText.includes('will now search') || lowerText.includes('proceeding to book') ||
+             lowerText.includes('booking process') || lowerText.includes('i have everything'));
+
+          if (looksLikeHandoff && this.matchedSkill && callbacks.onTaskHandoff) {
+            logger.warn('LLM described handoff as text instead of calling tool — auto-triggering handoff');
+            // Replace the last assistant message with one containing the handoff tool call
+            const syntheticId = `auto_handoff_${Date.now()}`;
+            this.conversation.replaceLastMessage([
+              { type: 'text', text: fullText } as ContentBlock,
+              {
+                type: 'tool_use', id: syntheticId, name: 'handoff_to_browser_agent',
+                input: {
+                  task_description: fullText,
+                  extracted_params: this.collectedParams,
+                },
+              } as ContentBlock,
+            ]);
+
+            const result = await this.handleToolCall(
+              { type: 'tool_use', id: syntheticId, name: 'handoff_to_browser_agent', input: { task_description: fullText, extracted_params: this.collectedParams } },
+              callbacks,
+            );
+            this.conversation.addToolResult(syntheticId, JSON.stringify(result));
+            continue;
+          }
+
           const looksLikeQuestion = !looksLikeError && fullText.includes('?') &&
             (lowerText.includes('address') ||
              lowerText.includes('phone') ||
