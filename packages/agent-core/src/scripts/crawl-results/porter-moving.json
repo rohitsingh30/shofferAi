@@ -1,0 +1,13 @@
+{
+  "skillName": "porter-moving",
+  "siteUrl": "https://porter.in",
+  "crawledAt": "2026-03-16T14:27:11.846Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"rating\"]"
+  },
+  "pageTitle": "Reliable & Hassle-Free Goods Transportation in India - Porter",
+  "pageUrl": "https://porter.in/",
+  "snapshotSummary": "For Enterprise\nDriver Partner\nSupport\nDelivery Aapki,\nTransport Hamara\n\nCity:\n\nAhmedabad\n\nTruck\nTwo Wheeler\nPackers & Movers\nGet an Estimate\n(takes ~2 mins)\nOur services\nPorter Enterprise\nStreamlining operations to drive business growth\nAPI Integration\nAutomate the transportation of your goods by integrating our APIs\nTwo-Wheelers\nReliable goods transportation services for up to 20 kg\nTrucks\nHassle-free goods transportation up to 2500 kg\nPackers & Movers\nHouse shifting hai? Ho Jayega\nAnd thanks t"
+}

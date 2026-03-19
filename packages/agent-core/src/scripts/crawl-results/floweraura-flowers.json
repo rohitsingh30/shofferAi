@@ -1,0 +1,16 @@
+{
+  "skillName": "floweraura-flowers",
+  "siteUrl": "https://www.floweraura.com",
+  "crawledAt": "2026-03-16T13:49:24.881Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "cartIcon": "[class*=\"cart-icon\"]",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "FlowerAura #1 Florist for Flower Delivery, Cakes & Gifts in India",
+  "pageUrl": "https://www.floweraura.com/",
+  "snapshotSummary": "FlowerAura\nDeliver To ?\n\nChoose Delivery Location\n\nSearch for\nflowers\n\nTrack Order\n\n0\n\nCart\nINR\nSign In\nMore\nFlowers\nCakes\nCombos\nBirthday\nAnniversary\nGifts\nPersonalised\nPlants\nChocolates\nOccasions\nInternational\n\nFlowers\nCakes\nCombos\nBalloon Decor\nPersonalised\nPlants\nHampers\nSame Day\nInternational\nShop By Occasions & Relations\n\nSurprise Your Loved Ones\n\nBirthday Gifts\nAnniversary Gifts\nGifts for Him\nGifts for Her\nBest Selling Flowers & Gifts\nView All\n\nSurprise Your Loved Ones\n\n30-Min Delivery\n10"
+}

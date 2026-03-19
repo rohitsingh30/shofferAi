@@ -1,0 +1,18 @@
+{
+  "skillName": "upwork-freelance",
+  "siteUrl": "https://www.upwork.com",
+  "crawledAt": "2026-03-16T14:49:59.590Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Log in\")",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "Upwork | Hire Top Freelance Talent with Confidence",
+  "pageUrl": "https://www.upwork.com/",
+  "snapshotSummary": "Skip to content\nUpwork home\nHire freelancers\nFind work\nWhy Upwork\nWhat’s new\nPricing\nFor enterprise\n:\n \nL\ni\nf\nt\ne\nd\nLog in\nSign up\nStop doing everything. Hire the top 1% of talent on Business Plus.\nGet started\nConnecting businesses in need to freelancers who deliver\nFind talent\nBrowse jobs\nSearch\nExplore millions of pros\nAI Services\nDevelopment & IT\nDesign & Creative\nSales & Marketing\nWriting & Translation\nAdmin & Support\nFinance & Accounting\nLegal\nHR & Training\nEngineering & Architecture\nHow it"
+}

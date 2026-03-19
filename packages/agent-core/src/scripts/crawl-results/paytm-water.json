@@ -1,0 +1,12 @@
+{
+  "skillName": "paytm-water",
+  "siteUrl": "https://paytm.com/water-bill-payment",
+  "crawledAt": "2026-03-16T14:24:26.146Z",
+  "success": true,
+  "selectors": {
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Water Bill Payment - Pay Online Water Bill at Paytm.com",
+  "pageUrl": "https://paytm.com/water-bill-payment",
+  "snapshotSummary": "Recharge & Bills\nTicket Booking\nPayments & Services\nPaytm for Business\nCompany\nDownload App\nSign In\nPrepaid/Postpaid\nElectricity\nDTH\nMetro\nBroadband/Landline\nEducation\nPay Loan\nInvest in Stocks\nBook a Cylinder\nPaytm First\nInsurance/LIC Premium\nMore\nPay Water Bill\nWater Board\nProceed\nWater Board\nAP PHED Itanagar and Naharlagun Bill Payment\nBangalore Water Supply and Sewerage Board (BWSSB) Bill Payment\nChandrapur Municipal Corporation Bill Payment\nChennai Metropolitan Water Supply And Sewerage Boa"
+}

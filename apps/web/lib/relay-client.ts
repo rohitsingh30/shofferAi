@@ -37,6 +37,7 @@ export class RelayClient {
   private reconnectDelay = 1000;
   private connected = false;
   private shouldReconnect = true;
+  private lastPongAt = Date.now();
   private options: Required<RelayClientOptions>;
 
   constructor(options: RelayClientOptions = {}) {
@@ -111,6 +112,7 @@ export class RelayClient {
 
   private handleMessage(msg: RelayMessage): void {
     if (isHeartbeatPong(msg)) {
+      this.lastPongAt = Date.now();
       return;
     }
 
@@ -206,8 +208,14 @@ export class RelayClient {
   }
 
   private startHeartbeat(): void {
+    this.lastPongAt = Date.now();
     this.heartbeatInterval = setInterval(() => {
       if (this.ws && this.connected) {
+        if (Date.now() - this.lastPongAt > 45000) {
+          logger.warn('Relay client: no heartbeat pong for 45s, closing dead connection');
+          this.ws.close();
+          return;
+        }
         this.ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
       }
     }, this.options.heartbeatIntervalMs);

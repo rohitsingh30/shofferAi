@@ -1,0 +1,13 @@
+{
+  "skillName": "confirmtkt-train",
+  "siteUrl": "https://www.confirmtkt.com",
+  "crawledAt": "2026-03-16T13:39:19.092Z",
+  "success": true,
+  "selectors": {
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "IRCTC Train Ticket Booking, Easy IRCTC Login | ConfirmTkt",
+  "pageUrl": "https://www.confirmtkt.com/",
+  "snapshotSummary": ""
+}

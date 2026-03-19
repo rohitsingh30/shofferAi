@@ -1,0 +1,15 @@
+{
+  "skillName": "booking-flight",
+  "siteUrl": "https://www.booking.com/flights",
+  "crawledAt": "2026-03-16T13:31:49.429Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "Find cheap flights & plane tickets | Booking.com",
+  "pageUrl": "https://www.booking.com/flights/index.html?label=gen173nr-10EgdmbGlnaHRzKIICOOgHSDNYBGhsiAEBmAEzuAEHyAEM2AED6AEB-AEBiAIBqAIBuALJjODNBsACAdICJGU5YzAwOTIxLTRiZWYtNDg2NS1iZjQ1LTc0ZDMwNWRiYWU0MNgCAeACAQ&sid=940636b07bffb1b395ccc6d77d79dcac&keep_landing=1&",
+  "snapshotSummary": "Skip to main content\nINR\nRegister\nSign in\nStays\nFlights\nFlight + Hotel\nCar rental\nAttractions\nAirport taxis\nCompare and book cheap flights with ease\nDiscover your next dream destination\nRound-trip\nOne-way\nMulti-city\nEconomy\nPremium economy\nBusiness\nFirst-class\nEconomy\nDirect flights only\nLeaving from\nHYD Rajiv Gandhi International Airport\nGoing to\nTravel dates\nSat, Apr 18 – Sat, Apr 25\nTravelers\n1 adult\nExplore\nImportant travel update\n\nDue to flight disruptions in the Middle East, we’re currentl"
+}

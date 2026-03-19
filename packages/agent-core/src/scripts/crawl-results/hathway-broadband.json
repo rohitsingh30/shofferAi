@@ -1,0 +1,15 @@
+{
+  "skillName": "hathway-broadband",
+  "siteUrl": "https://www.hathway.com",
+  "crawledAt": "2026-03-16T13:54:44.961Z",
+  "success": true,
+  "selectors": {
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Hathway: Best Service Provider for Fiber WiFi, Broadband & Digital TV",
+  "pageUrl": "https://www.hathway.com/",
+  "snapshotSummary": "Broadband  Business Broadband  Digital Cable TV  Investor Relations Support \nHathway Offers Committed Speed of 300 Mbps\n\nFiber-to-home broadband, Redefined Internet Excellence!\n\nLearn more\nFast. Faster. Fastest\n\nFeel the difference with committed speed of 300 Mbps\n\nView our latest plans\nExperience broadband like Never Before\nEnd to end fiber\nCommitted speed\nof 300 Mbps\nEqual upload and\ndownload speed\nView our latest plans\nHD Entertainment at your fingertips\n\nRedfine Your digital entertainment ex"
+}

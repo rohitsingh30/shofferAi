@@ -1,0 +1,14 @@
+{
+  "skillName": "fortis-hospital",
+  "siteUrl": "https://www.fortishealthcare.com",
+  "crawledAt": "2026-03-16T13:49:43.751Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": "[class*=\"listing\"]",
+    "cardTitle": "[class*=\"name\"]"
+  },
+  "pageTitle": "Best Hospital in India for Healthcare Services - Fortis Healthcare",
+  "pageUrl": "https://www.fortishealthcare.com/",
+  "snapshotSummary": "Find a Doctor\nInvestors\nAbout us\nCareers\nCSR\nContact us\n--Select--\nBangalore\nDelhi NCR\nMumbai\nAmritsar\nFaridabad\nGurgaon\nManesar\nJaipur\nKolkata\nLudhiana\nMohali\nNoida\nGreater Noida\nChennai\nHyderabad\nHospitals\nSpecialties\nCentre of Excellence\nMedia Centre\nMedical Services\nPatient Corner\nInternational Section\nRequest a Callback\nBook Appointment\nGet Health Checkup\nHealthcare for Good Today. Tomorrow. Always\nBook an Appointment\n\nWith country's leading experts\n\nHospitals\n\nHealth needs under one roof\n\n"
+}

@@ -1,0 +1,12 @@
+{
+  "skillName": "mmt-bus",
+  "siteUrl": "https://www.makemytrip.com/bus-tickets",
+  "crawledAt": "2026-03-16T14:13:22.931Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "Online Bus Ticket Booking, Book Confirmed Reservation Tickets @ MakeMyTrip",
+  "pageUrl": "https://www.makemytrip.com/bus-tickets/",
+  "snapshotSummary": "List Your Property\n\nGrow your business!\n\nIntroducing myBiz\n\nBusiness Travel Solution\n\nWishlist\n\nSave favourites\n\nMy Trips\n\nManage your bookings\n\n \n\nLogin or Create Account\n\nFlights\nHotels\nVillas & Homestays\nHoliday Packages\nTrains\nBuses\nCabs\nTours & Attractions\nnew\nVisa\nCruise\nnew\nForex Card & Currency\nTravel Insurance\n\nMAKEMYTRIP\n\nAbout Us, Investor Relations, Careers, MMT Foundation, CSR Policy & Committee, myPartner - Travel Agent Portal, List your hotel, Partners- Redbus, Partners- Goibibo, "
+}

@@ -1,0 +1,16 @@
+{
+  "skillName": "apna-jobs",
+  "siteUrl": "https://apna.co",
+  "crawledAt": "2026-03-16T13:26:19.415Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Login\")",
+    "locationInput": "input[placeholder*=\"city\" i]"
+  },
+  "pageTitle": "Search Jobs Online | Hire Candidates | Post a Job | apna.co",
+  "pageUrl": "https://apna.co/",
+  "snapshotSummary": "Jobs\nJob Prep\nNEW\nContests\nNEW\nDegree\nNEW\nResume Tools\n\nEmployer Login\n\nCandidate Login\nINDIA’S #1 JOB PLATFORM\nYour job search ends here\nDiscover 50 lakh+ career opportunities\n\nYour Experience\n\nSearch jobs\nProud to Support\nTrusted by 1000+ enterprises and 7 lakh+ MSMEs for hiring\nJob Prep\nPractice interviews with Free AI Interview Coach\nView all Preps\nSystem Architect\nNvidia\nPractice Interview\n\n5 min AI Interview\n\nSoftware Developer\nGoogle\nPractice Interview\n\n5 min AI Interview\n\nProduct Manager"
+}

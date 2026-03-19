@@ -1,0 +1,18 @@
+{
+  "skillName": "babyoye-baby",
+  "siteUrl": "https://www.babyoye.com",
+  "crawledAt": "2026-03-16T13:28:07.624Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cartIcon": "[class*=\"cart-icon\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]",
+    "locationInput": "input[placeholder*=\"address\" i]"
+  },
+  "pageTitle": "BabyOye Online Shopping Store – Buy at FirstCry.com",
+  "pageUrl": "https://www.firstcry.com/babyoye-store",
+  "snapshotSummary": "Stores & Preschools\nSupport\nTrack Order\nFirstCry Parenting\nLogin / Register\nShortlist\n0\nCart\n\nFirstcry Happiness now delivered the \"SAME DAY & NEXT DAY\".\n\nJust enter your Pincode and see delivery timelines on product pages.\n\nCHECK\nBABY GIRL(0-24M)\nBABY BOY(0-24M)\nGIRL(2Years +)\nBOY(2Years +)\nCATEGORIES\nClothing & Fashion\nToys\nBooks & CDs\nSchool Supplies\nBirthday Party Supplies\nBaby Diapering\nFeeding & Nursing\nBath & Skin Care\nHealth & Safety\nBaby Gear\nNursery\nMoms & Maternity\nGifts\nPreschool Adm"
+}

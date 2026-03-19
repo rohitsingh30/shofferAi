@@ -1,0 +1,12 @@
+{
+  "skillName": "dineout-table",
+  "siteUrl": "https://www.swiggy.com/dineout",
+  "crawledAt": "2026-03-16T13:43:24.213Z",
+  "success": true,
+  "selectors": {
+    "locationInput": "[data-testid*=\"location\"]"
+  },
+  "pageTitle": "Discover Dining Out Restaurants In Hyderabad And Book A Table",
+  "pageUrl": "https://www.swiggy.com/dineout",
+  "snapshotSummary": "Others\nSurvey no. 177, 177, Tellapur Rd, Gopanpally, Gachibowli, Hyderabad, Nallagandla, Telangana 500046, India\nSearch for restaurant and food\n1 items | ₹409\nExtra Charges may apply\nView Cart\nExplore Top Dining Out Restaurants in Hyderabad\nFilter\nSort By\nBook a table\nWithin 5km\nRating 4+\nPure Veg\nServes Alcohol\nGIRF SPECIAL\nTheth Masala\n4.0\nChinese • North Indian\n₹1200 for two\nLingampally, Hyderabad\n1.4 km\nTable booking\nFlat 10% off on pre-booking\n+ 2 more\nUp to 10% off with bank offers\nGIRF SP"
+}

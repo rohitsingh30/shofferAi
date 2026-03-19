@@ -1,0 +1,8 @@
+{
+  "skillName": "bosch-store",
+  "siteUrl": "https://www.boschindia.com/",
+  "crawledAt": "2026-03-16T13:32:20.660Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.boschindia.com/\nCall log:\n\u001b[2m  - navigating to \"https://www.boschindia.com/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

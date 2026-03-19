@@ -1,0 +1,14 @@
+{
+  "skillName": "linkedin-job",
+  "siteUrl": "https://www.linkedin.com/jobs",
+  "crawledAt": "2026-03-16T14:07:53.475Z",
+  "success": true,
+  "selectors": {
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "LinkedIn Job Search: Find US Jobs, Internships, Jobs Near Me",
+  "pageUrl": "https://www.linkedin.com/jobs",
+  "snapshotSummary": "Skip to main content\nLinkedIn\nJoin now\nSign in\nMillions of jobs and people hiring\nEmail or phone\n\nPassword\nShow\n\nForgot password?\nSign in\n\nor\n\nBy clicking Continue to join or sign in, you agree to LinkedIn’s User Agreement, Privacy Policy, and Cookie Policy.\n\nContinue with Google\nNew to LinkedIn? Join now\nFind the right job or internship for you\nEngineering\nBusiness Development\nFinance\nAdministrative Assistant\nRetail Associate\nCustomer Service\nOperations\nInformation Technology\nMarketing\nHuman Re"
+}

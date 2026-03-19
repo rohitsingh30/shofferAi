@@ -1,0 +1,21 @@
+{
+  "skillName": "anveshan-ghee",
+  "siteUrl": "https://www.anveshan.farm",
+  "crawledAt": "2026-03-16T13:26:08.646Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "addToCart": "button:has-text(\"Add\")",
+    "cartIcon": "[data-testid*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Log in\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Anveshan - A shop for natural and healthy food products",
+  "pageUrl": "https://www.anveshan.farm/",
+  "snapshotSummary": "Skip to content\n\nPure Desi Ghee & Oils At 15% OFF | Use Code: PURE15\n\nGet extra 2% off on all prepaid orders\n\nGet 17% OFF On Anveshan App | Use Code APP17\n\nAll Products\nA2 Ghee\nWood-Pressed Oils\nAtta\nShop\nHealthy Combo\nAnveshan Health Partner\nBlogs\nLog in\nCart\nWelcome To Anveshan!\nYou're One Step Closer to Purity\nAll\nGhee\nOils\nCombos\nAtta\nDeal\nSuperfoods\n3%\nOFF\nBest Seller\nTop Rated Choice\nADD\nA2 Gir Cow Ghee - 5L Dolchi\n 4.4 (795 reviews)\n₹11,250\n₹10,913\nBest Price ₹9,091\nwith coupon\n3%\nOFF\nBes"
+}

@@ -1,0 +1,16 @@
+{
+  "skillName": "townscript-events",
+  "siteUrl": "https://www.townscript.com",
+  "crawledAt": "2026-03-16T14:46:39.646Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "All Events in India | Find Activities & Things to do - Townscript",
+  "pageUrl": "https://www.townscript.com/in/india",
+  "snapshotSummary": "India\nCREATE EVENT\nLogin | Signup\nBengaluru\n176 Events\nChennai\n47 Events\nDelhi\n314 Events\nHyderabad\n57 Events\nMumbai\n126 Events\nPune\n93 Events\nAhmedabad\n34 Events\nGurugram\n317 Events\nJaipur\n17 Events\nKolkata\n32 Events\nNoida\n318 Events\nRishikesh\n487 Events\nThane\n125 Events\nPopular Events\nIn India\nVIEW ALL\nContent India 2026\nMar 16\n|\nBandra West, Mumbai\n₹5,000\nonwards\nPNB Soldierathon Delhi 2026 -\nRun With Soldiers - Run For Soldiers\nApr 05\n|\nPragati Vihar, New Delhi\n₹320\nonwards\nDGS Maritime 10 K"
+}

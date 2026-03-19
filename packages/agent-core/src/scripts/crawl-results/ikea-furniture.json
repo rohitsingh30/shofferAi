@@ -1,0 +1,21 @@
+{
+  "skillName": "ikea-furniture",
+  "siteUrl": "https://www.ikea.com/in/en/",
+  "crawledAt": "2026-03-16T13:59:26.057Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardPrice": "[data-testid*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "addToCart": "[class*=\"add-to-cart\"]",
+    "cartIcon": "[class*=\"cart-icon\"]",
+    "loginBtn": "a:has-text(\"Log in\")",
+    "profileIcon": "[class*=\"profile\"]",
+    "popupClose": "[role=\"dialog\"] button:first-child"
+  },
+  "pageTitle": "IKEA India-Affordable home furniture, designs & ideas - IKEA",
+  "pageUrl": "https://www.ikea.com/in/en/",
+  "snapshotSummary": "Skip to main content\nINEnglish\nPlan your perfect home with us\nEnter postal code\nSelect store\nProducts\nRooms\nOffers\nInspiration\nDesign/Support\nClear the search input field\nSearch IKEA products using a photo\nSearch\nHej! Log in\nShopping list\nShopping bag\nSkip listing\nStorage & organisation\nSofas & armchairs\nOffice furniture & gaming\nBeds & mattresses\nHome textiles\nCurtains & blinds\nKitchenware & tableware\nTables & chairs\nHome Decor\nLighting\nOutdoor products\nModular kitchens\nBathroom products\nSmall "
+}

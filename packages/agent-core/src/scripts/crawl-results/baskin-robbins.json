@@ -1,0 +1,13 @@
+{
+  "skillName": "baskin-robbins",
+  "siteUrl": "https://www.baskinrobbinsindia.com",
+  "crawledAt": "2026-03-16T13:29:04.143Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h3",
+    "cartIcon": "[data-testid*=\"cart\"]"
+  },
+  "pageTitle": "Baskin Robbins India Store",
+  "pageUrl": "https://baskinrobbinsindia.com/",
+  "snapshotSummary": "REWARDS PROGRAM\nORDER NOW\nRewards Program\nOrder Now\nPartner With Us\nAbout Us\nOur Stores\n\nWhat’s New?\nTiramisu\nCheesecake\nORDER NOW\nClassic with Mango Sauce\nCheesecake\nORDER NOW\nBlueberry Crumble\nMuffin\nORDER NOW\nChoco Walnut\nBrownie\nORDER NOW\nSaffron\nGelato\nORDER NOW\nBiscoff Cheesecake\nGelato\nORDER NOW\nStrawberry & Cream\nGelato\nORDER NOW\nShop by Range\nAll time\nFavorites\nBlack Currant\nORDER NOW\nVery Berry Strawberry\nORDER NOW\nCotton Candy\nORDER NOW\nMississippi Mud\nORDER NOW\nInside Scoop\nHere Are "
+}

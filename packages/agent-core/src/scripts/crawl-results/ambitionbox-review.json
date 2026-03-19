@@ -1,0 +1,17 @@
+{
+  "skillName": "ambitionbox-review",
+  "siteUrl": "https://www.ambitionbox.com",
+  "crawledAt": "2026-03-16T13:25:49.731Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardRating": "[class*=\"star\"]",
+    "addToCart": "button:has-text(\"Add\")",
+    "loginBtn": "button:has-text(\"Login\")",
+    "profileIcon": "[data-testid*=\"profile\"]"
+  },
+  "pageTitle": "AmbitionBox | A safe place to have career-related conversations",
+  "pageUrl": "https://www.ambitionbox.com/",
+  "snapshotSummary": "AmbitionBox\n+\nContribute\nLogin\nHome\nCommunities\nCompanies\nReviews\nSalaries\nInterviews\nJobs\nAwards\nWINNERS AWAITED!\nFor Employers\nINDIA’S NO. 1 PLATFORM FOR\nSalary insights\nInterview advice\nReviews\n1.5 crore+\nusers\n4 Crore+\nsalaries\n95 Lakh+\nreviews\n10 Lakh+\ninterviews\nHello, Guest!\nLogin\nDiscover Communities\nBFSI\nHospitality\nJob Referrals\nManufacturing\nSalary Discussions\nView all communities\nTalk anonymously about career thoughts you hold back\nImage\nPoll\nSalary\nVideo\nTrending right now\nBreaking "
+}

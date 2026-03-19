@@ -1,0 +1,13 @@
+{
+  "skillName": "wazirx-crypto",
+  "siteUrl": "https://wazirx.com",
+  "crawledAt": "2026-03-16T14:54:47.399Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "loginBtn": "a:has-text(\"Log in\")"
+  },
+  "pageTitle": "Buy Bitcoin & Crypto on India’s Largest Exchange | WazirX",
+  "pageUrl": "https://wazirx.com/",
+  "snapshotSummary": "EXCHANGE\nHELP\nLOG IN\nSIGN UP\nF.I.U.\nRegistered\nIndia का\nBitcoin\nEthereum\nExchange\nTrusted By 15 million+ Indians\nSIGN UP\nKYC - Swift & Compliant\nExperience seamless onboarding with swift KYC processes, ensuring full compliance with regulations.\n24/7 Support\nLike a trusted friend, our 24/7 expert support is always there, making your investment journey smoother.\nSeamless API Trading\nAmplify your trading experience with WazirX through seamless API integration.\nFeatures You Will Love\nStay informed, "
+}

@@ -1,0 +1,13 @@
+{
+  "skillName": "angel-one-trading",
+  "siteUrl": "https://www.angelone.in",
+  "crawledAt": "2026-03-16T13:25:56.058Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Online Trading & Stock Broking in India | Angel One",
+  "pageUrl": "https://www.angelone.in/",
+  "snapshotSummary": "Open Demat Account\nLogin\nTrade & Invest\nMutual Funds & SIP\nLearn\nNews\nProducts\nBecome a Partner\nPricing\nSupport\nYour One-Stop Investment Platform\nA trusted partner with 25 years of experience\n+91\n\n₹0\n\nAccount Opening\nCharges\n\n3.5Cr+\n\nUsers\n\n₹0\n\nAMC for the\n1st year\n\n*Flat ₹0 brokerage for any orders placed in the first 30 days\n\nScan the QR Code to\n\nLogin/Register\n\nfrom your mobile\n\nTRANSPARENT PRICING. NO HIDDEN CHARGES\n0\n₹\nAccount Opening\nCharges\n0\n₹\n0 Brokerage* across all segments for first 3"
+}

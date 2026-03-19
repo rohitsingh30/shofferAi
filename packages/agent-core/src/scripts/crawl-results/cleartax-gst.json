@@ -1,0 +1,14 @@
+{
+  "skillName": "cleartax-gst",
+  "siteUrl": "https://cleartax.in/gst",
+  "crawledAt": "2026-03-16T13:37:40.253Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Best GST Software in India for Return Filing, Billing & Reconciliation | ClearTax",
+  "pageUrl": "https://cleartax.in/gst",
+  "snapshotSummary": "Products \nSolutions \nResources \nCompany \n\nGST\n\nWhy Us?\nData Integration\nFeatures \nSecurity\nTestimonials\nRequest a demo   →\nOne GST software.\nEvery challenge solved.\n\nPredictable | Accurate | AI-powered\n\nSmart recommended IMS actions\n\nEnable PAN-level filing- GSTR-1 to 9C\n\nAI-powered ITC reconciliation\n\n4.5\nRequest a demo\nTake a Tour\n  →\nTrusted by your favourite brands\nNew Updates\nWe've got you covered\n\nOur cloud-based GST software tackles the ever-evolving GST system updates without any IT/SOP "
+}

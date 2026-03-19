@@ -1,0 +1,18 @@
+{
+  "skillName": "lg-service",
+  "siteUrl": "https://www.lg.com/in/support/",
+  "crawledAt": "2026-03-16T14:06:57.419Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[aria-label*=\"search\" i]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardRating": "[class*=\"star\"]",
+    "addToCart": "button:has-text(\"Add\")",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "Get Product Help & Support | LG IN",
+  "pageUrl": "https://www.lg.com/in/support/",
+  "snapshotSummary": "For Business\nShop\nTV/Audio/Video\nHome Appliances\nAir Solutions\nComputing\nAccessories\nSupport\nLG AI\nInvestor Relations\nSearch\nMyLG\nCart\nHome\nSupport\n\nCustomer Service\n\nRepublic Day\n\nLG Extended\nWarranty Program\n\nLG Cares for you. You Only Enjoy\n\nLG Extended<br>Warranty Program\nRequest a Call Back\n\nCustomer Service\n\nRepublic Day\n\nLG Extended\nWarranty Program\n\nLG Cares for you. You Only Enjoy\n\nLG Extended<br>Warranty Program\nRequest a Call Back\nPrevious\nNext\nSupport hub\n\nIf you already have an LG a"
+}

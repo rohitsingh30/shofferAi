@@ -1,0 +1,8 @@
+{
+  "skillName": "realme-store",
+  "siteUrl": "https://www.realme.com/in/",
+  "crawledAt": "2026-03-16T14:30:27.138Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.realme.com/in/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

@@ -1,0 +1,16 @@
+{
+  "skillName": "coverfox-insurance",
+  "siteUrl": "https://www.coverfox.com",
+  "crawledAt": "2026-03-16T13:40:17.618Z",
+  "success": true,
+  "selectors": {
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardRating": "[class*=\"rating\"]",
+    "addToCart": "button:has-text(\"Buy Now\")",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Coverfox Insurance | Buy/Renew & Compare Car, Bike, and Health Online",
+  "pageUrl": "https://www.coverfox.com/",
+  "snapshotSummary": "RETAIL INSURANCE\nCar\nCar Insurance\nCompanies\nThird Party Car Insurance\nComprehensive Car Insurance\nCar Insurance Calculator\nZero Dep Car Insurance\nCar Insurance Articles\nCashless Garages\nBike\nTwo Wheeler Insurance\nTwo Wheeler Insurance Companies\nTwo Wheeler Insurance Claim\nTwo Wheeler Premium Calculator\nThird Party Bike Insurance\nMultiyear Bike Insurance\nBike Insurance Articles\nHealth\nHealth Insurance\nCompanies\nMediclaim Policy\nIndividual Health Insurance Plans\nCritical Illness Insurance\nSenior "
+}

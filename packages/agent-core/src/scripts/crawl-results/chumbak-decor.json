@@ -1,0 +1,21 @@
+{
+  "skillName": "chumbak-decor",
+  "siteUrl": "https://www.chumbak.com",
+  "crawledAt": "2026-03-16T13:36:08.923Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "addToCart": "button:has-text(\"Add to Cart\")",
+    "cartIcon": "[data-testid*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Chumbak | Celebrate a Life of Joy",
+  "pageUrl": "https://www.chumbak.com/",
+  "snapshotSummary": "Previous\n\nChumbak Express - Same day delivery in Bangalore\n\nNext\nChumbak\nGift Store\nHome & Decor\nBags & Travel\nWatches\nCollections\nNew Arrivals\nOpen account page\nOpen cart\nGo to item 1\nGo to item 2\n\nBags and travel\n\nADD TO CART\nThe Kyoto Shoulder Bag | Lost In Paradise\nMRP :\nSale price\n₹ 2,499\nRegular price\n₹ 3,599\n31% OFF\nADD TO CART\nThe New York Tote | Lost In Paradise\nMRP :\nSale price\n₹ 2,499\nRegular price\n₹ 3,599\n31% OFF\nADD TO CART\nThe Cape Town Tote | Lost In Paradise\nMRP :\nSale price\n₹ 2,"
+}

@@ -1,0 +1,15 @@
+{
+  "skillName": "abhibus-bus",
+  "siteUrl": "https://www.abhibus.com",
+  "crawledAt": "2026-03-16T13:19:55.115Z",
+  "success": true,
+  "selectors": {
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardPrice": "[class*=\"price\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Book Bus Tickets Online at Lowest Fare, Upto ₹500 off On Bus Booking | AbhiBus",
+  "pageUrl": "https://www.abhibus.com/",
+  "snapshotSummary": "Offers\nTrack Ticket\nNeed Help?\nLogin/SignUp\nBuses\nFlights\nTrains\nHotels\nIndia’s Fastest Bus Ticket Booking Platform\nDeparture\nTodayTomorrow\nSearch\nBus Booking Discount Offers\nView All\nWhy Choose AbhiBus for Bus Ticket Booking?\n\nExperience the next generation of travel with India's 4.8-star rated online bus ticket booking site. Trusted by millions across 6,50,000+ routes, AbhiBus combines a massive network of 6,200+ partners with industry-leading innovation. From our AI-powered 'New Bus' filter a"
+}

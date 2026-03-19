@@ -1,0 +1,12 @@
+{
+  "skillName": "dominos-pizza",
+  "siteUrl": "https://www.dominos.co.in",
+  "crawledAt": "2026-03-16T13:43:44.547Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "Domino’s Pizza – Order Online | Get 2 Regular Pizza @99 Each",
+  "pageUrl": "https://www.dominos.co.in/",
+  "snapshotSummary": "OUR MENU\nDOMINO'S STORES\nGIFT CARD\nCORPORATE ENQUIRY\nCONTACT\nDownload App\nDomino's online ordering\n\nYummy pizza delivered fast & fresh\n\nORDER ONLINE NOW\nHome\nCoupons & Offers\nExplore\nOUR MENU\n\nExplore our range of delicious Pizzas, delivered in 30 minutes!\n\nDISCOVER PIZZA\n \nNEARBY STORE\n\nFind a Domino’s Pizza restaurant near you\n\nFIND DOMINO'S STORE\n \nBIRTHDAY PARTY\n\nCelebrate the joy of birthday with Fresh & Hot pizzas\n\nBOOK NOW\n \nCATERING\n\nLive Domino's Kitchen for weddings / corporate events\n"
+}

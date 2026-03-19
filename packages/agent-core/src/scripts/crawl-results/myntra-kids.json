@@ -1,0 +1,17 @@
+{
+  "skillName": "myntra-kids",
+  "siteUrl": "https://www.myntra.com/kids",
+  "crawledAt": "2026-03-16T14:14:47.831Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Kids Wear - Buy Kids Clothing, Accessories & Footwear | Myntra",
+  "pageUrl": "https://www.myntra.com/kids",
+  "snapshotSummary": "MEN\nWOMEN\nKIDS\nHOME\nBEAUTY\nGENZ\nSTUDIO NEW\nProfile\nWishlist\nBag\nHome\nKids Wear Online Store\nKids Wear Online Store\n - 590404 items\nFILTERS\nBoys\nGirls\nCATEGORIES\nTshirts(83895)\nClothing Set(74518)\nDresses(64851)\nKurta Sets(32733)\nSweatshirts(22833)\nShirts(22166)\nShorts(17171)\nBodysuit(16101)\n+ 424 more\nBRAND\nBAESD(35612)\nArvesa(16237)\nYK(16077)\nLULU & SKY(14504)\nPantaloons Junior(9227)\nINCLUD(7048)\nV-Mart(5910)\nStyleCast x Revolte(5573)\n+ 3826 more\nPRICE\n₹0 - ₹10,000+\nCOLOR\nBlue (78950)\nWhite (66"
+}

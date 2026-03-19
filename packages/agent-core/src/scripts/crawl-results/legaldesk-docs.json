@@ -1,0 +1,16 @@
+{
+  "skillName": "legaldesk-docs",
+  "siteUrl": "https://legaldesk.com",
+  "crawledAt": "2026-03-16T14:06:20.332Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "popupClose": "button[aria-label=\"Close\"]",
+    "locationInput": "[class*=\"location\"] input"
+  },
+  "pageTitle": "Legaldesk.com - India's 1st DIY Legal Documents Platform",
+  "pageUrl": "https://legaldesk.com/",
+  "snapshotSummary": "Login\nSign up\nFor Consumers\nPROPERTY\nRental Agreement\nCommercial Rental Agreement\nGeneral POA For Property\nView All Documents\nPERSONAL\nGeneral Power Of Attorney\nMake Your Will\nMake Your Own Affidavits Online\nView All Documents\nBUSINESS\nNon-Disclosure Agreement\nJob Offer & Employment Contract\nConsultancy Agreement\nView All Documents\n\t\nRequest Service\nRequest Service\nPrint ‘n’ Deliver\nGeneral Query\n\t\nSearch\n\t\n\n\n\nGet Stamp Paper + Legal Documents Delivered. All Online !!\n\nRental Agreements, Affidav"
+}

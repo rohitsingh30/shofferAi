@@ -1,0 +1,14 @@
+{
+  "skillName": "bookmyshow-sports",
+  "siteUrl": "https://in.bookmyshow.com",
+  "crawledAt": "2026-03-16T13:32:16.274Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "loginBtn": "button:has-text(\"Sign in\")",
+    "locationInput": "input[placeholder*=\"city\" i]"
+  },
+  "pageTitle": "Movie Tickets, Plays, Sports, Events & Cinemas nearby - BookMyShow",
+  "pageUrl": "https://in.bookmyshow.com/",
+  "snapshotSummary": "Search for Movies, Events, Plays, Sports and Activities\nSelect your region\nSign in\nMovies\nStream\nEvents\nPlays\nSports\nActivities\nListYourShow\nCorporates\nOffers\nGift Cards\nDetect my location\n\nPopular Cities\n\nMumbai\n\nKochi\n\nDelhi-NCR\n\nBengaluru\n\nHyderabad\n\nChandigarh\n\nAhmedabad\n\nPune\n\nChennai\n\nKolkata\n\nView All Cities\n\nRecommended Movies\nSee All ›\nDhurandhar The Revenge\nAction/Thriller\nThe Kerala Story 2: Goes Beyond\nDrama/Social\nHoppers\nAdventure/Animation/Comedy\nTighi\nDrama/Family\nO' Romeo\nAction"
+}

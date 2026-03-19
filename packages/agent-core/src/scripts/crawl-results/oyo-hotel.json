@@ -1,0 +1,13 @@
+{
+  "skillName": "oyo-hotel",
+  "siteUrl": "https://www.oyorooms.com",
+  "crawledAt": "2026-03-16T14:21:07.521Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "locationInput": "input[placeholder*=\"city\" i]"
+  },
+  "pageTitle": "OYO: Save Up to 70% on Hotel Booking | Free Cancellation & Pay at Hotel",
+  "pageUrl": "https://www.oyorooms.com/",
+  "snapshotSummary": "WIZARD MEMBER\nList your property\nStart earning in 30 mins\n0124-6201611\nCall us to Book now\nEnglish\nBangalore\nChennai\nDelhi\nGurgaon\nHyderabad\nKolkata\nMumbai\nNoida\nPune\nAll Cities\nOver 174,000+ hotels and homes across 35+ countries\nNear me\nMon, 16 Mar\n–\nTue, 17 Mar\n1 Room, 1 Guest\nSearch\nGet access to exclusive deals\nOnly the best deals reach your inbox\nYour email\nNotify me\nThere's an OYO around. Always.\n\nMore Destinations. More Ease. More Affordable.\n\n35+\nCountries\n174,000+\nHotels & Homes\n Indone"
+}

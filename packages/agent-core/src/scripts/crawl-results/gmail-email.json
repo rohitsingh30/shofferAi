@@ -1,0 +1,13 @@
+{
+  "skillName": "gmail-email",
+  "siteUrl": "https://mail.google.com",
+  "crawledAt": "2026-03-16T13:51:22.492Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "Inbox (5,975) - rsinghtomar3011@gmail.com - Gmail",
+  "pageUrl": "https://mail.google.com/mail/u/0/#inbox",
+  "snapshotSummary": "\nSkip to content\nUsing Gmail with screen readers\n\nSearch\nCompose\nLabels\nInbox\n5,975\nStarred\nSnoozed\nSent\nDrafts\n8\nPurchases\n40\nMore\n \nLabels\nLabels\n \n1–50 of 6,257\nConversations\n6 new\nPrimary\nJeevansathi Info — TWUA2397 has changed their Date of Birth\n50 new\nPromotions\nAgoda Price Alerts — Rohit, top price drops in Bangalore, selected for you!\n50 new\nSocial\nLinkedIn — Rohit, add Sana K N - HR Manager\n50 new\nUpdates\nHoner Aquantis — Notice - Revision of LPG Gas Pulse Rate\nNew\nJeevansathi Info\nTWU"
+}

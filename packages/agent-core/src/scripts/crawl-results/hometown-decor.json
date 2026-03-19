@@ -1,0 +1,21 @@
+{
+  "skillName": "hometown-decor",
+  "siteUrl": "https://www.hometown.in",
+  "crawledAt": "2026-03-16T13:57:12.349Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "[data-testid*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "button[aria-label=\"Close\"]",
+    "locationInput": "input[placeholder*=\"address\" i]"
+  },
+  "pageTitle": "HomeTown: India's #1 Online Furniture Store",
+  "pageUrl": "https://www.hometown.in/",
+  "snapshotSummary": "Skip to content\nSearch\nCart\nFurniture\nKitchen & Dining\nHome Decor\nHome Furnishing\nExchange & Upgrade\nClearance Sale\nNearest Store\nPopular categories\nEXCHANGE OFFER\n61% Off\nClaire Velvet Sofa In Beige Color\nSale price\n₹32,000\nRegular price\n₹83,900\nExchange price\n₹29900\nEXCHANGE OFFER\n67% Off\nMalta Fabric Sofa In Brown Color\nSale price\n₹33,200\nRegular price\n₹102,000\nExchange price\n₹24900\nEXCHANGE OFFER\n57% Off\nGarcia Fabric Two Seater Sofa\nSale price\n₹24,400\nRegular price\n₹56,900\nExchange price\n₹2"
+}

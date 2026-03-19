@@ -1,0 +1,15 @@
+{
+  "skillName": "justdial-service",
+  "siteUrl": "https://www.justdial.com",
+  "crawledAt": "2026-03-16T14:04:46.349Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": "[class*=\"listing\"]",
+    "cardTitle": "[class*=\"card\"] h2",
+    "locationInput": "input[placeholder*=\"location\" i]"
+  },
+  "pageTitle": "Find Businesses Near You on Local Search Engine - Justdial",
+  "pageUrl": "https://www.justdial.com/",
+  "snapshotSummary": "Skip to main content\nNoresults found\nSelect Langauge\nE N\nWe are Hiring\nInvestor Relations\nAdvertise\nFree Listing\nBUSINESS\nLogin / Sign Up\nLogin/ Sign up with your mobile number for more personalized experience\nSearch across\n‘5.3 Crore+‘ Businesses\n‘ 5.9 Crore+’ Products & Services\nDownload App\nFree Listing\nAdvertise\nOne-Stop for All Local Businesses, Services, & Stores Nearby Across India\nB2B\nQuick Quotes\nExplore\nREPAIRS & SERVICES\nGet Nearest Vendor\nExplore\nREAL ESTATE\nFinest Agents\nExplore\nDOC"
+}

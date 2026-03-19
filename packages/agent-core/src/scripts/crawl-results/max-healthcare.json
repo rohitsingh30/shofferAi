@@ -1,0 +1,17 @@
+{
+  "skillName": "max-healthcare",
+  "siteUrl": "https://www.maxhealthcare.in",
+  "crawledAt": "2026-03-16T14:10:34.968Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"name\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "popupClose": "button[aria-label=\"Close\"]",
+    "locationInput": "[class*=\"location\"] input"
+  },
+  "pageTitle": "Best Hospitals in Delhi NCR, India: Top Multispeciality Hospital | Max Healthcare",
+  "pageUrl": "https://www.maxhealthcare.in/",
+  "snapshotSummary": "Introducing the New State-of-the-art Tower at Nanavati Max Hospital, Mumbai\nMax Hospital, Mohali has Upgraded to Redefine Healthcare Excellence.\nFind a Doctor\nBlogs\nMy Reports\nInvestors\nResearch\nCSR\nContact Us\nWhatsApp Us (24/7)\n+91 926 888 0303 (24/7)\nHospitals\nTreatments\nServices\nAcademics\nQuick Enquiry\nInternational Patients\nBook an Appointment\nE\nM\nE\nR\nG\nE\nN\nC\nY\nDownload the Max MyHealth App\nScan to download\nSchedule Your Appointment Online\nSearch for Doctor or Speciality\nSelect Location\n\nInt"
+}

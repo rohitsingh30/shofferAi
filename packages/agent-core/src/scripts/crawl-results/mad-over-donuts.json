@@ -1,0 +1,14 @@
+{
+  "skillName": "mad-over-donuts",
+  "siteUrl": "https://www.madoverdonuts.com",
+  "crawledAt": "2026-03-16T14:08:36.641Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"name\"]",
+    "popupClose": "[class*=\"close-btn\"]",
+    "locationInput": "[class*=\"location\"] input"
+  },
+  "pageTitle": "",
+  "pageUrl": "https://madoverdonuts.com/",
+  "snapshotSummary": "Menu\nCustom Orders\nAbout\nContact Us\n  Find a store\nCustom Orders\nAbout\nMenu\nContact Us\nFind a store\n404\nPrivacy Policy\nBreak into Happiness\n\nwith delicious donuts made with KitKat\n\nOrder Now\nTrust us, It’s Worth It!\n\nTaste the perfection that will leave you craving more.\n\nOrder Now\nLive Your Boba Dreams\n\nTaste the happiness, sip the joy - it's more than just bubble tea, it's a burst of flavours!\n\nOrder Now\nBite Into Happiness at Mad Over Donuts\n\nWhere every bite is a memory glazed with joy and s"
+}

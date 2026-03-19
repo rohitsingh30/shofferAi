@@ -1,0 +1,20 @@
+{
+  "skillName": "lg-store",
+  "siteUrl": "https://www.lg.com/in/",
+  "crawledAt": "2026-03-16T14:07:09.445Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "#search",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "addToCart": "button:has-text(\"Add\")",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"profile\"]",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "Consumer & Home Electronics from LG | LG IN",
+  "pageUrl": "https://www.lg.com/in/",
+  "snapshotSummary": "This website collects cookies to provide you with an improved and personalized experience. See our Privacy Policy and use of Cookies.\n\nClose\nFor Business\nShop\nTV/Audio/Video\nHome Appliances\nAir Solutions\nComputing\nAccessories\nSupport\nLG AI\nInvestor Relations\nSearch\nMyLG\nCart\nLG\n\nTV Soundbar Bundle Offers\n\nPerfect Match, Perfect Price\n\nExtra upto 10%* off, with max savings of ₹20,000* on\nLG TV + Soundbar Combo\nExtra upto 10%* off, with max savings of ₹20,000* on<br>LG TV + Soundbar Combo\nBuy Now\n"
+}

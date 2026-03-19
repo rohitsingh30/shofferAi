@@ -1,0 +1,15 @@
+{
+  "skillName": "stanza-living",
+  "siteUrl": "https://www.stanzaliving.com",
+  "crawledAt": "2026-03-16T14:40:33.570Z",
+  "success": true,
+  "selectors": {
+    "resultCards": "[class*=\"listing\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "a[href*=\"cart\"]"
+  },
+  "pageTitle": "Stanza Living - Your Second Home in a new city.",
+  "pageUrl": "https://www.stanzaliving.com/",
+  "snapshotSummary": "Explore Residences\nKnow More\nYour second home\nin a new city.\n\n\nExperience the new era of shared living at our professionally managed spaces.\n\nNo brokerage,\nmove in your way.\n\nTransparent process.\nNo third-party agents.\n\nDuet or solo,\nyou decide!\n\n\nShared or private, live on\nyour own terms.\n\nCommute less,\nunwind more.\n\nSpend less time travelling and more time living!\n\nFind in and around...\nSearch your\nlandmark\nlocation\ncollege\noffice\nlocality\nlandmark\nlocation\ncollege\noffice\nlocality\nlandmark\nSea"
+}

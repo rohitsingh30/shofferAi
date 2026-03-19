@@ -1,0 +1,13 @@
+{
+  "skillName": "zomato-food",
+  "siteUrl": "https://www.zomato.com",
+  "crawledAt": "2026-03-16T15:00:10.917Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]"
+  },
+  "pageTitle": "Zomato",
+  "pageUrl": "https://www.zomato.com/",
+  "snapshotSummary": "India’s #1\nfood delivery app\nExperience fast & easy online ordering\non the Zomato app\nScroll down\nBetter food for\nmore people\nFor over a decade, we’ve enabled our customers to discover new tastes, delivered right to their doorstep\n3,00,000+\nrestaurants\n800+\ncities\n3 billion+\norders delivered\nWhat’s waiting for you\non the app?\nOur app is packed with features that enable you to experience food delivery like never before\nHealthy\n\nVeg Mode\n\nPlan\na Party\nGift Cards\n\nSchedule\nyour order\nGourmet\n\nOffer"
+}

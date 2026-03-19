@@ -1,0 +1,15 @@
+{
+  "skillName": "cashify-sell",
+  "siteUrl": "https://www.cashify.in",
+  "crawledAt": "2026-03-16T13:34:28.051Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Login\")"
+  },
+  "pageTitle": "Sell/Buy Old and Used Mobile Phones Online in India For Instant Cash | Cashify",
+  "pageUrl": "https://www.cashify.in/",
+  "snapshotSummary": "Gurgaon\nLogin\nAll\nSell Phone\nSell Gadgets\nBuy Refurbished Devices\nFind New Gadget\nBuy Laptop\nCashify Store\nMore\nSell old phone\nFrom your doorstep or at any of our 200 stores pan-India\nSell Now\nOur Services\nSell Phone\nBuy Gadgets\nBuy Phone\nBuy Laptops\nRepair Phone\nRepair Laptop\nFind New Phone\nNearby Stores\nNew Accessories\nBuy Smartwatches\nRecycle\nSell Your Old Device Now\nSell Phone\nSell Laptop\nSell TV\nSell Tablet\nSell Gaming Consoles\nSell Smartwatch\nSell Smart Speakers\nSell More\nBuy Refurbished D"
+}

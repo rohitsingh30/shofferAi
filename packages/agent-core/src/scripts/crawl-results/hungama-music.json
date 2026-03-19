@@ -1,0 +1,13 @@
+{
+  "skillName": "hungama-music",
+  "siteUrl": "https://www.hungama.com",
+  "crawledAt": "2026-03-16T13:58:47.298Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"name\"]",
+    "profileIcon": "[class*=\"profile\"]"
+  },
+  "pageTitle": "Welcome to Hungama OTT",
+  "pageUrl": "https://www.hungama.com/",
+  "snapshotSummary": "cookie_popup1 cookie_popup_btn1\n\n \nApps\nGet an App\nOthers\nHelp_FAQs\nContact Us\nSitemap\nCompany\ngeneral_setting_str_35\ngeneral_setting_str_34\nPartners\nBollywood Hungama\nArtist_Aloud\n\nCopyright©2026 Hungama Digital Media Entertainment Pvt. Ltd. All Right Reserved."
+}

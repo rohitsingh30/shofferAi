@@ -1,0 +1,8 @@
+{
+  "skillName": "microsoft365-subscribe",
+  "siteUrl": "https://www.microsoft.com/en-in/microsoft-365",
+  "crawledAt": "2026-03-16T14:12:02.110Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.microsoft.com/en-in/microsoft-365\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

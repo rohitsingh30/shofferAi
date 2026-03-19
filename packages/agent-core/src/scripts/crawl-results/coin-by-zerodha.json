@@ -1,0 +1,12 @@
+{
+  "skillName": "coin-by-zerodha",
+  "siteUrl": "https://coin.zerodha.com",
+  "crawledAt": "2026-03-16T13:38:35.125Z",
+  "success": true,
+  "selectors": {
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Coin by Zerodha - Buy and sell thousands of commission-free direct mutual funds in seconds",
+  "pageUrl": "https://coin.zerodha.com/",
+  "snapshotSummary": "Mutual funds\nNPS\nFixed Deposit\nInsurance\nLogin\nInvest in your long term financial goals\nExplore 0% commission direct Mutual funds and NPS investments with India's largest stockbroker.\nLogin\nExplore\n\nDon't have a Zerodha account?  Signup now\n\nMany investment options\nOne platform for all your longterm investment needs\nDirect mutual funds\n\nSave up to 1% in commissions by Investing in zero commission direct mutual funds for free.\n\nMore\nNational Pension System\n\nInvest in NPS for a secure future: Simp"
+}

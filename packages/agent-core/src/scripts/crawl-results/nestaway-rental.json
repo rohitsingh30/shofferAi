@@ -1,0 +1,14 @@
+{
+  "skillName": "nestaway-rental",
+  "siteUrl": "https://www.nestaway.com",
+  "crawledAt": "2026-03-16T14:15:59.250Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardPrice": "[class*=\"rupee\"]",
+    "cardRating": "[class*=\"star\"]"
+  },
+  "pageTitle": "Flats, House, Rooms for rent at PG prices without broker | Furnished/Unfurnished Apartments for rent | Nestaway",
+  "pageUrl": "https://www.nestaway.com/",
+  "snapshotSummary": "List Your Property\n\nHomes for rent that fit your timeline\nDiscover a place you'll love\nBuy\nRent\nFull House\nFlatmates\nCo-Living/ PG\nBangalore\n1,00,000+\nHomes Rented / Sold\n2,00,000+\nHappy Customers\n1,00,000+\nTrusted Owners\n\nIn and around Bangalore\n\nPopular Localities\nManyata Tech Park\n1+ Properties\n\nCurated\nespecially\nfor you\n\nRecommended\nproperties\n\n10 Houses Available\n\n1 BHK Semi Furnished Flat for Rent in Sudha Nest, Nagondanahalli, Bengaluru\n\nManaged by Nestaway\n\nBoys, Girls, Family\n\n16,000\n\n"
+}

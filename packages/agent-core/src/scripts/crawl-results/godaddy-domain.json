@@ -1,0 +1,18 @@
+{
+  "skillName": "godaddy-domain",
+  "siteUrl": "https://www.godaddy.com",
+  "crawledAt": "2026-03-16T13:51:39.468Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Domain Names, Websites, Hosting & Online Marketing Tools - GoDaddy",
+  "pageUrl": "https://www.godaddy.com/en-in",
+  "snapshotSummary": "Skip to main content\nIndia\nDomains\nWebsites\nEmail\nHosting\nMarketing\nSecurity\nAiro™ AI Builder\nPricing\nContact Us\nHelp\nSign In\nBIG DOMAIN SAVINGS\n\nSave 86% | ₹ 99.00 for .in or .co.in †\nNew customers only. 1-year term.\n\nStart Saving\nSearch Domains\n\n₹ 91.67*/1st yr.\n\nSatisfy the world's buyers with .shop\n\nGet a .com for only ₹ 1.00*/1st yr — includes Airo™\n\n3-year purchase required.\n\nWALTON GOGGINS\nACTOR / BUSINESS OWNER\n\nGODADDY AIRO™\n\n.com Domains\n\n₹ 1.00*\n\n/1st yr\n\n3-year purchase required\n\nCla"
+}

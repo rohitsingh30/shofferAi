@@ -1,0 +1,15 @@
+{
+  "skillName": "airbnb-stay",
+  "siteUrl": "https://www.airbnb.co.in",
+  "crawledAt": "2026-03-16T13:20:57.655Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardTitle": "[data-testid*=\"title\"]",
+    "profileIcon": "[data-testid*=\"profile\"]"
+  },
+  "pageTitle": "Airbnb | Holiday rentals, cabins, beach houses & more",
+  "pageUrl": "https://www.airbnb.co.in/",
+  "snapshotSummary": "Skip to content\nAirbnb homepage\nHomes\nHomes\nNEW\nNEW\nExperiences\nExperiences, new\nNEW\nNEW\nServices\nServices, new\nWhere\nWhen\nAdd dates\nWho\nAdd guests\nBecome a host\nPopular homes in South Goa\n7 of 9 items showing\n_\n_\nGuest favourite\nGuest favourite\nVilla in Varca\n₹13,874\n \nfor 2 nights\n₹13,874 for 2 nights\n,\n · \n4.92 out of 5 average rating\n4.92\nGuest favourite\nGuest favourite\nApartment in Canacona\n₹7,076\n \nfor 2 nights\n₹7,076 for 2 nights\n,\n · \n4.93 out of 5 average rating\n4.93\nGuest favourite\nGue"
+}

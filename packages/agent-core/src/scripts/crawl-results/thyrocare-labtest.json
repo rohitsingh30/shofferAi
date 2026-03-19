@@ -1,0 +1,16 @@
+{
+  "skillName": "thyrocare-labtest",
+  "siteUrl": "https://www.thyrocare.com",
+  "crawledAt": "2026-03-16T14:46:06.235Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Login\")",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Home | Thyrocare",
+  "pageUrl": "https://www.thyrocare.com/",
+  "snapshotSummary": "Check pincode\nLogin\nBook a test\nRadiology\nLabs Near Me\nBecome a Thyrocare Franchise\nMy Offers\nPartner with Thyrocare\nLab Tests at the Comfort of Your Home\nFull Body Checkups\nHercheck Packages\nJaanch Packages\nDiabetes\nHeart\nFever\nCancer\n\nRequest Callback\n\n100% NABL Labs*\n\nFirst National Diagnostic Chain to have 100% of its Labs with NABL Accreditation# (#As on 5th December 2024)\n\nTrusted by 9/10 Doctors\n\n9/10 Doctors trust that Thyrocare reports are Accurate & Reliable*\n\n1200+ Test Menu\n\nVast men"
+}

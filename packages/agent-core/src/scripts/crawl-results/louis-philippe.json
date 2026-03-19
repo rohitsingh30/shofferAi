@@ -1,0 +1,14 @@
+{
+  "skillName": "louis-philippe",
+  "siteUrl": "https://www.louisphilippe.com",
+  "crawledAt": "2026-03-16T14:08:28.597Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "Mens Shopping Online | Mens Clothing, Accessories & Footwear Online - Louis Philippe",
+  "pageUrl": "https://louisphilippe.abfrl.in/",
+  "snapshotSummary": "All discounts are inclusive of GST rate cut benefits.\n\nDownload the Louis Philippe App and get additional 15% discount on your first purchase. Use code: LPAPPORDER *T&C Apply \n\nMORE BRANDS\n\nDelivering to\nAdd delivery location\nSTORES\nCONTACT US\nLOG IN\n\nNEW IN\n\nSALE\n\nPRODUCTS\n\nMONOGRAM\n\nCOLLECTIONS\n\nWEDDING\n\nGIFT CARD\n\nEXPRESS DELIVERY\n\nSelect your nearest store\n\nT-Shirts\n\nShirts\n\nBlazers\n\nTrousers\n\nJeans\n\nShoes\n\nCargos\n\nFREE SHIPPING\nRETURN WITHIN 15 DAYS\nEXPRESS DELIVERY IN STORE MODE\n\nNEED HELP"
+}

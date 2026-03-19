@@ -1,0 +1,15 @@
+{
+  "skillName": "nykaa-man",
+  "siteUrl": "https://www.nykaaman.com",
+  "crawledAt": "2026-03-16T14:18:03.960Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "button:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Mens Grooming, Hair Care, Skin Care & Wellness Products Online at Best Prices in India | NykaaMan",
+  "pageUrl": "https://www.nykaaman.com/",
+  "snapshotSummary": "Great Offers From The Best Brands\nGift Card\n \nHelp\nCategories\nBrands\nGrooming Advice\nSign in\nLogin or Signup\nRegister now and get 2000 Nykaa reward points instantly!\nMobile Number\nSend OTP\nOr sign in using\nSign in with Mobile / Email\nContinue with Google\nSkin Care\nFashion & Lifestyle\nPerfumes & Deos\nHair Care\nLuxe\nBath & Body\nHealth & Nutrition\nHome\nShaving & Beard Care\nSports & Fitness\nSkin Care\nFragrance\nFootwear\nEthnic Wear\nBath & Body\nHair Care\nTopwear\nHealth & Nutrition\nFoot Locker\nHome\nBot"
+}

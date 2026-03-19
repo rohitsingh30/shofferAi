@@ -30,9 +30,8 @@ async function main() {
     logger.info('');
     logger.info('=== ShofferAI Laptop Relay ===');
     logger.info(`Cloud:   ${RELAY_CLOUD_URL}`);
-    logger.info(`Pool:    lazy (max ${poolStatus.maxSlots} Chrome slots, ${poolStatus.active} warm)`);
+    logger.info(`Chrome:  ${poolStatus.active} warm slot (up to ${poolStatus.maxSlots} on demand)`);
     logger.info(`Tools:   ${tools.length} Playwright MCP tools`);
-    logger.info('Chrome launches on demand when tasks arrive.');
     logger.info('Press Ctrl+C to stop.');
     logger.info('');
 
@@ -48,10 +47,9 @@ async function main() {
 
     logger.info('');
     logger.info('=== ShofferAI Laptop Relay (Dev) ===');
-    logger.info(`Relay: ws://localhost:${RELAY_PORT}`);
-    logger.info(`Pool:  lazy (max ${poolStatus.maxSlots} Chrome slots, ${poolStatus.active} warm)`);
-    logger.info(`Tools: ${tools.length} Playwright MCP tools`);
-    logger.info('Chrome launches on demand when tasks arrive.');
+    logger.info(`Relay:   ws://localhost:${RELAY_PORT}`);
+    logger.info(`Chrome:  ${poolStatus.active} warm slot (up to ${poolStatus.maxSlots} on demand)`);
+    logger.info(`Tools:   ${tools.length} Playwright MCP tools`);
     logger.info('Press Ctrl+C to stop.');
     logger.info('');
 

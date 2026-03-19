@@ -1,0 +1,15 @@
+{
+  "skillName": "medlife-medicine",
+  "siteUrl": "https://www.medlife.com",
+  "crawledAt": "2026-03-16T14:10:57.097Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "loginBtn": "a:has-text(\"Log in\")"
+  },
+  "pageTitle": "PharmEasy – Online Pharmacy & Medical Store with Healthcare Services in India | 50 Lakhs+ Customers",
+  "pageUrl": "https://pharmeasy.in/?src=medlife_home",
+  "snapshotSummary": "Express delivery to\nSelect Pincode\nMedicine\nHealthcare\nDoctor Consult\nLab Tests\nPLUS\nHealth Insights\nOffers\nWhat are you looking for?\nOrder with prescription. \nUPLOAD NOW\nSearch for\nSearch\nMedicine\nSAVE 27%\nLab Tests\nUPTO 70% OFF\nDoctor Consult\nFROM ₹199\nBranded Substitute\nUPTO 50% OFF\nHealthcare\nUPTO 60% OFF\nHealth Blogs\nPLUS\nSAVE 5% EXTRA\nOffers\nValue Store\nUPTO 50% OFF\nLab Tests by Health Concern\nPowered by\nOrder with Prescription\nUpload prescription and we will deliver your medicines\nUpload\n"
+}

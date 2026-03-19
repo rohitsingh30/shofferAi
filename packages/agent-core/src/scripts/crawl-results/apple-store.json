@@ -1,0 +1,14 @@
+{
+  "skillName": "apple-store",
+  "siteUrl": "https://www.apple.com/in/",
+  "crawledAt": "2026-03-16T13:26:49.950Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "profileIcon": "[aria-label*=\"profile\" i]"
+  },
+  "pageTitle": "Apple (India)",
+  "pageUrl": "https://www.apple.com/in/",
+  "snapshotSummary": "Apple\nApple\nStore\nMac\niPad\niPhone\nWatch\nAirPods\nTV & Home\nEntertainment\nAccessories\nSupport\n0\n+\nGet up to 6 months of No Cost EMI* plus up to ₹10000 instant cashback‡ on selected products with eligible cards. Shop\n \niPhone\n\nMeet the latest iPhone lineup.\n\nLearn more Shop iPhone\n \nMacBook Neo\n\nAmazing Mac. Surprising price.\n\nLearn more Buy\n \nAirPods Max 2\n\nListening. Remastered.\n\nOrder from 25 March\n\nAvailable early next month\n\nLearn more View pricing\n \nRead the letter from Tim\n \niPad Air\n\nNow su"
+}

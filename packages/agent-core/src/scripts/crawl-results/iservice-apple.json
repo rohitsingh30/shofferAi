@@ -1,0 +1,12 @@
+{
+  "skillName": "iservice-apple",
+  "siteUrl": "https://www.iservice.co.in",
+  "crawledAt": "2026-03-16T14:02:39.456Z",
+  "success": true,
+  "selectors": {
+    "loginBtn": "a:has-text(\"Sign in\")"
+  },
+  "pageTitle": "iService - iPhone. iPad. MacBook. Repairs and Service Center",
+  "pageUrl": "https://www.iservice.co.in/",
+  "snapshotSummary": "REPAIRTRACKDEVICESPAYSHOP\nCall us at : 074118 11911\nBLOGSIGN IN\n\n\nIndia's Most Trusted Gadget Repair Service!\n\nBook a doorstep service or walk-in to the nearest centre and track repair progress all the way\n\nwhich device do you have?\n\n\n\n\n\n\n\n\n50,000 + iService customers Nation-wide\n\nHow it works\n\n1 BOOK A REPAIR?\n\nBook an at-home service or schedule a device pick-up at your convenience. Need to talk to us? Walk in to our nearest store.\n\n2 HAND-OVER YOUR DEVICE?\n\nGive us your device based on your c"
+}

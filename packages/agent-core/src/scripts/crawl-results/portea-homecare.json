@@ -1,0 +1,13 @@
+{
+  "skillName": "portea-homecare",
+  "siteUrl": "https://www.portea.com",
+  "crawledAt": "2026-03-16T14:27:05.624Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"rupee\"]"
+  },
+  "pageTitle": "Healthcare at Home: India's #1 Home Care Services",
+  "pageUrl": "https://www.portea.com/",
+  "snapshotSummary": "Our Services\nAbout Us\nInvestor Relations\n+1800 121 2323\nBook Now\nQuality Medical Care Delivered At The Comfort of Your Home\n\nPortea Medical delivers quality care with compassion. We bring quality medical care into our patients’ homes and aim to make primary healthcare not only more accessible but also more affordable and accountable to our patient’s needs.\n\nBook Now\nMedical Services Offered At Home\n\nPortea Medical offers a Variety of healthcare services in the comfort of our patient’s homes incl"
+}

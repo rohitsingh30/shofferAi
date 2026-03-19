@@ -1,0 +1,12 @@
+{
+  "skillName": "paytm-gas",
+  "siteUrl": "https://paytm.com/gas-bill-payment",
+  "crawledAt": "2026-03-16T14:23:07.044Z",
+  "success": true,
+  "selectors": {
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Gas Bill Payment - Pay Gas Bill Online at Paytm.com",
+  "pageUrl": "https://paytm.com/gas-bill-payment",
+  "snapshotSummary": "Recharge & Bills\nTicket Booking\nPayments & Services\nPaytm for Business\nCompany\nDownload App\nSign In\nPrepaid/Postpaid\nElectricity\nDTH\nMetro\nBroadband/Landline\nEducation\nPay Loan\nInvest in Stocks\nBook a Cylinder\nPaytm First\nInsurance/LIC Premium\nMore\nPay Gas Bill\nPay Gas Bill\nBook a Cylinder\nPiped Gas Provider\nProceed\nPiped Gas Provider\nIndraprastha Gas Limited Bill Payment\nMahanagar Gas- Mumbai Bill Payment\nGujarat Gas Limited Bill Payment\nAdani Total Gas Limited Bill Payment\nGAIL Gas Limited Bil"
+}

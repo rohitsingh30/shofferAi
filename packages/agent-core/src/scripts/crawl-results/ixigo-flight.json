@@ -1,0 +1,12 @@
+{
+  "skillName": "ixigo-flight",
+  "siteUrl": "https://www.ixigo.com",
+  "crawledAt": "2026-03-16T14:02:49.723Z",
+  "success": true,
+  "selectors": {
+    "cardRating": "[data-testid*=\"rating\"]"
+  },
+  "pageTitle": "ixigo - Best Travel Website, Book Flights, Trains, Hotels & Buses",
+  "pageUrl": "https://www.ixigo.com/",
+  "snapshotSummary": "Up to ₹3,000 off on Flights & Hotels with ICICI Bank Credit Card + Interest Free EMI\n\nOffers\n\nCustomer Service\n\nLog in/Sign up\n\nFlights\n\nUp to 50% Off\n\nHotels\n\nTrains\n\nBuses\n\nMore\n\nBook Visa\n\nGroup Booking\n\nPlan\n\nOffers\n\nCustomer Service\n\nLog in/Sign up\n\nFlights\n\nUp to 50% Off\n\nHotels\n\nTrains\n\nBuses\n\nBook International and Domestic Flights\nOne Way\nRound Trip\n\n24x7 Customer Support\n\nHassle-Free Bookings\n\nBest Flight Offers\n\nHassle-Free Bookings\n\n24x7 Customer Support\n\nFrom\n\nTo\n\nDeparture\n\nTue, 17"
+}

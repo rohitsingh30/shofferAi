@@ -1,0 +1,13 @@
+{
+  "skillName": "codashop-topup",
+  "siteUrl": "https://www.codashop.com/in",
+  "crawledAt": "2026-03-16T13:38:23.194Z",
+  "success": true,
+  "selectors": {
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"card\"] h3"
+  },
+  "pageTitle": "Codashop भारत (India) | App Vouchers",
+  "pageUrl": "https://www.codashop.com/en-in/",
+  "snapshotSummary": "Loading...\nThe fastest way to get game credits online, without a credit card!\nSign up\nNew\nEA SPORTS FC Mobile\nPOPULAR\nTinder\nEA SPORTS FC Mobile\nSuper Sus\nDIRECT TOP-UP\nMapleStory M\nEA SPORTS FC Mobile\nZEPETO\nWorld War Heroes\nSuper Sus\nModern Strike Online\nDragon City\nDisney Magic Kingdoms\nNEWS & UPDATES\nCodashop Blog\n\nCheck out the blog here!\n\nCodashop India\nWhy top up games on Codashop?\n\nMillions of gamers count on Codashop every month for a seamless purchase experience when buying game credit"
+}

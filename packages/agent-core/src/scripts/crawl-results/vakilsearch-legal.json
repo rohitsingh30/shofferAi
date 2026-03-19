@@ -1,0 +1,12 @@
+{
+  "skillName": "vakilsearch-legal",
+  "siteUrl": "https://vakilsearch.com",
+  "crawledAt": "2026-03-16T14:52:11.812Z",
+  "success": true,
+  "selectors": {
+    "loginBtn": "button:has-text(\"Login\")"
+  },
+  "pageTitle": "India’s Leading Legal Services Provider Since 2010 | Vakilsearch",
+  "pageUrl": "https://vakilsearch.com/",
+  "snapshotSummary": "Consult an Expert\n\nBusiness Registration\n\nTax & Compliance\n\nTrademark & IP\n\nLawyer Services\n\nDocumentation\n\nOthers\n\nLogin\nEvents\nProducts\nArticle\nAbout Us\nContact\nMedia\nCareers\nRefer and Earn\nPartner With Us\nTalk to a Expert\n\nConsult an Expert\n\nBusiness Registration\n\nTax & Compliance\n\nTrademark & IP\n\nLawyer Services\n\nDocumentation\n\nOthers\n\nMore\n\nConsult an Expert\n\nTalk to a Lawyer\n\nTalk to a Chartered Accountant\n\nTalk to a Trademark Lawyer\n\nTalk to a Company Secretary\n\nBusiness Registration\n\nCom"
+}

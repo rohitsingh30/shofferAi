@@ -1,0 +1,12 @@
+{
+  "skillName": "ixigo-train",
+  "siteUrl": "https://www.ixigo.com",
+  "crawledAt": "2026-03-16T14:03:36.232Z",
+  "success": true,
+  "selectors": {
+    "cardRating": "[class*=\"star\"]"
+  },
+  "pageTitle": "ixigo - Best Travel Website, Book Flights, Trains, Hotels & Buses",
+  "pageUrl": "https://www.ixigo.com/",
+  "snapshotSummary": "Flights\n\nUp to 50% Off\n\nHotels\n\nTrains\n\nBuses\n\nMore\n\nBook Visa\n\nGroup Booking\n\nPlan\n\nOffers\n\nCustomer Service\n\nLog in/Sign up\n\nFlights\n\nHotels\n\nTrains\n\nBuses\n\nMore\n\nBook Visa\n\nGroup Booking\n\nPlan\n\nOffers\n\nCustomer Service\n\nLog in/Sign up\n\nFrom\n\nDEL - New Delhi\n\nTo\n\nBUP - Bathinda\n\nDeparture\n\nWed, 18 Mar\n\nReturn\n\nTravellers & Class\n\n1 Traveller, Economy\n\nSearch\n\nSpecial Fares\n(Optional)\n:\n\nStudent\nSenior Citizen\nArmed Forces"
+}

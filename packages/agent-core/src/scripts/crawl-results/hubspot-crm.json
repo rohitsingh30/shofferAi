@@ -1,0 +1,12 @@
+{
+  "skillName": "hubspot-crm",
+  "siteUrl": "https://app.hubspot.com",
+  "crawledAt": "2026-03-16T13:58:29.295Z",
+  "success": true,
+  "selectors": {
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "HubSpot Login and Sign in",
+  "pageUrl": "https://app.hubspot.com/login",
+  "snapshotSummary": "Sign in\n\nor create an account\n\nEmail\nContinue\n\nSee how HubSpot can help you achieve your growth goals.\n\nGet a demo\n©2026 HubSpot, Inc. All Rights Reserved.Privacy PolicyManage Cookies"
+}

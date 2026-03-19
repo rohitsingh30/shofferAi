@@ -1,0 +1,113 @@
+---
+name: ellementry-decor
+description: Shop on Ellementry — browse handcrafted home decor, kitchen, tableware, storage, checkout, pay.
+triggers:
+  - ellementry
+  - order from ellementry
+  - buy on ellementry
+  - ellementry decor
+  - handcrafted decor
+  - ellementry kitchen
+  - buy tableware online
+  - ellementry home
+  - artisan home decor
+siteUrl: https://www.ellementry.com
+requiresAuth: true
+params:
+  - name: product
+    required: true
+    hint: What to buy (e.g. "ceramic mug set", "wooden serving board", "glass jar", "wall planter", "candle holder")
+  - name: category
+    required: false
+    hint: Category (e.g. "kitchen", "tableware", "decor", "storage", "planters", "gifting")
+  - name: material
+    required: false
+    hint: Material preference (e.g. "ceramic", "wood", "glass", "brass", "terracotta", "marble")
+  - name: budget
+    required: false
+    hint: Max price (e.g. "under 2000", "budget 5000")
+  - name: payment_method
+    required: false
+    hint: Payment preference (UPI, card, COD)
+---
+
+# Ellementry Handcrafted Decor Shopping
+
+Chrome profile: rsinghtomar3011@gmail.com.
+
+## Steps
+
+### 1. Clarify Requirements
+- Confirm what the user wants: product type, room/use case, material preference.
+- Use `ask_user` to clarify: category (kitchen, tableware, decor, storage, planters), material (ceramic, wood, glass, brass, marble, terracotta), color palette, budget range.
+- Ask about purpose: self-use, gifting, housewarming, festive decor.
+- Note if user wants a set/collection or individual pieces.
+
+### 2. Open Ellementry & Verify Login
+- Open a NEW tab and navigate to `https://www.ellementry.com`.
+- Take snapshot. Verify logged in (account icon or user name in header).
+- If NOT logged in, login transparently using operator credentials. Do NOT ask user for credentials.
+- **If session expired, STOP and tell user: "Session expired, please re-login in Chrome Debug."**
+
+### 3. Search & Browse Products
+- Use the search bar or navigate to categories (Kitchen, Table, Home, Storage, Planters).
+- Take snapshot of product listing page.
+- Apply filters: category, material, price range, color, collection, bestsellers.
+- Extract top 3-5 options with: name, material, price, dimensions, color, rating.
+- Use `ask_user` (input_type "choice") to present options. Format: "Product Name — Material — Color — ₹X,XXX — Dimensions — Handcrafted"
+- Mention that Ellementry products are handcrafted — slight variations are a feature, not a defect.
+
+### 4. View Product Details
+- Click selected product.
+- Take snapshot of product page.
+- Extract: full name, price, material, dimensions, weight, color, care instructions, handcrafted note, delivery date, gift wrapping option.
+- If product has color/size variants, present them via `ask_user` (input_type "choice").
+- Check if the item is part of a collection (matching pieces available).
+- If gifting, ask if user wants gift wrapping.
+- Confirm with user: "Add [product] at ₹X,XXX to cart?"
+
+### 5. Add to Cart & Review
+- Click "Add to Cart".
+- If user wants multiple items from a collection, repeat search and add for each.
+- Go to cart, take snapshot.
+- Check for applicable discount codes or seasonal offers.
+- Apply best coupon if available.
+- Use `confirm_action` to present order summary:
+  - Items: name, material, color, dimensions for each
+  - Price: per item, subtotal
+  - Gift wrapping: if selected
+  - Delivery charges and estimated date
+  - Total amount
+- Do NOT proceed unless user confirms. If cancelled, ask what to change.
+
+### 6. Checkout & Payment
+- Click "Proceed to Checkout".
+- Verify/select delivery address. Add new address if needed via `ask_user`.
+- If gifting, add gift message via `ask_user` if the option is available.
+- Use `collect_payment` to collect via Razorpay:
+  - summary: JSON with items, materials, prices, gift_wrapping, delivery_charge, total
+  - amount_inr: total amount (number)
+  - description: "Ellementry handcrafted decor order"
+- STOP and WAIT for payment confirmation. If cancelled, ask what to change.
+
+### 7. Complete Order & Confirm
+- Select payment method and complete payment flow.
+- Handle OTP via `ask_user` if needed.
+- Take snapshot of order confirmation page.
+- Report: order ID, items ordered, price paid, estimated delivery date, care instructions for handcrafted items.
+
+## Site Notes
+
+- Ellementry specializes in handcrafted artisan products — each piece may have slight natural variations in color, texture, and finish.
+- Operator Chrome Profile 3 (rsinghtomar3011@gmail.com) should be logged in. Do NOT ask user for credentials.
+- If session expired, login transparently. OTP goes to operator phone.
+- Delivery typically takes 5-10 business days across India; fragile items are packed with extra care.
+- Free shipping on orders above ₹999 usually; below that, shipping charges apply.
+- Ellementry products make excellent gifts — mention gift wrapping and personalized message options.
+- Materials like ceramic, wood, and glass require careful handling — relay care instructions to user (no microwave for wood, hand-wash for hand-painted items).
+- Seasonal and festive collections (Diwali, Christmas) are limited edition — check availability.
+- Return policy: 7-day easy returns on undamaged items; handcrafted items may have specific return conditions.
+- Ellementry has physical stores in select cities (Delhi, Mumbai, Bangalore) — mention if user prefers in-store.
+- Collections are curated themes — if user likes one piece, suggest matching items from the same collection.
+- Use `confirm_action` for cart review, `collect_payment` for checkout.
+- When using confirm_action or collect_payment, WAIT for user response. Do NOT auto-proceed.

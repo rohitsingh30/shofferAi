@@ -1,0 +1,13 @@
+{
+  "skillName": "manipal-hospital",
+  "siteUrl": "https://www.manipalhospitals.com",
+  "crawledAt": "2026-03-16T14:10:03.105Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"card\"] h2"
+  },
+  "pageTitle": "Best Multispeciality Hospital In India | Top Hospital in India | Manipal Hospitals",
+  "pageUrl": "https://www.manipalhospitals.com/",
+  "snapshotSummary": "Access Lab Reports\nAppointment\nEmergency\n\nBook Appointments &\nHealth Checkup Packages\n\nCentre of Excellence \nDoctors\nHospitals \nInternational Patients\nPodcast\nSearch\n Appointment\n Health Check\n Home Care\n Contact Us\n Write to COO\n Review Us\nCall Us\nBook\nEnglish\nSelect Hospital\nSelect Speciality\nSelect Doctor\nMethod to Miracle\nPooja Bajaj - A Testament…\nRobot Assisted Radical…\nReverse Shoulder Arthroplasty\nVarun - Hand Replantation…\nView All\n\nThe Orthopaedic Department at Manipal Hospitals provid"
+}

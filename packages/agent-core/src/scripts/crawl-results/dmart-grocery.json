@@ -1,0 +1,15 @@
+{
+  "skillName": "dmart-grocery",
+  "siteUrl": "https://www.dmart.in",
+  "crawledAt": "2026-03-16T13:43:38.119Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Sign in\")",
+    "locationInput": "input[placeholder*=\"area\" i]"
+  },
+  "pageTitle": "Daily Offers, Daily Discounts on DMart Ready",
+  "pageUrl": "https://www.dmart.in/",
+  "snapshotSummary": "Logo\nAndheri…\nMumbai\nEarliest Home Delivery available\nTomorrow 07:00 AM - 10:00 AM\nSearch for\nSoft Drinks\nSEARCH\naccount_circleSign In / Register\n0\n₹0\nAll Categories\nDMart Grocery\nReady To Cook\nBeverages\nBiscuits & Cookies\nBath & Body\nDetergent & Fabric Care\nCleaners\nDaily Offers, Daily Discounts on DMart Ready\n\nPopular Categories\n\nDairy\nTea\nSoft Drinks\nCleaners\nBath Soaps\nToothpaste\nShampoos\nPooja Needs\nTowels\nBath Utility\nCoffee\nAll Categories\nGrocery\nDals\nPulses\nDry Fruits\nDMart Grocery\nCooki"
+}

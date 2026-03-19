@@ -32,6 +32,7 @@ export class RelayBridge implements MCPHostLike {
   private connected = false;
   private toolCallTimeoutMs = 60000;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private lastPongAt = Date.now();
 
   /**
    * Called by the custom server when a laptop WebSocket connects.
@@ -89,7 +90,10 @@ export class RelayBridge implements MCPHostLike {
   }
 
   private handleMessage(msg: RelayMessage): void {
-    if (isHeartbeatPong(msg)) return;
+    if (isHeartbeatPong(msg)) {
+      this.lastPongAt = Date.now();
+      return;
+    }
 
     if (isToolCallResponse(msg) || isToolListResponse(msg)) {
       const pending = this.pending.get(msg.id);
@@ -221,8 +225,15 @@ export class RelayBridge implements MCPHostLike {
 
   private startHeartbeat(): void {
     this.stopHeartbeat();
+    this.lastPongAt = Date.now();
     this.heartbeatInterval = setInterval(() => {
       if (this.laptopSocket && this.connected) {
+        // Check if laptop is still alive (no pong for 45s → consider dead)
+        if (Date.now() - this.lastPongAt > 45000) {
+          logger.warn('RelayBridge: no heartbeat pong for 45s, closing dead connection');
+          this.laptopSocket.close();
+          return;
+        }
         this.laptopSocket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
       }
     }, 15000);

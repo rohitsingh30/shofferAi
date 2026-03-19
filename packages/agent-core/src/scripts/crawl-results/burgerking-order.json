@@ -1,0 +1,13 @@
+{
+  "skillName": "burgerking-order",
+  "siteUrl": "https://www.burgerking.in",
+  "crawledAt": "2026-03-16T13:32:57.754Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"name\"]",
+    "profileIcon": "[class*=\"profile\"]"
+  },
+  "pageTitle": "BurgerKing India | Online ordering",
+  "pageUrl": "https://www.burgerking.in/",
+  "snapshotSummary": "Select Service\n\nDelivery\n\nDine in / Takeaway\n\nDELIVERY\nDINE-IN/TAKEAWAY\nNo stores nearby\nNEARBY STORES\nKING DEALS\nLOGIN\nCART\nHome\nACCOUNT\n\n0\n\nBK Crowns\n\nRecent Orders\nSaved Addresses\nSaved King Deals\nBK Wall\nNotifications\nFAQ's & Support\nSettings\n\nRestaurant Finder\n\nDisclaimer : All Images used are illustrative and strictly for representational purposes only\nBK® INFO\nAbout BK®\nFresh Taste\nInvestor Relations\nFssai\nCONTACT\nFAQ's & Support\nWrite to us :\nCareers\n\nCustomer Care\n\nSupply Chain Queries\n"
+}

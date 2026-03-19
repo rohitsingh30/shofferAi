@@ -1,0 +1,12 @@
+{
+  "skillName": "popeyes-order",
+  "siteUrl": "https://www.popeyes.in",
+  "crawledAt": "2026-03-16T14:26:56.451Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"name\"]"
+  },
+  "pageTitle": "Popeyes India | Order Popeyes Chicken & Chicken Sandwich Online",
+  "pageUrl": "https://www.popeyes.in/",
+  "snapshotSummary": "Home\nMenu\nStores\nOur Story\nContact\nDownload App\n\nServing\n\nSince 1972\n\n25+\n\nCountries\n\n3300+\n\nStores\n\n250 Million+\n\nChicken Sandwiches Served\n\nOur Signature\nProducts\nView All Menu\n\nThe Chicken Sandwich\n\nThe hype is real! Say hello to the new love of your life - our world-famous Chicken Sandwich.\n\nView All\n\nPopeyes Signature Chicken\n\nDig into our Signature Chicken; marinated for 12 hours in bold Cajun seasonings for delicious flavours in every bite.\n\nView All\n\nCajun Veg Burger\n\nNot an exaggeration"
+}

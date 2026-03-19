@@ -1,0 +1,8 @@
+{
+  "skillName": "gaana-music",
+  "siteUrl": "https://gaana.com",
+  "crawledAt": "2026-03-16T13:50:17.529Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://gaana.com/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

@@ -1,0 +1,12 @@
+{
+  "skillName": "koo-post",
+  "siteUrl": "https://www.kooapp.com",
+  "crawledAt": "2026-03-16T14:05:45.791Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "Error",
+  "pageUrl": "https://www.kooapp.com/",
+  "snapshotSummary": "Templates Wix.com\nLooks like this domain isn't\nconnected to a website yet\nIs this your domain?\nConnect it to your Wix website in just a few easy steps:\nGo to Wix.com > Subscriptions > Domains\nClick Use a Domain You Already Own\nFollow the steps to connect your domain to your website\nNeed more help?\nPlease contact our Support Team"
+}

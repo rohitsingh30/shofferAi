@@ -1,0 +1,18 @@
+{
+  "skillName": "us-polo",
+  "siteUrl": "https://www.uspoloassn.in",
+  "crawledAt": "2026-03-16T14:51:25.946Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "addToCart": "[class*=\"add-to-cart\"]",
+    "cartIcon": "[data-testid*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Log in\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "U.S. Polo Assn. India | Official Online Store for Men, Women and Kids",
+  "pageUrl": "https://uspoloassn.in/",
+  "snapshotSummary": "Item is successfully added to the cart!\nGo to cart\nHOME\nMEN\nWOMEN\nKIDS\nFOOTWEAR\nINNERWEAR\nMAGAZINE\nFAQ's\nCONTACT US\nSTORE LOCATOR\n    Log In/Create Account\n USPA Rewards\nNEW10: Extra 10% off on your first purchase, on styles up to 40% off.*T&C Apply.\nU.S. Polo Assn. India | Official Online Store for Men, Women & Kids Apparel\nAccount\n0\nWishlist\nUSPA Rewards\n0\nCart\nHOME\n \nMEN\n \nWOMEN\n \nKIDS\n \nFOOTWEAR\n \nINNERWEAR\nSHOP MEN\nSHOP WOMEN\nSHOP ALL\n\nJoin our Mailing List for Updates\n\nPOLICIES\nTerms and C"
+}

@@ -1,0 +1,12 @@
+{
+  "skillName": "fi-money",
+  "siteUrl": "https://fi.money",
+  "crawledAt": "2026-03-16T13:47:53.753Z",
+  "success": true,
+  "selectors": {
+    "cardRating": "[class*=\"star\"]"
+  },
+  "pageTitle": "Fi Money – Savings Account, Credit Cards & Loans App",
+  "pageUrl": "https://fi.money/",
+  "snapshotSummary": "ABOUT US\nLOANS\nCARDS\nACCOUNTS\nRESOURCES\nHELP\nDownload Fi\nOne app for all things money\n\n^T&C Apply\n\nLoved by 35 Lakh+ Indians\n₹40 Cr+\nsaved in Forex fees by users\n₹10,000 Cr+\nmanaged in user portfolios\n1 Billion+\npayments successfully completed\nFi partners with the best to secure your money\nISO 27001:2022\n\nOur partner bank hosts your Savings Account and follows all security standards per applicable regulations.\n\nYour money is always safe with our banking partner - Federal Bank, is covered under t"
+}

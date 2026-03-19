@@ -1,0 +1,15 @@
+{
+  "skillName": "naukri-job",
+  "siteUrl": "https://www.naukri.com",
+  "crawledAt": "2026-03-16T14:15:52.083Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "locationInput": "input[placeholder*=\"location\" i]"
+  },
+  "pageTitle": "Jobs - Recruitment - Job Search - Employment - Job Vacancies - Naukri.com",
+  "pageUrl": "https://www.naukri.com/",
+  "snapshotSummary": "Jobs\nPopular categories\nIT jobs\nSales jobs\nMarketing jobs\nData Science jobs\nHR jobs\nEngineering jobs\nJobs in demand\nFresher jobs\nMNC jobs\nRemote jobs\nWork from home jobs\nWalk-in jobs\nPart-time jobs\nJobs by location\nJobs in Delhi\nJobs in Mumbai\nJobs in Bangalore\nJobs in Hyderabad\nJobs in Chennai\nJobs in Pune\nCompanies\nExplore categories\nUnicorn\nMNC\nStartup\nProduct based\nInternet\nExplore collections\nTop companies\nIT companies\nFintech companies\nSponsored companies\nFeatured companies\nResearch compan"
+}

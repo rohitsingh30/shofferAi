@@ -1,0 +1,16 @@
+{
+  "skillName": "nike-shoes",
+  "siteUrl": "https://www.nike.com/in",
+  "crawledAt": "2026-03-16T14:16:43.324Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "popupClose": "[role=\"dialog\"] button:first-child"
+  },
+  "pageTitle": "Nike. Just Do It. Nike IN",
+  "pageUrl": "https://www.nike.in/",
+  "snapshotSummary": "Help\n|\nSign Up\n|\nLog In\nNew & Featured\nMen\nWomen\nKids\nJordan\n\nFeatured\n\nNew Arrivals\nBestsellers\nTop Picks Under ₹4999\n\nTrending\n\nJust Do The Work\nRetro Running\nAF1 Unmistakable\nDomain 3\n\nShop Icons\n\nAir Force 1\nAir Jordan 1\nAir Max\nDunk\n\nSport\n\nCricket\nRunning\nGym & Training\nSportswear\nFootball\nBasketball\n\nFeatured\n\nNew Arrivals\nBestsellers\nAll Conditions Gear\n\nShoes\n\nAll Shoes\nLifestyle\nJordan\nRunning\nBasketball\nGym & Training\nTennis\nSkateboarding\nSandals & Slides\n\nClothing\n\nAll Clothing\nTops "
+}

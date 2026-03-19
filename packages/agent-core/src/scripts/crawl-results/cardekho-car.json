@@ -1,0 +1,16 @@
+{
+  "skillName": "cardekho-car",
+  "siteUrl": "https://www.cardekho.com",
+  "crawledAt": "2026-03-16T13:34:00.472Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardPrice": "[class*=\"price\"]",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "CarDekho: New Cars, Car Prices, Buy & Sell Used Cars in India",
+  "pageUrl": "https://www.cardekho.com/",
+  "snapshotSummary": "All\nEnglish\nLogin / Register\nNEW CARS \nExplore New Cars\nElectric Cars\nPopular Cars\nUpcoming Cars\nNew Launches\nPopular Brands\nCompare Cars\nNew Car Offers & Discounts\nFind Car Dealers\nFind EV Charging Stations\nFind Fuel Stations\nCheck Fuel Prices\nUSED CARS \nBuy Used Cars\nUsed Cars In Your City\nSell My Car\nUsed Car Valuation\nDealership Near Me\nNEWS & REVIEWS \nNews & Top stories\nCar Expert Reviews\nUser Reviews\nCar Collection\nTips & Advice\nVIDEOS \nVideo Reviews\nVisual Stories\nSelect City\nadKoncept Hy"
+}

@@ -1,0 +1,15 @@
+{
+  "skillName": "pizzahut-order",
+  "siteUrl": "https://www.pizzahut.co.in",
+  "crawledAt": "2026-03-16T14:25:46.283Z",
+  "success": true,
+  "selectors": {
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "[class*=\"basket\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "locationInput": "input[placeholder*=\"location\" i]"
+  },
+  "pageTitle": "Order Pizza Online - Delivery and Takeaway",
+  "pageUrl": "https://www.pizzahut.co.in/",
+  "snapshotSummary": "Order Pizza Online - Delivery and Takeaway\nSign in\nDelivery\nCollect From Store\nFIND YOUR NEAREST HUT\nEnter your address to see your local deals, coupons and offers.\nFind my current location\nOur Most Popular Deals\nDeal may vary by location, only at participating stores, excluding dine-in restaurants, T&Cs apply\nDeal may vary by location, only at participating stores, excluding dine-in restaurants, T&Cs apply\nView all deals\nOrder Now\nDeals\nPizza\nSides\nDrinks\nDesserts\nAbout\nAbout Us\nContactless del"
+}

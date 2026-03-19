@@ -1,0 +1,17 @@
+{
+  "skillName": "hp-store",
+  "siteUrl": "https://www.hp.com/in-en",
+  "crawledAt": "2026-03-16T13:58:20.095Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cartIcon": "[class*=\"cart-icon\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Laptop Computers, Desktops, Printers, Ink & Toner | HP® India",
+  "pageUrl": "https://www.hp.com/in-en/home.html",
+  "snapshotSummary": "Skip to Content\nSkip to Footer\nSkip to Country Selector\nLaptops\nDesktops\nPrinters\nAccessories\nBusiness Solutions\nSupport\nHP OmniBook X Flip\nCopilot+ PCs are the fastest, most intelligent Windows PCs ever\n\nLearn\n\nShop\n\nEnd of Financial year Sale\nUpgrade now and benefit from tax savings while enhancing productivity and efficiency with a Next-Gen AI PC. Enjoy up to 40% off on select PCs and accessories.\n\nShop\n\nUnlock Exclusive HP Benefits – Just for You at Your Nearest HP World Store\nThe future won"
+}

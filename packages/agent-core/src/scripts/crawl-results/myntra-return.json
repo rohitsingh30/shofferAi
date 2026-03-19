@@ -1,0 +1,14 @@
+{
+  "skillName": "myntra-return",
+  "siteUrl": "https://www.myntra.com/my/orders",
+  "crawledAt": "2026-03-16T14:14:52.849Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cartIcon": "a[href*=\"cart\"]"
+  },
+  "pageTitle": "Myntra",
+  "pageUrl": "https://www.myntra.com/login?referer=https%3A%2F%2Fwww.myntra.com%2Fmy%2Forders",
+  "snapshotSummary": "MENWOMENKIDSHOME LIVINGSTUDIO\nWishlist\nBag\nLogin or Signup\n+91|Mobile Number*\nBy continuing, I agree to the Terms of Use & Privacy Policy and I am above 18 years old.\nCONTINUE\nHave trouble logging in? Get help"
+}

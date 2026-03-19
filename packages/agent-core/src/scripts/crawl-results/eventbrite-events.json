@@ -1,0 +1,17 @@
+{
+  "skillName": "eventbrite-events",
+  "siteUrl": "https://www.eventbrite.com",
+  "crawledAt": "2026-03-16T13:46:59.542Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "locationInput": "[data-testid*=\"location\"]"
+  },
+  "pageTitle": "Eventbrite - Discover the Best Local Events & Things to Do",
+  "pageUrl": "https://www.eventbrite.com/",
+  "snapshotSummary": "Eventbrite\nSearch events\nautocomplete\nFind Events\nCreate Events\nHelp Center\nFind my tickets\nSign in\n\nMusic\n\nNightlife\n\nPerforming & Visual Arts\n\nHolidays\n\nDating\n\nHobbies\n\nBusiness\n\nFood & Drink\n\nBrowsing events in\nautocomplete\nAll\nFor you\nToday\nThis weekend\nEvents in Hyderābād\n\nSales end soon\n\nYour Small Business Can Win Big Contracts\n\nThursday • 4:30 AM GMT+5:30\n\nFree\n\nPromoted\n\nAlmost full\n\nMasterclass on achieving financial freedom for working professionals\n\nSaturday • 2:00 PM\n\nStarbucks\n\nFr"
+}

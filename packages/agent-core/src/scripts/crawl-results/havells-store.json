@@ -1,0 +1,20 @@
+{
+  "skillName": "havells-store",
+  "siteUrl": "https://www.havells.com/",
+  "crawledAt": "2026-03-16T13:54:57.360Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "addToCart": "button:has-text(\"Add to Cart\")",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Havells India - Leading Manufacturer of Electrical Equipment & Home Appliances",
+  "pageUrl": "https://havells.com/",
+  "snapshotSummary": "Shop by Category See Our Brands Support\n For Business\nCart\nSkip to Content\n \nNew Products\nBest Seller\nRegister Product\nBuy AMC\nLoyalty\n1\n2\n3\n4\n5\n6\nDiscover Our Brands\nThis Weeks Highlights\nTrending\nFan\nWater Heater\nAppliances\nPersonal Grooming\nChimney Hob & Cooktop\nGreta Pro Storage Water Heater (Geyser)\nShop Now\nMeditate AP 250 Air Purifier\nShop Now\nHexo Plus 1100 W Mixer Grinder\nShop Now\nHavells Gracia Alkaline Water Purifier\nShop Now\nEpic Pro BLDC+ Ceiling Fan\nShop Now\nLloyd Product Highlight"
+}

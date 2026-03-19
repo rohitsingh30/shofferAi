@@ -50,7 +50,16 @@ export class SessionMCPHost implements MCPHostLike {
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
-    return this.inner.callToolWithSession(name, args, this.sessionId);
+    console.log('[mcp] session=%s callTool(%s) args=%s', this.sessionId, name, JSON.stringify(args).slice(0, 200));
+    const start = Date.now();
+    try {
+      const result = await this.inner.callToolWithSession(name, args, this.sessionId);
+      console.log('[mcp] session=%s callTool(%s) OK in %dms', this.sessionId, name, Date.now() - start);
+      return result;
+    } catch (err) {
+      console.error('[mcp] session=%s callTool(%s) FAILED in %dms:', this.sessionId, name, Date.now() - start, err);
+      throw err;
+    }
   }
 
   async disconnect(): Promise<void> {

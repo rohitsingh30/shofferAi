@@ -1,0 +1,8 @@
+{
+  "skillName": "toysrus-toys",
+  "siteUrl": "https://www.toysrus.co.in",
+  "crawledAt": "2026-03-16T14:46:52.368Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: net::ERR_NAME_NOT_RESOLVED at https://www.toysrus.co.in/\nCall log:\n\u001b[2m  - navigating to \"https://www.toysrus.co.in/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

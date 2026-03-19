@@ -1,0 +1,17 @@
+{
+  "skillName": "decathlon-sports",
+  "siteUrl": "https://www.decathlon.in",
+  "crawledAt": "2026-03-16T13:42:25.874Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardRating": "[class*=\"star\"]",
+    "addToCart": "button:has-text(\"Add to Cart\")",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "loginBtn": "a:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Buy Sporting Goods, Sportswear and Equipments | Download App",
+  "pageUrl": "https://www.decathlon.in/",
+  "snapshotSummary": "ALL\nSPORTS\n\nDelivery Location\n\n560001\nCHANGE\nPincode for Personalised Shopping & to Check Availability\n\nSign In\n\nMy Store\n\nSupport\n\nWishlist\n\nCart\n\nDecathlon: Shop from 50 Sports and 5000 Products In-Store & Online\n\nShop your\n\nWORKOUT CHECKLIST\n\nSHOP YOUR\n\nWORKOUT CHECKLIST\n\n4.6\nDOMYOS\n\nMen Gym Trackpant Convertible, Jog Fit, Quick Dry, Zip Pockets, 500 - Black\n\n₹ 999\n+1 offer\n\nADD TO CART\n\n4.5\nDOMYOS\n\nMen Fitness Tracksuit Jacket With Moisture Management FJA 100 - Black\n\n₹ 999\n\nADD TO CART\n\n4.8"
+}

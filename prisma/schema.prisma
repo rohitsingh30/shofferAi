@@ -159,6 +159,23 @@ model Payment {
   @@index([userId])
 }
 
+model SkillLesson {
+  id           String    @id @default(cuid())
+  skillId      String
+  errorPattern String
+  resolution   String    @db.Text
+  source       String    @default("auto") // "auto" | "user"
+  confidence   Float     @default(0.5)
+  successCount Int       @default(0)
+  failureCount Int       @default(0)
+  lastUsedAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime?
+
+  @@index([skillId])
+  @@index([skillId, confidence])
+}
+
 model TelemetryEvent {
   id        String   @id @default(cuid())
   timestamp DateTime @default(now())

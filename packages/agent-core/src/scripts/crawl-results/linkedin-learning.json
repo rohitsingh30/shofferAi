@@ -1,0 +1,17 @@
+{
+  "skillName": "linkedin-learning",
+  "siteUrl": "https://www.linkedin.com/learning",
+  "crawledAt": "2026-03-16T14:08:01.085Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "popupClose": "button[aria-label=\"Close\"]",
+    "locationInput": "input[placeholder*=\"location\" i]"
+  },
+  "pageTitle": "LinkedIn Learning: Online Training Courses & Skill Building",
+  "pageUrl": "https://www.linkedin.com/learning",
+  "snapshotSummary": "Skip to main content\nLEARNING\nLinkedIn Learning\nLearning\nStart free trial\nSign in\nDevelop skills that move your career forward\nGet guidance to develop the critical skills you need to advance your career from the only learning platform informed by the world’s largest talent marketplace.\nStart my free month\nBuy for my team\nPersonalize your learning\n\nSet career goals and use Skill Evaluations to connect with the right learning for where you are in your career.\n\nGuided learning that fits your career"
+}

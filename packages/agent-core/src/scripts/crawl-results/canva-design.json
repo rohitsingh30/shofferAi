@@ -1,0 +1,13 @@
+{
+  "skillName": "canva-design",
+  "siteUrl": "https://www.canva.com",
+  "crawledAt": "2026-03-16T13:33:38.708Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "loginBtn": "a:has-text(\"Log in\")"
+  },
+  "pageTitle": "Canva India: Visual Suite for Everyone",
+  "pageUrl": "https://www.canva.in/",
+  "snapshotSummary": "Loading finished\n\nSkip to main content\n\nCanva home\nDesign\nProduct\nPlans\nBusiness\nEducation\nHelp\nSign up\nLog in\nWhere heart meets art\n\nCanva makes it easy to create and share professional designs.\n\nSign up and start designing\nExplore Canva's Templates and AI Tools\n\nTry it now\n\nAI\n\nPresentation\n\nSocial Media\n\nPrint\n\nVideo\n\nEducation\n\nWatch your words turn into production-quality visuals with AI\nGenerate media\nBye-bye background, in a single click\nRemove background\nDesign, present & inspire with pr"
+}

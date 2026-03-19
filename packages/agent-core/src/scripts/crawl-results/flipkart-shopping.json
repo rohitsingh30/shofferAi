@@ -1,0 +1,14 @@
+{
+  "skillName": "flipkart-shopping",
+  "siteUrl": "https://www.flipkart.com",
+  "crawledAt": "2026-03-16T13:49:14.860Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Online Shopping Site for Mobiles, Electronics, Furniture, Grocery, Lifestyle, Books & More. Best Offers!",
+  "pageUrl": "https://www.flipkart.com/",
+  "snapshotSummary": "Location not set\nSelect delivery location\nLogin\nLogin\nMore\nCart\nFor You\nFashion\nMobiles\nBeauty\nElectronics\nHome\nAppliances\nToys, baby..\nFood & Health\nAuto Accessories\n2 Wheelers\nSports & Fitness\nBooks & Media\nFurniture\nInteresting finds\n   \nComraded Tee, Round Neck...\nUnder ₹399\n   \nMen's Casual Shoes...\nMin. 40% Off\n   \nGrab Big Discounts!\nMIn.40% Off\n   \nboAt, realme, Mivi & more\nBuy Now!\nTrends you may like\n     \nDualTone\n     \nSignet\n     \nKorean\n     \nWideLeg\nBrands in Spotlight\nWedding Ess"
+}

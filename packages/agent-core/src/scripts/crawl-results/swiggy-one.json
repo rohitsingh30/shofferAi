@@ -1,0 +1,12 @@
+{
+  "skillName": "swiggy-one",
+  "siteUrl": "https://www.swiggy.com/one",
+  "crawledAt": "2026-03-16T14:42:53.666Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "Order food online from India's best food delivery service. Order from restaurants near you",
+  "pageUrl": "https://www.swiggy.com/one",
+  "snapshotSummary": "We'll be back shortly\nWe are fixing a temporary glitch. Sorry for the inconvenience.\nGo Back"
+}

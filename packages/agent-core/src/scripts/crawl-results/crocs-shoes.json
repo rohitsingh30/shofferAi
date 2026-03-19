@@ -1,0 +1,18 @@
+{
+  "skillName": "crocs-shoes",
+  "siteUrl": "https://www.crocs.in",
+  "crawledAt": "2026-03-16T13:40:34.032Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Crocs™ India Online Store. Buy Clogs, Shoes, Sandals, Boots, Flip Flops - Crocs™ India",
+  "pageUrl": "https://www.crocs.in/",
+  "snapshotSummary": "WOMEN\nMEN\nKIDS\nJIBBITZ™ CHARMS\nBESTSELLERS\nNEW ARRIVALS\nCROCS SOCKS\nSALE\nLET THEM TALK\nPRICE DROP\n\nSIGN UP FOR 15% OFF\n\nWomen\nMen\nKids\nJibbitz™ Charms\nBestsellers\nNew Arrivals\nSale\nLet Them Talk\nPrice Drop\nSearch\nPrevious\n\nPrice Drop:\n\nUp To 50% Off + Extra 5% on Prepaid Orders!\n\nShop Now!\n\nPrice Drop:\n\nUp To 50% Off + Extra 5% on Prepaid Orders!\n\nShop Now!\n\nNext\nPopular Collections\nClassic\nInMotion\nEcho\nMellow\nBrooklyn\nMiami\nGetaway\nTrending Styles\nClassic New Colors\nWomen's New Arrivals\nMen's "
+}

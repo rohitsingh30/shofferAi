@@ -1,0 +1,14 @@
+{
+  "skillName": "kissht-emi",
+  "siteUrl": "https://www.kissht.com",
+  "crawledAt": "2026-03-16T14:05:37.434Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "popupClose": "[role=\"dialog\"] button:first-child"
+  },
+  "pageTitle": "Instant Personal Loans, Business Loans & Loan Against Property Online In India",
+  "pageUrl": "https://www.kissht.com/",
+  "snapshotSummary": "Loans\nCalculators\nTrack\nCompany\nInvestor Relations\n\nPAY EMI\n\nLaunching soon\n\nDigital Gold\n\nStart with only ₹10!\n\nKissht Loans.\n\nTrusted by Millions.\n\nWhether it's a planned milestone or an emergency, we offer secured and unsecured loans to meet your unique financial needs.\n\n60M+\n\nUsers\n\n4.6 ★\n\nRated on Playstore\n\nWhy ChooseKissht?\n\nFlexible\nRepayments\n\nInstant\nApprovals\n\nInterest Rates\nStarting From 1% pm\n\nQuick\nDisbursals\n\n100% Paperless\nProcess\n\nMinimal\nDocs\n\nOurProducts\n\nLoans\n\nAt Kissht, we "
+}

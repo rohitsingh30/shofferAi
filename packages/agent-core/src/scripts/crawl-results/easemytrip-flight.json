@@ -1,0 +1,17 @@
+{
+  "skillName": "easemytrip-flight",
+  "siteUrl": "https://www.easemytrip.com",
+  "crawledAt": "2026-03-16T13:45:24.341Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"rupee\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "profileIcon": "[class*=\"profile\"]",
+    "locationInput": "input[placeholder*=\"city\" i]"
+  },
+  "pageTitle": "EaseMyTrip.com - Book Flights, Hotels, Holidays, Bus & Train Tickets",
+  "pageUrl": "https://www.easemytrip.com/",
+  "snapshotSummary": "EMTMate\nAgent travel solution\nEMTDesk\nCorporate travel program\nEMTRoyale\nFor Prime Members\nExplore Bharat\nA Tour to India\nJoin EMTPro\nEnjoy More Benefits\nCall Support\nTel : 011 - 43131313, 43030303\nMail Support\nCare@easemytrip.com\nIndia\nLogin or Signup\nCustomer Login\nLogin & check bookings\nCorporate Travel\nLogin corporate account\nAgent Login\nLogin your agent account\nMy Booking\nManage your bookings here\nFlights\nHotels\nTrains\nBus\nHolidays\nCabs\nACTIVITIES\nVisa\nMore\nMonuments \nMajestic Monuments of "
+}

@@ -22,8 +22,10 @@ const g = globalThis as unknown as {
 
 // Create or reuse the relay bridge / MCP host
 if (!g.mcpHost) {
+  console.log('[singletons] Initializing MCP host (RELAY_MODE=%s, NODE_ENV=%s)', process.env.RELAY_MODE, process.env.NODE_ENV);
   if (process.env.RELAY_MODE === 'cloud' || process.env.NODE_ENV === 'production') {
     // Production: RelayBridge — laptop connects IN to us (no tunnel needed)
+    console.log('[singletons] Using RelayBridge (cloud/production mode)');
     const bridge = g.relayBridge || new RelayBridge();
     g.relayBridge = bridge;
     g.__relayBridge = bridge; // custom-server.js reads this to wire up WebSocket
@@ -31,10 +33,12 @@ if (!g.mcpHost) {
   } else {
     // Dev: connect OUT to local relay server (laptop runs RelayServer on localhost:8765)
     const relayUrl = process.env.RELAY_LAPTOP_URL || 'ws://localhost:8765';
+    console.log('[singletons] Using RemoteMCPHost (dev mode) -> %s', relayUrl);
     g.mcpHost = new RemoteMCPHost(relayUrl, {
       authToken: process.env.RELAY_AUTH_TOKEN,
     });
   }
+  console.log('[singletons] MCP host initialized');
 }
 
 export const remoteMcpHost = g.mcpHost;
@@ -44,9 +48,12 @@ export const workflowEngine = g.workflowEngine || new WorkflowEngine(prisma);
 export const vault = g.vault || new CredentialVault(prisma);
 
 // Skills loaded from SKILL.md files in packages/agent-core/src/skills/
-export const skills = g.skills || loadSkills();
+if (!g.skills) {
+  g.skills = loadSkills();
+  console.log('[singletons] Loaded %d skills', g.skills.length);
+}
+export const skills = g.skills;
 
 // Cache singletons on globalThis
 g.workflowEngine = workflowEngine;
 g.vault = vault;
-g.skills = skills;

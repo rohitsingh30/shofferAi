@@ -1,0 +1,12 @@
+{
+  "skillName": "wow-momo",
+  "siteUrl": "https://www.wowmomo.com",
+  "crawledAt": "2026-03-16T14:57:26.880Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "WOW! Momo – India's Fastest Growing QSR Chain",
+  "pageUrl": "https://www.wowmomo.com/",
+  "snapshotSummary": "HOME\nABOUT US\nEVENTS & BULK ORDERS\nNUTRITION\nFRANCHISE FORM\nT20 Combo _830X370\nWow! rewards-1920X799_Updated\nKorean Momo _1920X799\nWow! Kulfi mango _1920X799\nOh Saucy_1920X799\nPink Kulfi_1920X799\nQuick Eats _1920X799\nWow! Chicken _Chaar ka Pyaar -1920X799\nThe Wow! Momo Story\n\nStarted by classmates Sagar Daryani and Binod Homagai,  Kolkata based company Wow! Momo was started on 29th August 2008. Hailing from St Xavier’s Kolkata in their final year of their graduation they took the final plunge an"
+}

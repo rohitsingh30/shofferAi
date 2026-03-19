@@ -12,9 +12,16 @@ export interface TelemetryData {
 
 /**
  * Fire-and-forget telemetry tracking.
- * Never throws — errors are silently logged.
+ * Never throws — errors are logged to console.
  */
 export function track(data: TelemetryData): void {
+  const tag = data.success === false ? '✗' : '+';
+  console.log('[telemetry] %s %s/%s task=%s user=%s dur=%sms meta=%s',
+    tag, data.category, data.event,
+    data.taskId || '-', data.userId?.slice(0, 8) || '-',
+    data.durationMs ?? '-',
+    data.metadata ? JSON.stringify(data.metadata).slice(0, 150) : '-');
+
   prisma.telemetryEvent
     .create({
       data: {
@@ -27,8 +34,8 @@ export function track(data: TelemetryData): void {
         metadata: data.metadata ? JSON.stringify(data.metadata) : null,
       },
     })
-    .catch(() => {
-      // Silent — telemetry must never break the app
+    .catch((err) => {
+      console.error('[telemetry] DB write failed for %s/%s:', data.category, data.event, err instanceof Error ? err.message : err);
     });
 }
 

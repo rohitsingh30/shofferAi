@@ -1,0 +1,8 @@
+{
+  "skillName": "theobroma-bakery",
+  "siteUrl": "https://www.theobroma.in",
+  "crawledAt": "2026-03-16T14:45:27.322Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.theobroma.in/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

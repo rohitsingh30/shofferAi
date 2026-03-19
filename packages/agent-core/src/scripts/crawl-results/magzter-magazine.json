@@ -1,0 +1,15 @@
+{
+  "skillName": "magzter-magazine",
+  "siteUrl": "https://www.magzter.com",
+  "crawledAt": "2026-03-16T14:09:01.085Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Get digital subscriptions of magazines and newspapers | Magzter.com",
+  "pageUrl": "https://www.magzter.com/",
+  "snapshotSummary": "Magazines\nNewspapers\nStories\nDownload App\nIN\nUnlimited access to 10,000+ magazines and newspapers with one subscription\n\nRead digitally on any device\n\nNo commitments, cancel anytime\n\nView Plans\nPOPULAR ON MAGZTER\n\nView All\n\nIndia Today\n\nBusiness Standard\n\nBusiness Today India\n\nHindustan Times\n\nSmart Investment\n\nThe New Indian Express\n\nTHE WEEK India\n\nMint Mumbai\n\nOpen\n\nDinamani Chennai\n\nReader's Digest India\n\nVijayavani Bengaluru\n\nTime\n\nThe Guardian\n\nFinancial Express Mumbai\n\nOutlook Money\n\nThe "
+}

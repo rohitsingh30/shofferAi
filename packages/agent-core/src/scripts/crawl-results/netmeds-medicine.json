@@ -1,0 +1,19 @@
+{
+  "skillName": "netmeds-medicine",
+  "siteUrl": "https://www.netmeds.com",
+  "crawledAt": "2026-03-16T14:16:28.267Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardPrice": "[class*=\"price\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"profile\"]",
+    "locationInput": "input[placeholder*=\"address\" i]"
+  },
+  "pageTitle": "Order Medicine Online from India's Most Trusted Online Pharmacy | Netmeds",
+  "pageUrl": "https://www.netmeds.com/",
+  "snapshotSummary": "Deliver to Delhi, 110001\nSign In\nAll Categories\nMedicine\nLab Tests\nBeauty\nWellness\nHealth Corner\nOffers\nHomeopathy\nView all\nHealth Devices\nView all\nPersonal Care\nView all\nAyurveda\nView all\nFitness\nView all\nMom & Baby\nView all\nSexual Wellness\nView all\nTreatments\nView all\nSurgical\nView all\nVeterinary\nView all\nBiluma\nView all\nCetaphil\nView all\nShop by category\nView All\nPrescription Medicine\nDevices\nMom & Baby\nWellness\nDiabetes Care\nHair Care\nSexual Wellness\nEyewear\nLab tests & Health checkups from "
+}

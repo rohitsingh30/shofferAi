@@ -1,0 +1,13 @@
+{
+  "skillName": "hudle-sports",
+  "siteUrl": "https://hudle.in",
+  "crawledAt": "2026-03-16T13:58:41.510Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardRating": "[class*=\"star\"]"
+  },
+  "pageTitle": "Hudle | Where India Plays",
+  "pageUrl": "https://hudle.in/",
+  "snapshotSummary": "List Your Sports Venue\nCareers\nGet the App Now\nKickstart Your Fitness Journey\n​\nSelect Sport\n​\nSelect City\n​\nLIVE GAMES\n0\n0\n0\n0\n0\nChoose from 40+ Sports\n\nBadminton\n\nBox Cricket\n\nPadel\n\nFootball\n\nPickleball\n\nExplore More\n\nGame Changing Stories\n\nWhen I moved to India, I carried my passion for football with me. What I found was more than just a game - it was a community of football enthusiasts with a shared joy. Every match feels like coming home.\n\nMelissa •Mumbai\n\nBetween life's daily routines, we"
+}

@@ -1,0 +1,14 @@
+{
+  "skillName": "boxeight-food",
+  "siteUrl": "https://www.box8.in",
+  "crawledAt": "2026-03-16T13:32:27.890Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Box8 - Food delivery | Order food online in Mumbai, Delhi NCR, Bangalore, Hyderabad, Pune, Chennai & Kolkata",
+  "pageUrl": "https://box8.in/",
+  "snapshotSummary": "DELIVERYShowing Default Location\nexpand_more\nWhy EatClub?\nDeals\nexpand_more\nCart\nSign in\nkeyboard_arrow_left\nkeyboard_arrow_right\n\n\n2Cr+ Meals\nserved & we are not stopping!\n\n\n300+ Stores\nIn Mumbai, Delhi NCR, Bangalore, Hyderabad, Pune, Chennai & Kolkata\n\n\n28 Minutes\nSuperfast Delivery. We reach you before the hunger does.\n\n\n4.3 \nrated & 11000+ 5 star reviews that keep us motivated.\nIndia’s Largest\nDesi Meals Brand\nIrresistible meals in easy-to-carry boxes.\nAll-in-1 meals, Biryanis, Curries, Par"
+}

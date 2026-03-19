@@ -1,0 +1,15 @@
+{
+  "skillName": "google-calendar",
+  "siteUrl": "https://calendar.google.com",
+  "crawledAt": "2026-03-16T13:52:41.434Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "addToCart": "button:has-text(\"Add\")",
+    "profileIcon": "[aria-label*=\"account\" i]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Google Calendar - Week of March 15, 2026",
+  "pageUrl": "https://calendar.google.com/calendar/u/0/r?pli=1",
+  "snapshotSummary": "Skip to main content\nKeyboard shortcuts\nAccessibility Feedback\nCalendar\nToday\nMonday, March 16\nPrevious week\nNext week\nMarch 2026\nMarch 2026\nsearch\nSearch\nSupport\nSettings menu\nWeek\narrow_drop_down\nSwitch to Calendar\nSwitch to Tasks\nadd\nCreate\nCreate\nDrawer\nNavigation calendar\nMarch 2026\nPrevious month\nNext month\nS\nSunday\nSunday\n\t\nM\nMonday\nMonday\n\t\nT\nTuesday\nTuesday\n\t\nW\nWednesday\nWednesday\n\t\nT\nThursday\nThursday\n\t\nF\nFriday\nFriday\n\t\nS\nSaturday\nSaturday\n\n\n1\n\t\n2\n\t\n3\n\t\n4\n\t\n5\n\t\n6\n\t\n7\n\n\n8\n\t\n9\n\t\n10\n\t\n11"
+}

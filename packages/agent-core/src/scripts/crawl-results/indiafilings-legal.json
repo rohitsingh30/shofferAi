@@ -1,0 +1,14 @@
+{
+  "skillName": "indiafilings-legal",
+  "siteUrl": "https://www.indiafilings.com",
+  "crawledAt": "2026-03-16T14:00:12.745Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Login\")"
+  },
+  "pageTitle": "IndiaFilings - MCA, Trademark, GST and Income Tax Services",
+  "pageUrl": "https://www.indiafilings.com/",
+  "snapshotSummary": "IndiaFilings\nStartup\nRegistrations\nTrademark\nGST\nIncome Tax\nMCA\nCompliance\nGlobal\nWe're Hiring! 🥳\nLogin\nIndia's Largest AI‑Powered\nCorporate Services & Compliance Platform\n\nJoin millions of users who trust IndiaFilings to simplify and automate their MCA, GST, and Income Tax compliance. Our AI-powered platform with intelligent automation and expert professional support - delivers end-to-end workflows, paperless filing, and secure cloud storage. Start and operate a business with peace of mind.\n\nB"
+}

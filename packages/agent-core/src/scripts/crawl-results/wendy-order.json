@@ -1,0 +1,8 @@
+{
+  "skillName": "wendy-order",
+  "siteUrl": "https://www.wendys.in",
+  "crawledAt": "2026-03-16T14:55:10.807Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: net::ERR_CONNECTION_CLOSED at https://www.wendys.in/\nCall log:\n\u001b[2m  - navigating to \"https://www.wendys.in/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

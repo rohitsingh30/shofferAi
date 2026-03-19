@@ -1,0 +1,14 @@
+{
+  "skillName": "cleartax-itr",
+  "siteUrl": "https://cleartax.in",
+  "crawledAt": "2026-03-16T13:37:47.565Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Income Tax e Filing for FY 2025-26 (AY 2026-27) | Upload Form-16 for eFiling Income Tax Returns | ITR Filing - ClearTax",
+  "pageUrl": "https://cleartax.in/",
+  "snapshotSummary": "Products\nResources\nCompany\nGet Started\n₹1766.69 Cr Refund processed this year\nHire a Tax Expert\n\nRevised Filing by Experts\nBelated ITR filing\nITR-U\nHire Now\nMax Tax Savings Guaranteed\nTax Planning Services\nBook Now\nWe are now live for ITR filing on\n★4.9/5\n45K+ Reviews\n₹1,050 Cr+\nRefunds delivered last year\n7.5 M+\nUsers Trust Us\nAI-powered finance solutions for individuals and teams worldwide\nClear Finance Cloud\n\nAn AI-powered finance ecosystem built to help finance teams gain control, accuracy, "
+}

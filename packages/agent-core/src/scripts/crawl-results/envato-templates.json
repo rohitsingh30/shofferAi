@@ -1,0 +1,19 @@
+{
+  "skillName": "envato-templates",
+  "siteUrl": "https://themeforest.net",
+  "crawledAt": "2026-03-16T13:46:15.465Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "[role=\"dialog\"] button:first-child"
+  },
+  "pageTitle": "WordPress Themes & Website Templates from ThemeForest",
+  "pageUrl": "https://themeforest.net/",
+  "snapshotSummary": "Skip to content\nEnvato Market\nStart Selling\n Our Products\nThe unlimited creative subscription\nFree creative tutorials and courses\nCustomize mockups, design and video\nJoin the Envato community\nSign In\nWeb Themes & Templates Code Video Audio Graphics Photos 3D Files AI Tools & Unlimited Stock Assets\nAll Items\nWordPress\nElementor\nHosting\nHTML\nShopify\nJamstack\nMarketing\nCMS\neCommerce\nUI Templates\nPlugins\nMore\nProfessional WordPress Themes & Website Templates for any project\nDiscover thousands of eas"
+}

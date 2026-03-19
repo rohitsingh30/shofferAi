@@ -1,0 +1,13 @@
+{
+  "skillName": "cars24-buy",
+  "siteUrl": "https://www.cars24.com",
+  "crawledAt": "2026-03-16T13:34:06.391Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "Cars24: Buy & Sell Used Cars | Car Loan | New Car | Challan",
+  "pageUrl": "https://www.cars24.com/",
+  "snapshotSummary": "India\n\nBuy used car\n\nSell car\n\nCar finance\n\nNew cars\n\nCar services\n\nCall us\n\nHello, Sign in\n\nAccount \n\nBuy used car\n\nSell car\n\nUsed car valuation\n\nNew cars\n\nCar loan\n\nPersonal loan\n\nInsurance\n\nPay challan\n\nVehicle history\n\nGet car checked\n\nRTO check\n\nMore\n\nView all cars\nOur services\nPrevious\n\nBUY\n\nDrive home your dream car\n\n300 quality checks\n\n30-day return\n\nFinance it your way\n\nView all cars\n\nLOANS24\n\nMake your dreams real with a personal loan\n\nAttractive interest rates\n\nDisbursal in 5 mins\n\nGe"
+}

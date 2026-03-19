@@ -1,0 +1,15 @@
+{
+  "skillName": "myntra-fashion",
+  "siteUrl": "https://www.myntra.com",
+  "crawledAt": "2026-03-16T14:14:41.613Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Online Shopping for Women, Men, Kids Fashion & Lifestyle - Myntra",
+  "pageUrl": "https://www.myntra.com/",
+  "snapshotSummary": "MEN\nWOMEN\nKIDS\nHOME\nBEAUTY\nGENZ\nSTUDIO NEW\nProfile\nWishlist\nBag\n1\n2\n3\n4\nRISING STARS\n1\n2\n3\nLUXE GRAND REDUCTION DEALS\n1\n2\n3\nMEDAL WORTHY BRANDS TO BAG\n1\n2\n3\n4\nGRAND GLOBAL BRANDS\n1\n2\nSHOP BY CATEGORY\n\nUPTO ₹200 OFF\n\nONLINE SHOPPING\n\nMen\nWomen\nKids\nHome\nBeauty\nGenz\nGift Cards\nMyntra Insider\n\nUSEFUL LINKS\n\nBlog\nCareers\nSite Map\nCorporate Information\nWhitehat\nCleartrip\nMyntra Global\n\nCUSTOMER POLICIES\n\nContact Us\nFAQ\nT&C\nTerms Of Use\nTrack Orders\nShipping\nCancellation\nPrivacy policy\nGrievance Redre"
+}

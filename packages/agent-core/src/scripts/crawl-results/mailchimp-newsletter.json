@@ -1,0 +1,19 @@
+{
+  "skillName": "mailchimp-newsletter",
+  "siteUrl": "https://mailchimp.com",
+  "crawledAt": "2026-03-16T14:09:17.999Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Log in\")",
+    "profileIcon": "[class*=\"profile\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Email & SMS Marketing Platform | Mailchimp",
+  "pageUrl": "https://mailchimp.com/",
+  "snapshotSummary": "Skip to main content\n\nSave 50% for 12 months - limited time offer. Get started today.\n\nIndustries and Solutions\nIntegrations\nResources\nSales: +1 (800) 315-5939\nPricing\nLog In\nMain Menu\n\nTHE #1 AI-POWERED EMAIL MARKETING AND AUTOMATIONS PLATFORM*\n\nData-driven marketing without the complexity\nMaximize ROI with easy-to-use marketing analytics, automations, and AI tools.\nSign Up\nMailchimp has a four and half star rating\n*Based on 24,900+ reviews across\nBusinesses like yours are growing faster—and st"
+}

@@ -1,0 +1,13 @@
+{
+  "skillName": "wedmegood-wedding",
+  "siteUrl": "https://www.wedmegood.com",
+  "crawledAt": "2026-03-16T14:54:57.745Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"rating\"]"
+  },
+  "pageTitle": "Weddings, Indian Wedding Planning Online - WedMeGood",
+  "pageUrl": "https://www.wedmegood.com/",
+  "snapshotSummary": "Write A Review\nDownload App\nIndia's Favourite Wedding Planning Platform\nAll Cities\nVenues\nVendors\nPhotos\nReal Weddings\nBlog\nE-Invites\nGenie\nLog In\nYour Wedding, Your Way\nFind the best wedding vendors with thousands of trusted reviews\nSelect vendor type\nSelect city\nGet Started\nPopular Searches:\nPhoto Credits : Shutterdown\nPopular Venue Searches\n4 Star & Above Hotels\nMumbai |\nBangalore |\nPune |\nMore\nBanquet Halls\nMumbai |\nBangalore |\nPune |\nMore\nMarriage Garden / Lawns\nMumbai |\nBangalore |\nPune |\n"
+}

@@ -1,0 +1,15 @@
+{
+  "skillName": "99acres-property",
+  "siteUrl": "https://www.99acres.com",
+  "crawledAt": "2026-03-16T13:19:24.424Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "locationInput": "input[placeholder*=\"city\" i]"
+  },
+  "pageTitle": "India Real Estate Property Site - Buy Sell Rent Properties Portal - 99acres.com",
+  "pageUrl": "https://www.99acres.com/",
+  "snapshotSummary": "All India\nFor Buyers\nFor Tenants\nFor Owners\nFor Dealers / Builders\nInsights\nNEW\nPost property\nLOGIN / REGISTER\nSell or rent faster at the right price!\nPost Property\nExplore our Services\nFor Buyers\nFor Buyers\nInsightsNEW\nPrice Trends\nHome Loan Tools & More\nView All Insights\nArticles & News\nArticles For Buyers\nReal Estate News\nBuyer Guide\nHome Interior Guide\nPolicies (GST, RERA, PMAY, Budget)\nFor Tenants\nFor Tenants\nInsightsNEW\nPrice Trends\nHome Loan Tools & More\nView All Insights\nArticles & News\n"
+}

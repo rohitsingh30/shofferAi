@@ -1,0 +1,12 @@
+{
+  "skillName": "haier-store",
+  "siteUrl": "https://www.haier.com/in/",
+  "crawledAt": "2026-03-16T13:54:14.926Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "Home Appliances: Buy Refrigerator, Washing Machine, AC, TV and More | Haier India",
+  "pageUrl": "https://www.haier.com/in/",
+  "snapshotSummary": "Haier\n \nProducts\n \nBuy\n \nService & Support\n \nAbout Haier\n \nHaier Smart Solutions\n\nWe use cookies to give you the best online experience. By using our website you agree to our use of cookies in accordance with our cookie policy. Learn more here.\n\n \nFLAGSHIP PRODUCTS\n\nStyle Your Kitchen with 4 Door Colorful Refrigerators\n\nColorful Microwaves that Perfectly Match your Modern Kitchen\n\nMore\n \n\nIndia's only Colorful Display with  One Touch AI wash\n\nIndia’s first AI-powered colourful display panel offe"
+}

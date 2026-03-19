@@ -1,0 +1,16 @@
+{
+  "skillName": "uniqlo-fashion",
+  "siteUrl": "https://www.uniqlo.com/in/en/",
+  "crawledAt": "2026-03-16T14:49:39.357Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Uniqlo India: Premium Clothing For Men, Women & Kids",
+  "pageUrl": "https://www.uniqlo.com/in/en/",
+  "snapshotSummary": "Menu / Product\nSearch\nWOMEN\nMEN\nKIDS\nBABY\n\nClick & Collect is now LIVE! Shop online anytime and collect your order with no shipping charges at your preferred UNIQLO store.\n\nWe’ve upgraded our system to give you a better experience. Please reset your password to continue and enjoy a ₹300 migration voucher. Know more!\n\nCheerful Characters UT (Graphic T-Shirt)\n\nThis collection of graphic T-shirts reimagines iconic illustrations of beloved characters.\n\nAIRism Cotton Short Sleeve T-Shirt\n\nSmooth 'AIR"
+}

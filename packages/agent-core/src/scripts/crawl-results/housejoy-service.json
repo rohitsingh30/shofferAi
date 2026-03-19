@@ -1,0 +1,8 @@
+{
+  "skillName": "housejoy-service",
+  "siteUrl": "https://www.housejoy.in",
+  "crawledAt": "2026-03-16T13:58:11.608Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: net::ERR_NAME_NOT_RESOLVED at https://www.housejoy.in/\nCall log:\n\u001b[2m  - navigating to \"https://www.housejoy.in/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

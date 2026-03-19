@@ -1,0 +1,15 @@
+{
+  "skillName": "olx-sell",
+  "siteUrl": "https://www.olx.in",
+  "crawledAt": "2026-03-16T14:18:35.862Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "button:has-text(\"Login\")",
+    "locationInput": "input[placeholder*=\"city\" i]"
+  },
+  "pageTitle": "OLX - Free classifieds in India, Buy and Sell for free anywhere in India with OLX Online Classified Advertising",
+  "pageUrl": "https://www.olx.in/",
+  "snapshotSummary": "Search\n\"Cars\"\n\"Properties\"\n\"Mobiles\"\n\"Bikes\"\n\"Jobs\"\n\"Cars\"\nWishlist\nLogin\nSELL\nALL CATEGORIES\nCars\nMotorcycles\nMobile Phones\nFor Sale: Houses & Apartments\nFor Rent: Houses & Apartments\nBeds-Wardrobes\nTVs, Video - Audio\n16 Mar, 2026\nCars\nBikes\nProperties\nElectronics & Appliances\nMobiles\nCommercial Vehicles & Spares\nJobs\nFurniture\nFashion\nPets\nBooks, Sports & Hobbies\nServices\nLoad more\nPOPULAR LOCATIONS\nKolkata\nMumbai\nChennai\nPune\nTRENDING LOCATIONS\nBhubaneshwar\nHyderabad\nChandigarh\nNashik\nABOUT U"
+}

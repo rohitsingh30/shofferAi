@@ -1,0 +1,17 @@
+{
+  "skillName": "commonfloor-rental",
+  "siteUrl": "https://www.commonfloor.com",
+  "crawledAt": "2026-03-16T13:39:02.182Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "popupClose": "button[aria-label=\"Close\"]",
+    "locationInput": "input[placeholder*=\"city\" i]"
+  },
+  "pageTitle": "Property in India | Real Estate India | Buy/Sale/Rent Properties Online in India | Commonfloor.com",
+  "pageUrl": "https://www.commonfloor.com/",
+  "snapshotSummary": "Bangalore\nBangalore\nMumbai\nDelhi\nPune\nChennai\nHyderabad\nKolkata\nAhmedabad\nBuy\nPOST PROPERTY\nLog in to your account\nSign up as individual\nSign up as builder/agent\nPROJECTS \nLUXURY PROPERTIES NEW\nHOME LOANS\nAWARDS \nBLOG\nAREA CONVERTER NEW\nCF GROUPS\nBuy - Apartments\nBelow ₹60 Lakhs\n₹60 Lakhs - ₹80 Lakhs\n₹80 Lakhs - ₹1 Crore\nBuy - Villas\n₹60 Lakhs - ₹80 Lakhs\n₹80 Lakhs - ₹1 Crore\n₹1 Crore - ₹5 Crore\nBuy - Luxury Properties\n₹1 Crore - ₹1.6 Crores\n₹1.6 Crores - ₹5 Crores\nAbove ₹5 Crores\nBuy - Plots\nBe"
+}

@@ -1,0 +1,19 @@
+{
+  "skillName": "firstcry-baby",
+  "siteUrl": "https://www.firstcry.com",
+  "crawledAt": "2026-03-16T13:48:17.829Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "[class*=\"cart-icon\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]",
+    "locationInput": "input[placeholder*=\"address\" i]"
+  },
+  "pageTitle": "Baby Products Online India: Newborn Baby Products & Kids Online Shopping at FirstCry.com",
+  "pageUrl": "https://www.firstcry.com/",
+  "snapshotSummary": " \nSelect location\nStores & Preschools\nSupport\nTrack Order\nFirstCry Parenting\nLogin / Register\nShortlist\n0\nCart\nALL CATEGORIES\nBOY FASHION\nGIRL FASHION\nFOOTWEAR\nTOYS\nDIAPERING\nGEAR\nFEEDING\nBATH\nNURSERY\nMOMS\nHEALTH\nBOUTIQUES\nPREMIUM BOUTIQUES\n \n\nSeason Of Celebration | Upto To 14Y\n\nShop Now\n\nShop More, Save More | Upto To 14Y\n\nExplore Casual Wear & More\n\nNEW TODAY\n\nEid Collection | Upto To 14Y\n\nShop Ethnic Wear & Party Wear Collection\n\nMore For Less | Up To 14Y\n\nShop Inners, Tops & More Value Pack"
+}

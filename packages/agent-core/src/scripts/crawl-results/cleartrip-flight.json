@@ -1,0 +1,13 @@
+{
+  "skillName": "cleartrip-flight",
+  "siteUrl": "https://www.cleartrip.com",
+  "crawledAt": "2026-03-16T13:37:52.790Z",
+  "success": true,
+  "selectors": {
+    "cardPrice": "[class*=\"price\"]",
+    "loginBtn": "[data-testid*=\"login\"]"
+  },
+  "pageTitle": "Cleartrip: #1 Site for Booking Flights Tickets & Hotels Online - Get Best Travel Deals",
+  "pageUrl": "https://www.cleartrip.com/",
+  "snapshotSummary": "Offers\n\nBusiness\n\nMy Trips\n\nSupport\n\nLog in\nFlights\n\nHotels\n\nBuses\n\nHolidays\n\nSearch flights\nEnjoy hassle free flight ticket bookings at lowest airfare\n\nOne way\n\nRound trip\n\n1 Adult, Economy\nWed, Mar 18\nReturn\n\nCleartrip for Work\n\nUnlock 10% extra savings\n\nSAVE MORE\n\nStudent\n\nExtra baggage, discounts\n\nSenior citizen\n\nUp to ₹600 off\n\nArmed forces\n\nUp to ₹600 off\n\nNon-stop flights only\n\nSearch flights\n0\n1\n2\n3\n4\n\nMore offers\n\nView all\n\nSave Up to 20% Off with Akasa Air!\n\nFly To / From Navi Mumbai.\n"
+}

@@ -1,0 +1,12 @@
+{
+  "skillName": "healthifyme-diet",
+  "siteUrl": "https://www.healthifyme.com",
+  "crawledAt": "2026-03-16T13:55:44.392Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]"
+  },
+  "pageTitle": "Healthify",
+  "pageUrl": "https://www.healthifyme.com/in/",
+  "snapshotSummary": "Introducing HealthifyRx: Medical Weight Loss That Lasts\n\nClinically backed GLP-1 medication, doctor support, and personalized coaching — all in one plan.\n\nLearn More\nMeet Healthify.\nHealth Made Easy\nWith AI.\n\nImprove your nutrition with HealthifySnap's advanced meal tracking & meet Ria, your personalized AI coach.\n\nTry HealthifySnap\nTalk to AI Coach Ria\n.video-block { -webkit-mask-image: -webkit-radial-gradient(white, black); }\nTry Ria- Your Personal\nAI Health Coach!\nTalk to AI Coach Ria\nHealthi"
+}

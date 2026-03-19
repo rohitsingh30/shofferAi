@@ -1,0 +1,17 @@
+{
+  "skillName": "booking-hotel",
+  "siteUrl": "https://www.booking.com",
+  "crawledAt": "2026-03-16T13:31:59.128Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "[data-testid*=\"search\"] input",
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardTitle": "[data-testid*=\"title\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "Booking.com | Official site | The best hotels, flights, car rentals & accommodations",
+  "pageUrl": "https://www.booking.com/",
+  "snapshotSummary": "Skip to main content\nINR\nList your property\nRegister\nSign in\nStays\nFlights\nFlight + Hotel\nCar rental\nAttractions\nAirport taxis\nFind your next stay\n\nSearch deals on hotels, homes, and much more...\n\nSun, Mar 22\n—\nMon, Mar 23\n2 adults · 0 children · 1 room\nSearch\nI'm looking for an entire home or apartment\nAdd flights to my search\nWhy Booking.com?\nBook now, pay at the property\n\nFREE cancellation on most rooms\n\n300M+ reviews from fellow travelers\n\nGet trusted information from guests like you\n\n2+ mil"
+}

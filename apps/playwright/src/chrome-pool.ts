@@ -35,7 +35,7 @@ export interface ChromePoolOptions {
 }
 
 const DEFAULT_OPTIONS: ChromePoolOptions = {
-  maxSlots: parseInt(process.env.POOL_SIZE || '3', 10),
+  maxSlots: parseInt(process.env.POOL_SIZE || '6', 10),
   profileSourceDir: process.env.CHROME_PROFILE_SOURCE ||
     join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome-Debug'),
   poolDataDir: process.env.POOL_DATA_DIR ||

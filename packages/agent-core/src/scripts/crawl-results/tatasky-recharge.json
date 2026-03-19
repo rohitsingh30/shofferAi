@@ -1,0 +1,14 @@
+{
+  "skillName": "tatasky-recharge",
+  "siteUrl": "https://www.tataplay.com",
+  "crawledAt": "2026-03-16T14:44:50.656Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"name\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "Best DTH (Direct To Home) Service Provider in India | Tata Play",
+  "pageUrl": "https://www.tataplay.com/",
+  "snapshotSummary": "Home\nWatch\nTrack Order\nRecharge\nGet Help\nExisting customer?\nGo to My Account\nNot a Tata Play customer?\nI want a new DTH Connection\nI want DTH Connection + OTT Apps\nI want to enjoy OTT Apps\n\nWhether it’s watching your favourite shows or your favourite sports, never compromise on quality entertainment. Looking for one of the best DTH in India? Choose Tata Play.\n\nWhat is a DTH service?\n\nDTH is direct-to-home, which means that your favourite channels are streamed directly to your house with a set to"
+}

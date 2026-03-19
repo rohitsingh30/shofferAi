@@ -1,0 +1,14 @@
+{
+  "skillName": "hotstar-subscribe",
+  "siteUrl": "https://www.hotstar.com",
+  "crawledAt": "2026-03-16T13:58:00.416Z",
+  "success": true,
+  "selectors": {
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardTitle": "[data-testid*=\"title\"]",
+    "profileIcon": "[data-testid*=\"profile\"]"
+  },
+  "pageTitle": "JioHotstar - Watch TV Shows, Movies, Specials, Live Cricket & Football",
+  "pageUrl": "https://www.hotstar.com/in/home",
+  "snapshotSummary": "JioHotstar\nJio Hotstar Home\n\nKaataan\n\nOut on March 27\n\nOne mystery, many crimes ,an intense journey of revenge and truth.\n\nTeaser\n2026\nU/A 16+\nHindi\n\n32 singles, 2 villas, 1 dilemma! Love or money? Your favourite dating show is back with non-stop drama and fierce twists. Get ready for the ultimate battle!\n\nReality\nCompetition\nCouples\nGames\nWatch Now\nUnmute Trailer\n \nNew on JioHotstar\nNEW EPISODES SUN\nNEW EPISODE DAILY\nHijack 1971\nThe Bad Guys: Reign of Chaos\n \n \nKids Shows\nAvatar: The Last Airbe"
+}

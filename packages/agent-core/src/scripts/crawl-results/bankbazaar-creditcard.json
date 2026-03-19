@@ -1,0 +1,16 @@
+{
+  "skillName": "bankbazaar-creditcard",
+  "siteUrl": "https://www.bankbazaar.com/credit-card.html",
+  "crawledAt": "2026-03-16T13:28:57.672Z",
+  "success": true,
+  "selectors": {
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardPrice": "[class*=\"rupee\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Login\")",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "Compare & Apply Best Credit Cards In India | Instant Approval",
+  "pageUrl": "https://www.bankbazaar.com/credit-card.html",
+  "snapshotSummary": "CARDS \nLOANS \nINVESTMENTS \n\nTrack Application\n\nLogin\nCredit Cards\nHome Loans\nPersonal Loans\nOther Loans\nCalculators\nInvestments\n\nCredit Score\n\nGovt. Utility Documents\n\nDownload Mobile App\n\nInsurance\nResources\nBankBazaar\nHome\nCredit Card\nCompare & Apply for Credit Cards Online\nCompare, check your eligibility and apply for credit cards online.\nType of employment\n\nSalaried\n\nEarn regular monthly income\n\nBusiness Owner\n\nRun own business\n\nSelf-employed Professional\n\nOwn a practice (e.g. Doctor, C.A, e"
+}

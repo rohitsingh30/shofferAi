@@ -1,0 +1,17 @@
+{
+  "skillName": "reliance-digital",
+  "siteUrl": "https://www.reliancedigital.in",
+  "crawledAt": "2026-03-16T14:31:15.584Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "Online Electronic Shopping Store in India | Best Electronic Store",
+  "pageUrl": "https://www.reliancedigital.in/",
+  "snapshotSummary": "Orders\nContact us\nResource Center\nFind a store\n400001 - Mumbai\nCart\nWishlist\nLogin\nApple Store\nAir Conditioners\nTelevisions\nMobiles\nAir Coolers\nAudio\nTablets\nRefrigerators\nLaptops\nSmart Wearables\nSmall Appliances\nWashing Machines\nAll Categories\nUpgrade to Summer Comfort | ACs Starting from Rs. 24990\nUp to Rs. 4000 Bank Discount HDFC, ICICI, Kotak Cards\nView All\nTCL 1.5 Ton 3 Star Split Invertor Air Conditioner, AR18EV3, White (7 in 1 Convertible, 100% Grooved Copper, 4 Way Swing, Turbo Cool, 202"
+}

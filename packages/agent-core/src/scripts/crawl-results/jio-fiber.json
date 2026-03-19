@@ -1,0 +1,17 @@
+{
+  "skillName": "jio-fiber",
+  "siteUrl": "https://www.jio.com/fiber",
+  "crawledAt": "2026-03-16T14:03:58.306Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[data-testid*=\"title\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "Broadband Connection & Internet Services | JioFiber",
+  "pageUrl": "https://www.jio.com/fiber/",
+  "snapshotSummary": "Mobile\nHome\nBusiness\nSupport\nDiscover\nBrowse Plans\nGet JioHome\nApps & Services\nDevices\nPay Bills\nRecharge\nJioPC\n1/3\nUnlimited broadband for your home\nEnjoy up to 1 Gbps internet speed across devices..\nBook now\nExplore\nYouTube Premium is FREE for you\nYou can enjoy ad-free videos, offline viewing, background play and over 100 million songs!\nExplore eligible plans\nExclusive Offer\nFree installation worth ₹1000.\nBook now\nUnlimited broadband for your home\nEnjoy up to 1 Gbps internet speed across devic"
+}

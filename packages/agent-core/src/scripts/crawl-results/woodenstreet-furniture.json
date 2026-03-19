@@ -1,0 +1,16 @@
+{
+  "skillName": "woodenstreet-furniture",
+  "siteUrl": "https://www.woodenstreet.com",
+  "crawledAt": "2026-03-16T14:56:59.951Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "profileIcon": "[class*=\"profile\"]"
+  },
+  "pageTitle": "Furniture @upto 50% OFF | Online Furniture Store in India Wooden Street",
+  "pageUrl": "https://www.woodenstreet.com/",
+  "snapshotSummary": "Furniture\nHome Interiors\nBulk Order\n+91-9314444747\nBecome a Franchise\nTrack Order\nHelp Center\n\nStores\n\nProfile\n\nWishlist (0)\n\nCart (0)\n\nSofas\n\nLiving\n\nBedroom\n\nMattress\n\nDining\n\nStorage\n\nStudy & Office\n\nOutdoor\n\nDecor & Furnishing\n\nModular Kitchen & Wardrobe\n\nWS Luxe\n\n20 Lakh+ Customers\n\nFree\nDelivery\n\nBest\nWarranty*\n\n15 Lakh sq. ft. Mfg. Unit\n\nAll\nLiving\nBedroom\nDining\nMattress\nDecor\nSOFAS\nBEDS\nDINING\nTV UNITS\nCOFFEE TABLES\nCABINETS\nMATTRESSES\nWARDROBES\nSOFA CUM BED\nBOOKSHELVES\nALL STUDY TABLES"
+}

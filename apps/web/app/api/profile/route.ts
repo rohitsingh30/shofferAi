@@ -1,55 +1,68 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
+import { getAuthUser } from '@/lib/auth-helper';
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: Request) {
+  const authUser = await getAuthUser(request);
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: session.user.id },
-  });
+  try {
+    const profile = await prisma.profile.findUnique({
+      where: { userId: authUser.userId },
+    });
 
-  if (!profile) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    if (!profile) {
+      console.log('[profile] GET user=%s — not found', authUser.userId);
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    console.log('[profile] GET user=%s OK', authUser.userId);
+    return NextResponse.json({
+      ...profile,
+      addresses: JSON.parse(profile.addresses),
+      preferences: JSON.parse(profile.preferences),
+    });
+  } catch (error) {
+    console.error('[profile] GET user=%s ERROR:', authUser.userId, error);
+    return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
   }
-
-  // Parse JSON strings for the response
-  return NextResponse.json({
-    ...profile,
-    addresses: JSON.parse(profile.addresses),
-    preferences: JSON.parse(profile.preferences),
-  });
 }
 
 export async function PUT(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authUser = await getAuthUser(request);
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { phone, addresses, preferences } = await request.json();
+  try {
+    const { phone, addresses, preferences } = await request.json();
+    console.log('[profile] PUT user=%s', authUser.userId);
 
-  const profile = await prisma.profile.upsert({
-    where: { userId: session.user.id },
-    update: {
-      phone: phone !== undefined ? phone : undefined,
-      addresses: addresses !== undefined ? JSON.stringify(addresses) : undefined,
-      preferences: preferences !== undefined ? JSON.stringify(preferences) : undefined,
-    },
-    create: {
-      userId: session.user.id,
-      phone,
-      addresses: JSON.stringify(addresses || []),
-      preferences: JSON.stringify(preferences || {}),
-    },
-  });
+    const profile = await prisma.profile.upsert({
+      where: { userId: authUser.userId },
+      update: {
+        phone: phone !== undefined ? phone : undefined,
+        addresses: addresses !== undefined ? JSON.stringify(addresses) : undefined,
+        preferences: preferences !== undefined ? JSON.stringify(preferences) : undefined,
+      },
+      create: {
+        userId: authUser.userId,
+        phone,
+        addresses: JSON.stringify(addresses || []),
+        preferences: JSON.stringify(preferences || {}),
+      },
+    });
 
-  return NextResponse.json({
-    ...profile,
-    addresses: JSON.parse(profile.addresses),
-    preferences: JSON.parse(profile.preferences),
-  });
+    console.log('[profile] PUT user=%s OK', authUser.userId);
+    return NextResponse.json({
+      ...profile,
+      addresses: JSON.parse(profile.addresses),
+      preferences: JSON.parse(profile.preferences),
+    });
+  } catch (error) {
+    console.error('[profile] PUT user=%s ERROR:', authUser.userId, error);
+    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+  }
 }

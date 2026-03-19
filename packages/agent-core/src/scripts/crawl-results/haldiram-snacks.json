@@ -1,0 +1,22 @@
+{
+  "skillName": "haldiram-snacks",
+  "siteUrl": "https://www.haldirams.com",
+  "crawledAt": "2026-03-16T13:54:23.315Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "addToCart": "button:has-text(\"Add to Cart\")",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]",
+    "popupClose": "[role=\"dialog\"] button:first-child",
+    "locationInput": "input[placeholder*=\"address\" i]"
+  },
+  "pageTitle": "Haldirams Nagpur | Haldiram Nagpur | Home of Haldiram Products | Sweets, Namkeen",
+  "pageUrl": "https://www.haldirams.com/",
+  "snapshotSummary": "Delivering PAN India & Free Shipping across India on Orders above ₹500| Estimated Standard Delivery Timeline of 3-5 Working Days, Though Delivery Time May Vary Depending On Pin Code CAUTION - Beware of Fraud!! We do not accept / encourage online payments with respect to super stockist / distributorship / franchisee / employment.\nTrack order\nE-Coupons\nSkip to Content\nWEDDING SPECIAL\nSWEETS\nPacked Sweets\nExotic Collection\nTin Sweets\nFestive Treats\nSignature Collection\nSAVORIES\nNamkeen\nPapad\nReady "
+}

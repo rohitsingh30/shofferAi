@@ -1,0 +1,13 @@
+{
+  "skillName": "panasonic-store",
+  "siteUrl": "https://www.panasonic.com/in/",
+  "crawledAt": "2026-03-16T14:21:33.275Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]"
+  },
+  "pageTitle": "Panasonic Home Appliances & Consumer Electronics in India",
+  "pageUrl": "https://www.panasonic.com/in/",
+  "snapshotSummary": "Panasonic Life Solutions India Pvt. Ltd\nConsumer\nBusiness\ne-store\nBrand Shop\nSupport\nCase Study\nAbout Us\nNews\nContact us\nThis site uses cookies, by continuing to browse you explicitly consent to usage as per Privacy Policy\nBuy Now\nConsumer\nAir Conditioners\nBeauty Care\nCameras & Camcorders\nCold Chain\nHome Appliances\nHome Entertainment\nAnchor by Panasonic\nBattery\nAir Conditioners\nTelevision\nMicrowave Ovens\nSmall Appliances\nAudio\nCamera\nWashing Machine\nPublic Notice\nSupport\nNew!! Request a Live Dem"
+}

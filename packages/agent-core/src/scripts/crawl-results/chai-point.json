@@ -1,0 +1,8 @@
+{
+  "skillName": "chai-point",
+  "siteUrl": "https://www.chaipoint.com",
+  "crawledAt": "2026-03-16T13:35:44.374Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.chaipoint.com/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

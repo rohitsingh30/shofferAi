@@ -251,7 +251,7 @@ ChromePool automatically clones the Chrome-Debug profile directory for each Chro
 │                    PRODUCTION CHECKLIST                        │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│  ☁️ CLOUD RUN (auto)          💻 LAPTOP (manual)             │
+│  ☁️ CLOUD RUN (auto)          💻 LAPTOP (manual or daemon)    │
 │  ─────────────────           ───────────────────             │
 │  ✅ Next.js App               ☐ ./start-laptop.sh            │
 │  ✅ API Routes                  (launches Chrome + relay     │
@@ -271,3 +271,131 @@ ChromePool automatically clones the Chrome-Debug profile directory for each Chro
 │  No RELAY_CLOUD_URL needed for local dev                     │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Running Forever (Auto-Start on Boot)
+
+### ☁️ Cloud Run — Already Runs Forever
+
+Cloud Run automatically:
+- Starts your container when traffic arrives
+- Restarts if it crashes
+- Scales 0→3 instances based on load
+- No action needed — it just works
+
+### 💻 Laptop Relay — macOS LaunchAgent
+
+The relay uses a **macOS LaunchAgent** to auto-start on login and restart on crash.
+
+**Files involved:**
+
+| File | Purpose |
+|------|---------|
+| `~/Library/LaunchAgents/com.shofferai.relay.plist` | macOS daemon config — auto-start on login |
+| `apps/playwright/scripts/start-relay-daemon.sh` | Daemon entry point — loads nvm, sets env vars, runs relay |
+| `/tmp/shofferai-relay.log` | stdout logs |
+| `/tmp/shofferai-relay-error.log` | stderr logs |
+
+**How it works:**
+- `RunAtLoad: true` → Starts automatically when you log in
+- `KeepAlive.SuccessfulExit: false` → Restarts if the process crashes (exit code ≠ 0)
+- `ThrottleInterval: 30` → Waits 30 seconds between restart attempts (prevents crash loops)
+- ChromePool handles all Chrome lifecycle — no separate Chrome daemon needed
+
+**Setup (one-time):**
+
+```bash
+# 1. Ensure the plist exists
+cat ~/Library/LaunchAgents/com.shofferai.relay.plist
+# If missing, create it (see below)
+
+# 2. Load the daemon
+launchctl load ~/Library/LaunchAgents/com.shofferai.relay.plist
+
+# 3. Verify it's running
+launchctl list | grep shofferai
+# Should show:  <PID>  0  com.shofferai.relay
+
+# 4. Check logs
+tail -20 /tmp/shofferai-relay.log
+tail -20 /tmp/shofferai-relay-error.log
+```
+
+**The plist:**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.shofferai.relay</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/rohit/shofferAi/apps/playwright/scripts/start-relay-daemon.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/shofferai-relay.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/shofferai-relay-error.log</string>
+</dict>
+</plist>
+```
+
+**Common operations:**
+
+```bash
+# Check status
+launchctl list | grep shofferai
+
+# View live logs
+tail -f /tmp/shofferai-relay.log
+
+# Restart the relay
+launchctl stop com.shofferai.relay   # KeepAlive auto-restarts it
+
+# Stop completely (until next login)
+launchctl unload ~/Library/LaunchAgents/com.shofferai.relay.plist
+
+# Re-enable
+launchctl load ~/Library/LaunchAgents/com.shofferai.relay.plist
+```
+
+> ⚠️ **Obsolete: `com.shofferai.chrome-debug.plist`** — This used to launch Chrome separately on port 9222. No longer needed — ChromePool launches Chrome on OS-assigned ports. If you still have it, disable it:
+> ```bash
+> launchctl unload ~/Library/LaunchAgents/com.shofferai.chrome-debug.plist
+> mv ~/Library/LaunchAgents/com.shofferai.chrome-debug.plist \
+>    ~/Library/LaunchAgents/com.shofferai.chrome-debug.plist.disabled
+> ```
+
+### What Keeps Everything Alive
+
+```
+┌───────────────────────────────────────────────────────────┐
+│  COMPONENT          │  KEPT ALIVE BY          │  RESTARTS │
+├─────────────────────┼─────────────────────────┼───────────┤
+│  Cloud Run app      │  GCP Cloud Run          │  Auto     │
+│  Cloud SQL          │  GCP managed service    │  Auto     │
+│  Laptop relay       │  macOS LaunchAgent      │  Auto     │
+│  Chrome instances   │  ChromePool (on demand) │  On task  │
+│  WSS connection     │  RelayOutbound reconnect│  Auto     │
+└───────────────────────────────────────────────────────────┘
+```
+
+**Edge cases handled:**
+- **Laptop sleeps**: Relay reconnects when laptop wakes (RelayOutbound has exponential backoff: 1s, 2s, 4s... max 30s)
+- **Relay crashes**: LaunchAgent restarts within 30 seconds
+- **Chrome crashes**: ChromePool detects it, marks slot as error, launches new Chrome on next task
+- **Cloud Run cold start**: First request after idle may take 5-10 seconds (container boots)
+- **Token expires**: If Chrome session cookies expire, open Chrome-Debug base profile manually, re-login, ChromePool picks up new sessions on next clone

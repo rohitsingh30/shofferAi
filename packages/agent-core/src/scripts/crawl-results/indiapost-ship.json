@@ -1,0 +1,15 @@
+{
+  "skillName": "indiapost-ship",
+  "siteUrl": "https://www.indiapost.gov.in",
+  "crawledAt": "2026-03-16T14:00:36.552Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[aria-label*=\"search\" i]",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "popupClose": "[role=\"dialog\"] button:first-child"
+  },
+  "pageTitle": "India Post",
+  "pageUrl": "https://www.indiapost.gov.in/",
+  "snapshotSummary": "भारत सरकार\nGOVERNMENT OF INDIA\nAccessibility Links\nOpen login menu\n\nDepartment of Posts\n\nGovernment of India\n\nMinistry of Communications\n\nHome\nMinistry\nOnline Services\nOfferings\nDocuments\nMedia\nConnect\nWelcome / स्वागत है\n\nPlease select your preferred language / कृपया भाषा चुनें\n\nA\nEnglish\nअ\nहिन्दी (Hindi)\nIndia Post - Department of Posts\n1\n2\n3\n4\n5\n6\n7\nWeb banner for Dak Samvaad January 2026 - Hindi\nAnnouncements\nFor registration of complaints, Please click here\nFor registration of complaints, P"
+}

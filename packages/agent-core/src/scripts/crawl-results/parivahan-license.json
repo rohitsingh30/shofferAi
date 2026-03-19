@@ -1,0 +1,16 @@
+{
+  "skillName": "parivahan-license",
+  "siteUrl": "https://parivahan.gov.in",
+  "crawledAt": "2026-03-16T14:21:41.604Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"title\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Welcome! | Parivahansewa",
+  "pageUrl": "https://parivahan.gov.in/",
+  "snapshotSummary": "   Home\n Skip to navigation\n Screen Reader Access\nA-\nA\nA+\nA\nA\nहिन्दी\nPARIVAHAN\nSEWA\nसड़क परिवहन और राजमार्ग मंत्रालय\nMinistry of Road Transport Highways\nAbout Us\nInformational Services\nOnline Services\nDashboard & Reports\nExternal Links\nPublic Media\nSitemap\nContact Us\nLogin\nDriving License Related Services\n\nVarious services related to new/old driving licence or learner's licence like Appointment Booking, Duplicate driving licence, Application Status, Online test for learner's licence, etc.\n\nOnlin"
+}

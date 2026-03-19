@@ -45,6 +45,11 @@ blob-report/
 # Debug snapshots
 *.snap.md
 
+# Screenshots (Playwright MCP saves to cwd by default)
+/*.png
+/*.jpeg
+/*.jpg
+
 # Docker
 docker-data/
 

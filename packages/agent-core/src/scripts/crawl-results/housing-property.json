@@ -1,0 +1,15 @@
+{
+  "skillName": "housing-property",
+  "siteUrl": "https://housing.com",
+  "crawledAt": "2026-03-16T13:58:13.416Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "loginBtn": "button:has-text(\"Login\")"
+  },
+  "pageTitle": "Search India Real Estate and Properties - Housing.com",
+  "pageUrl": "https://housing.com/",
+  "snapshotSummary": "Your search for property ends here - Buy, Rent, Sell - Housing.com\nFor Buyers\nFor Tenants\nFor Sellers\nServices\nNews & Guide\nDownload App\nPost PropertyFREE\nTrusted place to find a home\n\n6K+ listings added daily and 73K+ total verified\n\nBUY\nRENT\nCOMMERCIAL\nPG/CO-LIVING\nPLOTS\nSearch\nAre you a Property Owner?  \nSell / Rent for FREE\nHousing's top picks\nExplore top living options with us\nSignature Natures Edge\nSignature Avenues\nView Projects\nSignature Natures Edge\nTukkuguda, Hyderabad\n5.87 Cr\n4 BHK Vi"
+}

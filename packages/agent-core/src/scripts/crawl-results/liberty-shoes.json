@@ -1,0 +1,14 @@
+{
+  "skillName": "liberty-shoes",
+  "siteUrl": "https://www.libertyshoes.com",
+  "crawledAt": "2026-03-16T14:07:18.003Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"title\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Best Footwear Company in India | Best Wholesalers Shoe suppliers in India | Branded Shoes Wholesale Online India",
+  "pageUrl": "https://www.libertyshoes.com/",
+  "snapshotSummary": "TOP MENU\nPARTNERSHIP OPPORTUNITIES\nCONTACT US\nVENDOR LOGIN\nHEADER MENUS\nABOUT US\nBRANDS\nOUR NETWORK\nINVESTORS\nCAREERS\nSHOP NOW\nTAKE A LEAP\n\nIt is about moving with the times and being totally at ease on the big stage. We are out showcasing our growth. Our fresh new Brands. Fresh new way of management. Our innovative and technology updates that are ushering the new era of growth and Leadership. We are focussed on increasing Brand Value, Brand Sales, Shareholder Values and gaining a leadership pos"
+}

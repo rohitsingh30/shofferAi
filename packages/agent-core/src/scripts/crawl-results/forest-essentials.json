@@ -1,0 +1,19 @@
+{
+  "skillName": "forest-essentials",
+  "siteUrl": "https://www.forestessentialsindia.com",
+  "crawledAt": "2026-03-16T13:49:33.666Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardPrice": "[class*=\"price\"]",
+    "addToCart": "button:has-text(\"Add to Bag\")",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"profile\"]",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "Luxury Ayurveda Beauty Store - Authentic Ayurvedic Products Online | Forest Essentials",
+  "pageUrl": "https://www.forestessentialsindia.com/",
+  "snapshotSummary": "WE DELIVER ACROSS INDIA & INTERNATIONALLY.\nFREE BESTSELLER ON 1ST ORDER*. CODE:WELCOME\nCOMPLIMENTARY SAMPLES ABOVE ₹999!\nWE DELIVER ACROSS INDIA & INTERNATIONALLY.\nFREE BESTSELLER ON 1ST ORDER*. CODE:WELCOME\nCOMPLIMENTARY SAMPLES ABOVE ₹999!\nWE DELIVER ACROSS INDIA & INTERNATIONALLY.\nSearch\nSTORES\n₹ INR\nBag\n0\nACCOUNT\nSOUNDARYA CLUB\nCUSTOMISED SKINCARE\nNEW\n \nFACE\n \nBATH & BODY\n \nHAIR\n \nMAKEUP\n \nGIFTING\nNEW\n \nTRAVEL MINIS\n \nBABY CARE\n \nMEN\n \nFRAGRANCE\n \nABOUT US\n \nEXCLUSIVES!\n   \n‹\n›\nBODY\nShop Now"
+}

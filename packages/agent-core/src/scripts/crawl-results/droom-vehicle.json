@@ -1,0 +1,14 @@
+{
+  "skillName": "droom-vehicle",
+  "siteUrl": "https://www.droom.in",
+  "crawledAt": "2026-03-16T13:44:24.339Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "a[href*=\"cart\"]"
+  },
+  "pageTitle": "Droom: Automotive E-Commerce Platform to Buy and Sell Vehicles",
+  "pageUrl": "https://droom.in/",
+  "snapshotSummary": "All\nMenu\n\nNEW LAUNCH !\nDroom Rental\n\nBuy Used\nBuy New\nSell/Exchange\nLoan\nInsurance\nRental\nHot\nDiagnostic Reports\nAncillary Services\nDiscover Your Dream Vehicle\nCars\nBikes\nScooters\nEg: Maruti Suzuki Swift\nAdvance Search\nTop Searched Cars\nMaruti Suzuki Swift\nHyundai Venue\nTata Nexon\nHonda City\nHyundai Creta\nKia Seltos\nSearch Vehicles By\nCars\nBikes\nScooters\nBrand\nPrice Range\nBody Type\nFuel Type\nResearch Tools\nView All\n\nCheck Vehicle Price\n\nVehicle Research\n\nTotal Cost of Ownership\n\nVehicle Compare\n"
+}

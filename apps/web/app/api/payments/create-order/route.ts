@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { getRazorpay, RAZORPAY_KEY_ID } from '@/lib/razorpay';
 import { track } from '@/lib/telemetry';
+import { getAuthUser } from '@/lib/auth-helper';
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authUser = await getAuthUser(request);
+  if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -22,22 +22,22 @@ export async function POST(request: Request) {
   const totalCents = amountCents + serviceFeeCents;
 
   try {
-    // Create Razorpay order
+    console.log('[payment/create] taskId=%s user=%s amount=%d paise', taskId, authUser.userId, totalCents);
     const order = await getRazorpay().orders.create({
-      amount: totalCents, // Razorpay expects amount in paise
+      amount: totalCents,
       currency: 'INR',
       receipt: `task_${taskId}`,
       notes: {
         taskId,
-        userId: session.user.id,
+        userId: authUser.userId,
       },
     });
+    console.log('[payment/create] taskId=%s razorpay orderId=%s', taskId, order.id);
 
-    // Create Payment record in DB
     await prisma.payment.create({
       data: {
         taskId,
-        userId: session.user.id,
+        userId: authUser.userId,
         status: 'pending',
         amountCents,
         serviceFeeCents,
@@ -49,8 +49,9 @@ export async function POST(request: Request) {
           : JSON.stringify(bookingSummary),
       },
     });
+    console.log('[payment/create] taskId=%s DB record created', taskId);
 
-    track({ event: 'payment_created', category: 'payment', userId: session.user.id, taskId, metadata: { amountCents: totalCents, orderId: order.id } });
+    track({ event: 'payment_created', category: 'payment', userId: authUser.userId, taskId, metadata: { amountCents: totalCents, orderId: order.id } });
     return NextResponse.json({
       orderId: order.id,
       amount: totalCents,
@@ -59,7 +60,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Payment creation failed';
-    track({ event: 'error', category: 'payment', userId: session.user.id, taskId, success: false, metadata: { error: msg } });
+    const stack = error instanceof Error ? error.stack : '';
+    console.error('[payment/create] taskId=%s ERROR: %s\n%s', taskId, msg, stack);
+    track({ event: 'error', category: 'payment', userId: authUser.userId, taskId, success: false, metadata: { error: msg } });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

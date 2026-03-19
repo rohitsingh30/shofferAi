@@ -1,0 +1,13 @@
+{
+  "skillName": "aadhaar-download",
+  "siteUrl": "https://myaadhaar.uidai.gov.in",
+  "crawledAt": "2026-03-16T13:19:39.568Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h3",
+    "loginBtn": "button:has-text(\"Login\")"
+  },
+  "pageTitle": "myAadhaar - Unique Identification Authority of India | Government of India",
+  "pageUrl": "https://myaadhaar.uidai.gov.in/",
+  "snapshotSummary": "Unique Identification Authority of India\nmyAadhaar\nEnglish\nInviting early\nadopters to test the\nAadhaar app\nDownload Now!\n\n\nShare feedback at\nfeedback.app@uidai.net.in\n\nWelcome to myAadhaar\n\nLogin\n\nLogin with Aadhaar and OTP\n\nEnglish\nहिंदी\nবাংলা\nಕನ್ನಡ\nગુજરાતી\nമലയാളം\nमराठी\nଓଡ଼ିଆ\nਪੰਜਾਬੀ\nதமிழ்\nతెలుగు\nاردو\nAadhaar Enrolment & Update Charges\nEnrolment & Update Forms\nList of Supporting Documents for Aadhaar Enrolment & Update\nServices that require mobile number to be registered with Aadhaar\nDownload Aa"
+}

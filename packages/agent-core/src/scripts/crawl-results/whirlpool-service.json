@@ -1,0 +1,8 @@
+{
+  "skillName": "whirlpool-service",
+  "siteUrl": "https://www.whirlpoolindia.com/support",
+  "crawledAt": "2026-03-16T14:55:59.933Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.whirlpoolindia.com/support\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

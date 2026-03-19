@@ -1,0 +1,13 @@
+{
+  "skillName": "phonepe-recharge",
+  "siteUrl": "https://www.phonepe.com",
+  "crawledAt": "2026-03-16T14:25:34.871Z",
+  "success": true,
+  "selectors": {
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "PhonePe: UPI Payments, Investment, Insurance, Recharges, DTH & More",
+  "pageUrl": "https://www.phonepe.com/",
+  "snapshotSummary": "COMPANY\nOUR SOLUTIONS\nINVESTOR RELATIONS\nCONTACT US\nTRUST & SAFETY\nPhonePe Pulse\nBeat of progress\n\nFind out how money moves in a country of 140 Crore!\nNow updated with the latest data for Q4 2022 (Oct-Dec)\n\nExplore Now\nOne Device, One App\nAny Payment Method\nGet your PhonePe POS\nTop picks shortlisted from\n1000+ Mutual Funds\n\nAnalysed using CRISP\n\nExplore Now\nDaily Mutual Fund SIP\n\nStarting at just ₹10/day\n\nInvest Now\n\n1.95%\n\nFREE\nAccept payments for your\nonline business at zero cost\n\nSign up for "
+}

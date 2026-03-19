@@ -1,0 +1,16 @@
+{
+  "skillName": "bajaj-finserv-loan",
+  "siteUrl": "https://www.bajajfinserv.in",
+  "crawledAt": "2026-03-16T13:28:50.646Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"profile\"]"
+  },
+  "pageTitle": "Bajaj Finserv: Loans, Cards, Insurance, Investments, Payments and more",
+  "pageUrl": "https://www.bajajfinserv.in/",
+  "snapshotSummary": "Bajaj Finserv\n\nEnglish\n\nSign In >\n\nSign In\n\nEMI Card\n\nNotifications\n\nCart\n\nPrime\n\nPartners\n\nBAJAJ FINANCE LIMITED\n Menu\nLoans \nAll on EMI \nBajaj Mall \nInsta EMI Card \nInvestments \nInsurance \nPayments \nOffers \nServices \nAbout Bajaj Finserv \nPay EMIs\nDo not call\nDownload the app\n\nHot Deals\n\nElectronics On EMI\n\nPersonal Loan\n\nACs on Easy EMI\n\nGold Loan\n\nTwo Wheeler\n\nHome Loan\n\nULIP Plan\n\nBusiness Loan\n\nShare Market\n\nLAS ALL\n\nHealthCover on EMI\n\nDoctor World\n\nLifestyle On EMI\n\nLoans\n\nAuto world\n\nBaj"
+}

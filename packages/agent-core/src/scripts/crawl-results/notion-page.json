@@ -1,0 +1,13 @@
+{
+  "skillName": "notion-page",
+  "siteUrl": "https://www.notion.so",
+  "crawledAt": "2026-03-16T14:17:21.929Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h3",
+    "loginBtn": "a:has-text(\"Log in\")"
+  },
+  "pageTitle": "The AI workspace that works for you. | Notion",
+  "pageUrl": "https://www.notion.com/",
+  "snapshotSummary": "New\nIntroducing Custom Agents: They keep your work moving 24/7.\nLearn more→\nProduct\nAI\nSolutions\nResources\nEnterprise\nPricing\nRequest a demo\nLog in\nGet Notion free\nMeet the night shift.\n\nNotion agents keep work moving 24/7. They capture knowledge, answer questions, and push projects forward—all while you sleep.\n\nGet Notion free\nRequest a demo\nPause\n\nTrusted by 98% of the Forbes Cloud 100\n\nMeet your new 24/7 AI teammates.\nCustom Agents\nNew\n\nAutomate repetitive work for your team.\n→\n\nQ&A agents\n\nA"
+}

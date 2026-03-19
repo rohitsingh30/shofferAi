@@ -1,0 +1,16 @@
+{
+  "skillName": "vedantu-tutor",
+  "siteUrl": "https://www.vedantu.com",
+  "crawledAt": "2026-03-16T14:52:42.742Z",
+  "success": true,
+  "selectors": {
+    "resultCards": "[class*=\"listing\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Vedantu: Premier K1 to K12 Online Classes and Offline Centers for Competitive Exams",
+  "pageUrl": "https://www.vedantu.com/",
+  "snapshotSummary": "Courses\nCourses for Kids\nFree study material\nOffline Centres\nOnline Tuition\nLet's Chat\nMore\nOur results\n\nA celebration of all our success stories\n\nChild safety\n\nCreating a safe learning environment for every child\n\nHelp India Learn\n\nHelps in learning for Children affected by the Pandemic\n\nWAVE\n\nHighly-interactive classroom that makes learning fun\n\nVedantu Improvement Promise (VIP)\n\nWe guarantee improvement in school and competitive exams\n\nMaster talks\n\nHeartfelt and insightful conversations with"
+}

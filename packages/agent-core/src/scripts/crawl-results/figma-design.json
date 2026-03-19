@@ -1,0 +1,13 @@
+{
+  "skillName": "figma-design",
+  "siteUrl": "https://www.figma.com",
+  "crawledAt": "2026-03-16T13:48:00.683Z",
+  "success": true,
+  "selectors": {
+    "loginBtn": "a:has-text(\"Log in\")",
+    "popupClose": "[role=\"dialog\"] button:first-child"
+  },
+  "pageTitle": "Figma: The Collaborative Interface Design Tool",
+  "pageUrl": "https://www.figma.com/",
+  "snapshotSummary": "This website uses cookies, pixel tags, and local storage for performance, personalization, and marketing purposes. We use our own cookies and some from third parties. Only essential cookies are turned on by default. Cookies settings\n\nAllow all cookies\nDo not allow cookies\n\nSkip to main content\n\nProducts\nSolutions\nCommunity\nResources\nPricing\nLog in\nContact sales\nGet started for free\nMake anything possible, all in Figma\nMake anything possible, all in Figma\nMake anything possible, all in F​\nGet sta"
+}

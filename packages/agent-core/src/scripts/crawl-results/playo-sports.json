@@ -1,0 +1,13 @@
+{
+  "skillName": "playo-sports",
+  "siteUrl": "https://playo.co",
+  "crawledAt": "2026-03-16T14:26:03.344Z",
+  "success": true,
+  "selectors": {
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "button:has-text(\"Login\")"
+  },
+  "pageTitle": "Book Sports Venues, Courts, Trainers, Events, and Find Players | Playo",
+  "pageUrl": "https://playo.co/",
+  "snapshotSummary": "Play\nBook\nTrain\nLogin / Signup\nBangalore\nBOOK SPORTS VENUES.\nJOIN GAMES.\nFIND TRAINERS NEAR YOU.\nThe World’s Largest Sports Community to Book Venues, Find Trainers, and Join Games Near you.\nY\nO\nU\nR\nO\nN\nE\nS\nT\nO\nP\nP\nL\nA\nT\nF\nO\nR\nM\nPopular Sports\nBadminton\nFootball\nCricket\nSwimming\nTennis\nTable Tennis\nBlogs to Keep You Fit!\nLearn Volleyball in 5!\nThe most simplified Volleyball manual you’ll need\nSEPTEMBER 26, 2018 | PLAYO\nNames Celebrated by Cricket\nUnderstand what it takes to become a Cricket icon!"
+}

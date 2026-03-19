@@ -1,0 +1,12 @@
+{
+  "skillName": "makemytrip-hotel",
+  "siteUrl": "https://www.makemytrip.com",
+  "crawledAt": "2026-03-16T14:09:42.023Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"name\"]"
+  },
+  "pageTitle": "MakeMyTrip - #1 Travel Website 50% OFF on Hotels, Flights & Holiday",
+  "pageUrl": "https://www.makemytrip.com/",
+  "snapshotSummary": "List Your Property\n\nGrow your business!\n\nIntroducing myBiz\n\nBusiness Travel Solution\n\nWishlist\n\nSave favourites\n\nMy Trips\n\nManage your bookings\n\n \n\nLogin or Create Account\n\nINR\n|\nEnglish\nFlights\nHotels\nVillas & Homestays\nHoliday Packages\nTrains\nBuses\nCabs\nTours & Attractions\nnew\nVisa\nCruise\nnew\nForex Card & Currency\nTravel Insurance\nPERSONAL ACCOUNT\nMYBIZ ACCOUNT\nMobile Number\n\n‎+91\n\nCONTINUE\n\nOr Login/Signup With\n\nBy proceeding, you agree to MakeMyTrip's  Privacy Policy, User Agreement and T&Cs"
+}

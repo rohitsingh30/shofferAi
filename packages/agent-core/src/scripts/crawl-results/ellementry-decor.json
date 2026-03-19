@@ -1,0 +1,22 @@
+{
+  "skillName": "ellementry-decor",
+  "siteUrl": "https://www.ellementry.com",
+  "crawledAt": "2026-03-16T13:46:05.905Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "addToCart": "button:has-text(\"Add to Bag\")",
+    "cartIcon": "[data-testid*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "[class*=\"close-btn\"]",
+    "locationInput": "input[placeholder*=\"address\" i]"
+  },
+  "pageTitle": "Shop Handmade Lifestyle and Homeware Products – ellementry",
+  "pageUrl": "https://www.ellementry.com/",
+  "snapshotSummary": "□\nSKIP TO CONTENT\n0\n0 items\nKITCHENWARE\nTABLEWARE\nSERVEWARE\nDECOR\nFURNITURE & LIGHTING\nSOFT FURNISHING\nCOLLECTIONS\nOFFERS\nGIFTING\nSTORES\nshop by category\nKitchenware\nTableware\nServeware\nDecor\nFurniture & Lighting\nSoft Furnishing\nGifting\nBAKEWARE\nCOOKWARE\nORGANISER\nUTILITIES\nACCESSORIES\nshop new arrivals\nMEET WHAT’S NEW\nnew arrival\nquoise round coffee mug set of - 2\nRegular price\nRs. 1,350.00\nnew arrival\nquoise conical coffee mug set of 2\nRegular price\nRs. 1,350.00\nnew arrival\nquoise tall tumbler"
+}

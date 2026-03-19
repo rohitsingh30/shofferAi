@@ -1,0 +1,16 @@
+{
+  "skillName": "lic-policy",
+  "siteUrl": "https://licindia.in",
+  "crawledAt": "2026-03-16T14:07:28.537Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Login\")",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "Home | Official website of Life Insurance Corporation of India.",
+  "pageUrl": "https://licindia.in/",
+  "snapshotSummary": "Navigation\nSkip to Content\nSkip to main content\n 8976862090\n +91-22-68276827\n Branch Locator\nभाषा\nहिन्दी\nमराठी\nAbout Us\nProducts\nGroup Business\nCustomer Services\nInvestor Relations\nNRI\nNPS\nPay Premium\nLogin\n*REPRINTING APPLICATION FORM OF AAO (GENERALIST/SPECIALIST/ASSISTANT ENGINEERS)-2025* *CALL LETTER DOWNLOAD FOR RECRUITMENT OF AAO (GENERALIST/SPECIALIST/ASSISTANT ENGINEERS)-2025-LINK IS LIVE* *Aap ki punji aap ka Adhikar (आप की पूंजी आप का अधिकार)*\n​ ​\nI want to\nSelect\nProtect my family\nCre"
+}

@@ -1,0 +1,15 @@
+{
+  "skillName": "bigbasket-grocery",
+  "siteUrl": "https://www.bigbasket.com",
+  "crawledAt": "2026-03-16T13:30:17.537Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardRating": "[class*=\"star\"]",
+    "addToCart": "button:has-text(\"Add\")",
+    "loginBtn": "button:has-text(\"Login\")"
+  },
+  "pageTitle": "Online Grocery Shopping and Online Supermarket in India - bigbasket",
+  "pageUrl": "https://www.bigbasket.com/",
+  "snapshotSummary": "Shop by\nCategory\nElectronics\nFashion\nFood Court\nPharma-L1\nPharmacy & Wellness\nFruits & Vegetables\nFoodgrains, Oil & Masala\nBakery, Cakes & Dairy\nBeverages\nSnacks & Branded Foods\nBeauty & Hygiene\nCleaning & Household\nKitchen, Garden & Pets\nEggs, Meat & Fish\nGourmet & World Food\nBaby Care\nPaan Corner\nAudio devices\nCameras & Accessories\nElectrical Accessories\nHome Appliances\nKitchen Appliances\nPersonal Care & Grooming\nPhone & Laptop Accessory\nPhone, Laptop & Tablets\nSmart Wearables\nTVs & Monitors\nE"
+}

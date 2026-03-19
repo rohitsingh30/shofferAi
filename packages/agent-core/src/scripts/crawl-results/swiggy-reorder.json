@@ -1,0 +1,13 @@
+{
+  "skillName": "swiggy-reorder",
+  "siteUrl": "https://www.swiggy.com",
+  "crawledAt": "2026-03-16T14:42:58.519Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "locationInput": "input[placeholder*=\"location\" i]"
+  },
+  "pageTitle": "Order Food & Groceries. Discover the best restaurants. Swiggy it!",
+  "pageUrl": "https://www.swiggy.com/",
+  "snapshotSummary": "1\nCart\nRohit Singh Tomar\nHelp\nOffers\nNEW\nSearch\nSwiggy Corporate\nSwiggy Corporate\nPartner with us\nGet the App\nOrder food & groceries. Discover best restaurants. Swiggy it!\nSearch for restaurant, item or more\nRohit, what's on your mind?\nShop groceries on Instamart\nFresh Vegetables\nFresh Fruits\nDairy, Bread and Eggs\nRice, Atta and Dals\nMasalas and Dry Fruits\nOils and Ghee\nMunchies\nSweet Tooth\nCold Drinks and Juices\nBiscuits and Cakes\nInstant and Frozen Food\nMeat and Seafood\nCereals and Breakfast\nS"
+}

@@ -1,0 +1,14 @@
+{
+  "skillName": "ola-cab",
+  "siteUrl": "https://www.olacabs.com",
+  "crawledAt": "2026-03-16T14:18:20.047Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "loginBtn": "button:has-text(\"Sign in\")",
+    "locationInput": "input[placeholder*=\"location\" i]"
+  },
+  "pageTitle": "Book Cabs Nearby at Best Price | Hire Taxi Nearby Online at Olacabs.com",
+  "pageUrl": "https://www.olacabs.com/",
+  "snapshotSummary": "Ola Electric\nKrutrim\nOutstation\nBook an Ola Cab\nFree S1 Test Ride\nMoving people, and the world\nDaily\nRental\nOutstation\nSEARCH\nOLA CABS\nGlobal mobility ecosystem driving communities forward\n\n250+\n\nCities covered\n\nAcross India, Australia, New Zealand and the UK\n\n55 Cr+\n\nYearly rides\n\nBooked by our customers every year\n\n12 Cr+\n\nKilometers on S1\n\nDistance covered on Ola S1 scooters within a year of launch\n\nThere's an Ola ride for everyone\n\nFor any budget\n\nFrom Bikes and Autos to Prime Sedans and Pri"
+}

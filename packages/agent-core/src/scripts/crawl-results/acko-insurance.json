@@ -1,0 +1,15 @@
+{
+  "skillName": "acko-insurance",
+  "siteUrl": "https://www.acko.com",
+  "crawledAt": "2026-03-16T13:20:01.418Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "ACKO Insurance | Buy Car, Bike, Health, Term & Travel Insurance Online",
+  "pageUrl": "https://www.acko.com/",
+  "snapshotSummary": "Products\nEnterprise\nWhy ACKO?\nSupport\nRenewals\nNew to ACKO?\nRenew health insurance\nRenew car insurance\nRenew bike insurance\nRenew life insurance\nExisting ACKO Customer\nLogin and renew policy\nClaims\nFile a claim\nTrack a claim\nLogin\nCar insurance\nBike insurance\nHealth insurance\nLife insurance\nTravel insurance\nCar insurance\nComprehensive car insurance\nThird party car insurance\nOwn damage car insurance\nZero depreciation car insurance\nThe only pass that pays you back for flight troubles\nKnow more\nAbo"
+}

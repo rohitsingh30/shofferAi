@@ -1,0 +1,15 @@
+{
+  "skillName": "pernia-pop-up",
+  "siteUrl": "https://www.perniaspopupshop.com",
+  "crawledAt": "2026-03-16T14:24:44.714Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "locationInput": "input[placeholder*=\"address\" i]"
+  },
+  "pageTitle": "Shop Luxury Indian Ethnic Wear For Women Online | Pernia's Pop-Up Shop",
+  "pageUrl": "https://www.perniaspopupshop.com/",
+  "snapshotSummary": "WOMEN\nMEN\nJEWELLERY\nKIDSWEAR\nSTUDIO\nFIRST LOOK\nFor best prices and early deliveries, WhatsApp us at. 918488070070\nINR\nAUD\nGBP\nCAD\nHKD\nSGD\nUSD\nEUR\nNEW\nWOMEN\nLEHENGAS\nSAREES\nKURTA SETS\nANARKALIS\nSHARARAS\nWESTERN\nPRÊT\nFUSION\nWEDDING\nREADY TO SHIP\nSALE\nWEDDING TALES\nVIEW ALL\nDIYARAJVVIR\nSHOP NOW\nABHINAV MISHRA\nSHOP NOW\nPETTICOAT LANE\nSHOP NOW\nSHOP BY CATEGORIES\nVIEW ALL\nLEHENGAS\nUP TO 40% OFF\nKURTA SETS\nUP TO 50% OFF\nSAREES\nUP TO 60% OFF\nSHARARA SETS\nUP TO 40% OFF\nANARKALIS\nUP TO 40% OFF\nDRESSES\nUP "
+}

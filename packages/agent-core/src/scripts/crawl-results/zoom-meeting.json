@@ -1,0 +1,8 @@
+{
+  "skillName": "zoom-meeting",
+  "siteUrl": "https://zoom.us",
+  "crawledAt": "2026-03-16T15:00:29.691Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.title: Execution context was destroyed, most likely because of a navigation"
+}

@@ -1,0 +1,16 @@
+{
+  "skillName": "simplilearn-course",
+  "siteUrl": "https://www.simplilearn.com",
+  "crawledAt": "2026-03-16T14:35:25.147Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": ".card",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Simplilearn | Online Courses - Bootcamp & Certification Platform",
+  "pageUrl": "https://www.simplilearn.com/",
+  "snapshotSummary": "All Courses\nFor Business\nResources\nMore\nLogin\nGet Certified. Get Ahead.\n8,000,000 Careers advanced\n1,500 Live classes every month\n85% Report career success\nExplore ProgramsTry Simplilearn for Business\nBe a Leader in Your Field\nChange, Adapt and Build with AI\nAll our top programs include Generative AI components\nExplore Programs\nUnlock Unlimited Live Classes for Your Workforce\n700+ Live classes monthly\n550+ Learning solutions\n100+ Hands-on projects with labs\nExplore Simplilearn Learning Hub+\nPart"
+}

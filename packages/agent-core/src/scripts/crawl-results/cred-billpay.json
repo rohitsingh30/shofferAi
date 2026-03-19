@@ -1,0 +1,8 @@
+{
+  "skillName": "cred-billpay",
+  "siteUrl": "https://web.cred.club",
+  "crawledAt": "2026-03-16T13:40:24.923Z",
+  "success": false,
+  "selectors": {},
+  "error": "page.goto: net::ERR_NAME_NOT_RESOLVED at https://web.cred.club/\nCall log:\n\u001b[2m  - navigating to \"https://web.cred.club/\", waiting until \"domcontentloaded\"\u001b[22m\n"
+}

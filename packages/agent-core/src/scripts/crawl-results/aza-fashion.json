@@ -1,0 +1,15 @@
+{
+  "skillName": "aza-fashion",
+  "siteUrl": "https://www.azafashions.com",
+  "crawledAt": "2026-03-16T13:27:59.947Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardRating": "[class*=\"star\"]",
+    "cartIcon": "a[href*=\"cart\"]",
+    "loginBtn": "button:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Buy Designer Wear For Women, Men and Kids | Aza Fashions",
+  "pageUrl": "https://www.azafashions.com/",
+  "snapshotSummary": "WOMEN\nMEN\nKIDS\nJEWELLERY\nACCESSORIES\nAZA EDITORIALS\nFor styling assistance & customizations, WhatsApp us at+91-8291990059\nINR\n(₹)\nImage Search\n\nFind a store\n\nNew\nReady To Ship\nSummer Wedding\nEID Store\nAza Exclusive\nOn Sale\nIndo-Western\nWestern Wear\nKurta Sets\nLehengas\nSarees\nPret\nDesigners\n\nWomen\n\nMen\n\nKids\n\nJewellery\n\nAccessories\n\nAza Editorials\n\nShop By Category\nKurta Sets\nLehengas\nSarees\nSharara & Gharara Sets\nDresses\nAnarkalis\nKaftans\nPre-Draped Sarees\nPant Sets\nStraight Kurta Sets\nGowns\nVie"
+}

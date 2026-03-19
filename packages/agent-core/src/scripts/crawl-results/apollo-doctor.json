@@ -1,0 +1,14 @@
+{
+  "skillName": "apollo-doctor",
+  "siteUrl": "https://www.apollo247.com",
+  "crawledAt": "2026-03-16T13:26:28.293Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h2",
+    "addToCart": "button:has-text(\"Add\")",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Apollo 247 - Online Doctor Consultation & Book Lab Tests at Home",
+  "pageUrl": "https://www.apollo247.com/",
+  "snapshotSummary": "Login\nBuy Medicines\nFind Doctors\nLab Tests\nCircle Membership\nHealth Records\nCredit CardNew\nBuy InsuranceNew\n1\n2\n3\n4\nBuy Medicines & Essentials\n\n2HRS DELIVERY\n\nDoctor Appointment\n\nBOOK NOW\n\nLab Tests\n\nAT HOME\n\nHealth Insurance\n\nEXPLORE PLANS\n\nShop By Category (12)\nHealth Monitors\nAyurvedic Diabetes Care\nPain Relief\nBaby Care\nNutritional Drinks & Supplements\nAdult Diapers\nVitamins & Minerals\nProtein Powders & Drinks\nSummer Essentials\nHome Medical Supplies\nIntimate Care\nSkin & Hair Care\nTop Booked "
+}

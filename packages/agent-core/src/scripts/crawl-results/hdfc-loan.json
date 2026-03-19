@@ -1,0 +1,16 @@
+{
+  "skillName": "hdfc-loan",
+  "siteUrl": "https://www.hdfcbank.com",
+  "crawledAt": "2026-03-16T13:55:27.799Z",
+  "success": true,
+  "selectors": {
+    "resultCards": "[class*=\"listing\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "loginBtn": "a:has-text(\"Login\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "Personal Banking & Netbanking Services | HDFC Bank",
+  "pageUrl": "https://www.hdfc.bank.in/",
+  "snapshotSummary": "Skip To Main Content\nPersonal\nNRI\nHNI\nWholesale\nAgri\nMSME\nGovernment Schemes\nDiscover Products\nNeed Help\nBetter Money Choices®\nOffers\nASK\nEVA\nSearch...\nLOGIN\nAbout Us\nEnglish\nExperience\nHDFC Bank\nDifferently\n\nIntroducing the New\nHDFC Bank App | NetBanking | Website\n\nMobileApp\nNetBanking\nProducts\nServices\nSelect Product Type\nSelect Product\nApply Now\nKnow More\nASK\nEVA\n\nBanking Solutions tailor-made for you\n\nTrending\nAccounts\nDeposits\nCards\nLoans\nInsurance\nInvestments\nUnbelievable Offer? Thoda Dhya"
+}

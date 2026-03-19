@@ -1,0 +1,17 @@
+{
+  "skillName": "google-ads",
+  "siteUrl": "https://ads.google.com",
+  "crawledAt": "2026-03-16T13:52:24.633Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "#search",
+    "cardTitle": "[class*=\"card\"] h3",
+    "addToCart": "button:has-text(\"Add\")",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[class*=\"profile\"]",
+    "popupClose": "[class*=\"close-btn\"]"
+  },
+  "pageTitle": "Google Ads - Reach Customers & Sell More with Online Advertising",
+  "pageUrl": "https://business.google.com/in/google-ads/?pli=1",
+  "snapshotSummary": "Skip to content\nWhere to start?\nSolutions\nLearning & insights\nGet support\nGoogle Ads\nGoals\nHow it works\nCost\nArticles & case studies\nExpert support\nSchedule a meeting\nSign in\nStart now\nNew to Google Ads? Choose an offer to earn up to ₹60,000 in ad credit and jumpstart your first campaign.\nChoose now\nDo more for your business with Google Ads\nDrive sales\nStand out\nBe found\nShow up\n\nwith Google Ads\n\nShopping\nFootwear Sale\nExplore collections\nexample-business.com\nVideo\nSafesure Bank\nexample-business"
+}

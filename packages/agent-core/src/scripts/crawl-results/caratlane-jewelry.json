@@ -1,0 +1,13 @@
+{
+  "skillName": "caratlane-jewelry",
+  "siteUrl": "https://www.caratlane.com",
+  "crawledAt": "2026-03-16T13:33:49.367Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "CaratLane - A TATA Product | Best Store for Online Jewellery Shopping",
+  "pageUrl": "https://www.caratlane.com/",
+  "snapshotSummary": "CaratLane - A TATA Product\nLatest\nLatest\n\n1/3\n\n₹8,819 ₹9,800\n\nHeart 925 Silver Diamond Ring\n\n₹5,490 ₹6,100\n\nAnchor 925 Silver Diamond Men's Ring\n\n₹9,359 ₹10,399\n\nDrop 925 Silver Diamond Pendant Earrings\n\n₹9,810 ₹10,900\n\nPinnacle 925 Silver Diamond Pendant Necklace\nShop Now\nView All Collections\nHome\nSearch Relationship\n\nTreasure Chest\n\nNEW\n\nStores\n\nDelivery & Stores\n\nEnter Pincode\nYour PIN Code unlocks\n\nFastest delivery date, Try-at-Home availability,\nNearest store and In-store design!\n\nCHANGE\nEN"
+}

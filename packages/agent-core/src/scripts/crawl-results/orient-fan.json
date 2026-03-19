@@ -1,0 +1,21 @@
+{
+  "skillName": "orient-fan",
+  "siteUrl": "https://www.orientelectric.com",
+  "crawledAt": "2026-03-16T14:19:51.148Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"card\"] h2",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"star\"]",
+    "addToCart": "button:has-text(\"Add to Cart\")",
+    "cartIcon": "[data-testid*=\"cart\"]",
+    "loginBtn": "a:has-text(\"Log in\")",
+    "profileIcon": "[class*=\"account\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Shop Home & Kitchen Appliances Online - Fans, Air Coolers, Lightings",
+  "pageUrl": "https://orientelectric.com/",
+  "snapshotSummary": "Smart, Silent and Stylish Fans are here. Click here to know more\n\nExplore Categories\n✕\nFans\nLighting\nWater Heater\nSmall Appliances\nAir Coolers\nSwitchgears\nShop By Product\nCeiling Fans\nTable Fans\nWall Fans\nStand Fans\nExhaust Fans\nPersonal Fan\nCatalogue\nFans Catalogue\nOrient fans price list\nFans\nLighting\nWater Heaters\nSmall Appliances\nAir Coolers\nSwitchgears\nCorporate\nRegister Warranty\nContact\nAccount\nCart\nPlease enter your delivery pincode to get the best experience\nSubmit\n1\n2\n3\n4\nShop By Categor"
+}

@@ -1,0 +1,17 @@
+{
+  "skillName": "edx-course",
+  "siteUrl": "https://www.edx.org",
+  "crawledAt": "2026-03-16T13:45:57.202Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "resultCards": "[class*=\"product-card\"]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "edX | Online Courses, Certificates & Degrees from Leading Institutions",
+  "pageUrl": "https://www.edx.org/",
+  "snapshotSummary": "Learn\nedX For Business\nSign In\nRegister for free\n\nEducation is empowerment. Get 15% off until March 31 with code IWD2026 for International Women's Day. Learn more.\n\nClose site banner.\nSave up to 15% on courses\n\nWe're celebrating International Women's Day all month long! Save up to 15% on select courses and programs with IWD2026.\n\nStart learning today\nLearn more\nOffer ends March 31, 2026.\nCourse\nWomen Making History: Ten Objects, Many Stories\nHarvard University\n8 weeks to complete\nIntroductory le"
+}

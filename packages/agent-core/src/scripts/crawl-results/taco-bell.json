@@ -1,0 +1,13 @@
+{
+  "skillName": "taco-bell",
+  "siteUrl": "https://www.tacobell.co.in",
+  "crawledAt": "2026-03-16T14:43:05.413Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "popupClose": ".modal button[class*=\"close\"]"
+  },
+  "pageTitle": "Home-TacoBell",
+  "pageUrl": "https://www.tacobell.co.in/",
+  "snapshotSummary": "Loading...\nORDER NOW\nOUR FOOD\nFIND US\nNUTRITION\nABOUT US\nWHAT’S NEW\nMORE +\nO\nU\nR\nM\nE\nN\nU\n \nOur menu\nTHE LINE-UP\nNEWLY LAUNCHED\nBIG BELL BOX COMBOS\nEVERY DAY BEST VALUE\nMEAL MANIA\nBIG SAVING COMBOS\nTACO & CHALUPA\nBURRITO & WRAPS\nRICE BOWLS\nQUESADILLA\nBEVERAGES\nDESSERTS, SIDES & DIP\nOur Restaurants\nCONNAUGHT PLACE, DELHI\nClick here to see \nOur Restaurants\nCYBER HUB, GURUGRAM\nOur Restaurants\nNEHRU PLACE, DELHI\nOur Restaurants\nSJR KORAMANGLA, BANGALORE\nOur Restaurants\nPANJAGUTTA, HYDERABAD\nTo Locate"
+}

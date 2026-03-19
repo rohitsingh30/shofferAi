@@ -1,0 +1,13 @@
+{
+  "skillName": "mygate-visitor",
+  "siteUrl": "https://mygate.com",
+  "crawledAt": "2026-03-16T14:14:30.944Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"card\"] h2",
+    "loginBtn": "a:has-text(\"Login\")"
+  },
+  "pageTitle": "Comprehensive housing society Management Software in India",
+  "pageUrl": "https://mygate.com/",
+  "snapshotSummary": "Mygate holds 74% market share among community management apps: Redseer 2026 Know more\nSkip to the content\nMygate\nMaking everyday living easier\n\nTech solutions to bring home convenience & security, and keep you connected to the community.\n\nBook a demo →\nThe Mygate app\nOur community ecosystem\n\nWe’re the platform that pulls every moving part of your community into one place\n\nFullstack RWA toolkit\n\nA comprehensive society ERP that brings together all aspects of community management: accounting, audi"
+}

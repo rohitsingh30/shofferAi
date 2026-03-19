@@ -1,0 +1,14 @@
+{
+  "skillName": "linkedin-post",
+  "siteUrl": "https://www.linkedin.com",
+  "crawledAt": "2026-03-16T14:08:06.220Z",
+  "success": true,
+  "selectors": {
+    "cardRating": "[class*=\"star\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]"
+  },
+  "pageTitle": "LinkedIn: Log In or Sign Up",
+  "pageUrl": "https://www.linkedin.com/",
+  "snapshotSummary": "Skip to main content\n\nAgree & Join LinkedIn\n\nBy clicking Continue to join or sign in, you agree to LinkedIn’s User Agreement, Privacy Policy, and Cookie Policy.\n\nLinkedIn\nTop Content\nPeople\nLearning\nJobs\nGames\nSign in\nJoin now\nBuild your professional brand & network to get ahead in your career\nSign in with email\n\nBy clicking Continue to join or sign in, you agree to LinkedIn’s User Agreement, Privacy Policy, and Cookie Policy.\n\nNew to LinkedIn? Join now\n\nExplore top LinkedIn content\n\nDiscover re"
+}

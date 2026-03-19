@@ -1,0 +1,15 @@
+{
+  "skillName": "tatacliq-shopping",
+  "siteUrl": "https://www.tatacliq.com",
+  "crawledAt": "2026-03-16T14:44:35.363Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"title\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "Online Fashion & Lifestyle Shopping for Women, Men & Kids in India - Tata CLiQ",
+  "pageUrl": "https://www.tatacliq.com/",
+  "snapshotSummary": "Tata CLiQ Luxury\nSign in / Sign Up\nTrack Orders\nCLiQ Care\nGift Card\nCLiQ Cash\nCategories\nBrands\n\nSearch for\n\nProducts\nBrands\nCategories\nTata MarketPlace\nAbout Us\nCareers\nTerms of Use\nPrivacy Policy\nAffiliates\nSitemap\nBlog\nCustomer Service\nShopping\nOffers & Promotions\nPayments\nCancellation\nReturns & Refunds\nReturns Policy\nElectronics Return Policy\nContact Us\nReviews Guidelines\nHome & Furniture Return Policy\nReplacement Policy\nMy Tata CLiQ\nMy Account\nMy Orders\nMy Shopping Bag\nMy Wishlist\nTata CLiQ"
+}

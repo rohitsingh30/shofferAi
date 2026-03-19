@@ -1,0 +1,14 @@
+{
+  "skillName": "max-fashion",
+  "siteUrl": "https://www.maxfashion.in",
+  "crawledAt": "2026-03-16T14:10:23.710Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "loginBtn": "button:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Online Shopping for Women, Men & Kids Fashion in India | Max Fashion",
+  "pageUrl": "https://www.maxfashion.in/in/en/",
+  "snapshotSummary": "Free Shipping\nReturn To Store\nOnline Gift Card\n\nDelivering To\n\nDownload Our Apps\nStore Locator\nHelp\nSIGN UP / SIGN IN\n\nFavourites\n\nBasket\n\nMore\n\nSleepwear\nPolo Shop\nWomen\nMen\nKids\nGenZ Store\nFlat 400 off on 1999. Code: MAX400 | Flat 200 off on 1499. Code: MAX200. Free Shipping on ALL Orders!\n \n \n \n \n \n \n \n \n \nSleepwear Edit\n \n \n \n \nThe Polo Shop\n \n \n \n \n \n \nSummer Ready\n \n \n \n \n \nKids Zone\n \nEthnic Edit\n \nHow New Is Your New?\n \n \nKids Must-Haves\n \n \n \n \nOnline Exclusives\n \n \n \nFootwear & Accesso"
+}

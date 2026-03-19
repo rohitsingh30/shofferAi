@@ -1,0 +1,12 @@
+{
+  "skillName": "swiggy-genie",
+  "siteUrl": "https://www.swiggy.com/genie",
+  "crawledAt": "2026-03-16T14:42:40.313Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]"
+  },
+  "pageTitle": "Order food online from India's best food delivery service. Order from restaurants near you",
+  "pageUrl": "https://www.swiggy.com/genie",
+  "snapshotSummary": "We'll be back shortly\nWe are fixing a temporary glitch. Sorry for the inconvenience.\nGo Back"
+}

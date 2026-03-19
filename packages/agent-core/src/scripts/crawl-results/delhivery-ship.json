@@ -1,0 +1,13 @@
+{
+  "skillName": "delhivery-ship",
+  "siteUrl": "https://www.delhivery.com",
+  "crawledAt": "2026-03-16T13:42:42.262Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "popupClose": "button[aria-label=\"Close\"]"
+  },
+  "pageTitle": "Integrated Logistics, Express Parcel, Freight, Courier, Shipping, Supply Chain, eCommerce, Cross Border",
+  "pageUrl": "https://www.delhivery.com/",
+  "snapshotSummary": "Services Solutions Partner Company Track Support\nShip Now\nUPDATES:\nBe alert: A targeted phishing scam is circulating via SMS, falsely claiming “non-delivery due to failed attempts” and redirecting users to fraudulent websites\nPlease do not transfer money to payment links that are not shared from Delhivery's official accounts\nDelhivery does not require OTP or credentials for address confirmation for your delivery\nOur Customer Support team is reachable only from our website or app. Login with your"
+}

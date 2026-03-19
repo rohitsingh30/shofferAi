@@ -1,0 +1,16 @@
+{
+  "skillName": "agoda-hotel",
+  "siteUrl": "https://www.agoda.com",
+  "crawledAt": "2026-03-16T13:20:43.094Z",
+  "success": true,
+  "selectors": {
+    "resultCards": "[data-testid*=\"card\"]",
+    "cardTitle": "[class*=\"title\"]",
+    "cardRating": "[data-testid*=\"rating\"]",
+    "addToCart": "button:has-text(\"Add\")",
+    "loginBtn": "button:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Agoda Official Site | Free Cancellation & Booking Deals | Over 2 Million Hotels",
+  "pageUrl": "https://www.agoda.com/?ds=F3FJzF%2B909CB%2BiIo",
+  "snapshotSummary": "                                                                                                                                                                                                                                                                                                                                                   \n                                                                                                                                                                "
+}

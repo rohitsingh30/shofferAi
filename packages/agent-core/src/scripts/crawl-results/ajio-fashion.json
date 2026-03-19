@@ -1,0 +1,15 @@
+{
+  "skillName": "ajio-fashion",
+  "siteUrl": "https://www.ajio.com",
+  "crawledAt": "2026-03-16T13:22:17.516Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"title\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "popupClose": "[role=\"dialog\"] button:first-child"
+  },
+  "pageTitle": "Online Shopping Site for Women, Men, Kids Fashion, Lifestyle & More.",
+  "pageUrl": "https://www.ajio.com/",
+  "snapshotSummary": "Skip To Content\nSign In / Join AJIO\nCustomer Care\nVisit AJIOLUXE\nMEN\nWOMEN\nKIDS\nBEAUTY\nHOME & KITCHEN\nSlide 2 of 3 Rare Rabbit at Min 50 Percent Off\n Previous\n Next\nSlide 2 of 5 Nyrika Riwaah saree with zigzag pattern. Minimum seventy percent off.\nSlide 2 of 5 Nyrika Riwaah saree with zigzag pattern. Minimum seventy percent off.\n Previous\n Next\n Previous\n Next\n Previous\n Next\n Previous\n Next\nlocale-banner-popup\nAllow us to access Your location\n\nWe need your location to provide you with the best "
+}

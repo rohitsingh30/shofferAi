@@ -1,0 +1,16 @@
+{
+  "skillName": "99designs-logo",
+  "siteUrl": "https://99designs.com",
+  "crawledAt": "2026-03-16T13:19:30.437Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[type=\"search\"]",
+    "cardTitle": "[class*=\"name\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "loginBtn": "a:has-text(\"Log in\")",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "Logos, Web, Graphic Design & More. | 99designs",
+  "pageUrl": "https://99designs.com/",
+  "snapshotSummary": "Categories\nHow it works\nFind a designer\nInspiration\nStudio\n1 800 513 1678\nLog in\nCreated for Vegan Jerky Co\nPackaging by Mj.vass\nGrow with great design\n\nNo matter what your business needs, we can connect you with a creative expert to make your business look and feel professional. Because good design makes great business.\n\n \nGet a design\n\nPopular:\n\nLogo design\nWebsite\nBranding\n   \n\nLogos, websites, book covers & more...\n\nView all design categories\nDesign for what you need\nView all design categori"
+}

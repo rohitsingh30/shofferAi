@@ -1,0 +1,18 @@
+{
+  "skillName": "igp-gifts",
+  "siteUrl": "https://www.igp.com",
+  "crawledAt": "2026-03-16T13:59:18.763Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[name=\"q\"]",
+    "resultCards": "[class*=\"listing\"]",
+    "cardTitle": "[class*=\"card\"] h3",
+    "cardPrice": "[class*=\"price\"]",
+    "cardRating": "[class*=\"rating\"]",
+    "cartIcon": "[class*=\"cart-icon\"]",
+    "profileIcon": "[class*=\"profile\"]"
+  },
+  "pageTitle": "IGP: Online Gift Delivery | Send Gifts to India, Online Gifts Shop",
+  "pageUrl": "https://www.igp.com/",
+  "snapshotSummary": "Where to deliver?\n \n\nSearch for gifts\n\nINR\nUSD\nCAD\nGBP\nAED\nAUD\nNZD\nSGD\nEUR\nSame Day Delivery\nCakes\nFlowers\nPersonalized\nPlants\nNew Arrivals\nInternational\nCorp. Gifts\nIGP Luxe\nGudi Padwa\nRamadan Eid Gifts\nFreshly Arrived Cakes\nPhoto Frames & Gifts\nBalloon Decor\nPremium Gourmet Delights\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\nSurprises for Every Celebration\nCurated gift ideas for every occasion, big or small\nDelivery in 60 Mins\nBirthday Gifts\nBalloon Gifts & Decor\nAnniversary Gifts\nWedding Gifts\nHouse Warming\nBest-S"
+}

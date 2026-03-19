@@ -1,0 +1,17 @@
+{
+  "skillName": "amazon-pantry",
+  "siteUrl": "https://www.amazon.in/pantry",
+  "crawledAt": "2026-03-16T13:25:11.915Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "cardTitle": "[class*=\"name\"]",
+    "cartIcon": "[class*=\"cart-icon\"]",
+    "loginBtn": "a:has-text(\"Sign in\")",
+    "profileIcon": "[aria-label*=\"account\" i]",
+    "locationInput": "[class*=\"location\"] input"
+  },
+  "pageTitle": "Amazon Pantry: The Online Grocery Shopping Store- Shop Daily Grocery Items and Get delivered in Next Day- Amazon.in",
+  "pageUrl": "https://www.amazon.in/b/ref=pntry_wayfind_logo?node=9574332031",
+  "snapshotSummary": "Skip to\nMain content\nKeyboard shortcuts\nSearch\nopt\n+\n/\nCart\nshift\n+\nopt\n+\nC\nHome\nshift\n+\nopt\n+\nH\nOrders\nshift\n+\nopt\n+\nO\nShow/Hide shortcuts\nshift\n+\nopt\n+\nZ\nTo move between items, use your keyboard's up or down arrows.\n.in\nDelivering to Hyderabad 500068\nUpdate location\nAmazon Pantry\nAmazon Pantry\nAll Categories\nEN\nHello, sign in\nAccount & Lists\nReturns\n& Orders\n0\nCart\nAll\nFresh\nMX Player\nSell\nBestsellers\nMobiles\nToday's Deals\nCustomer Service\nPrime\nNew Releases\nFashion\nElectronics\nAmazon Pay\nHome"
+}

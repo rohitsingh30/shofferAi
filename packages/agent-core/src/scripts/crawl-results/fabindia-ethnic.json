@@ -1,0 +1,16 @@
+{
+  "skillName": "fabindia-ethnic",
+  "siteUrl": "https://www.fabindia.com",
+  "crawledAt": "2026-03-16T13:47:29.877Z",
+  "success": true,
+  "selectors": {
+    "searchBar": "input[placeholder*=\"search\" i]",
+    "resultCards": ".card",
+    "cardPrice": "[class*=\"amount\"]",
+    "cartIcon": "[aria-label*=\"cart\" i]",
+    "profileIcon": "[class*=\"account\"]"
+  },
+  "pageTitle": "Online Shopping for Women, Men, Kids and Home & Living | Fabindia",
+  "pageUrl": "https://www.fabindia.com/",
+  "snapshotSummary": "Skip to Main Content\nSkip to Footer\nDue to current geopolitical conditions affecting air traffic in parts of Middle East & EU region, some deliveries may experience delays as routes are being rerouted or temporarily suspended. While we are making every effort to minimize disruption however transit timelines may be impacted.\n  India \n\nNew Arrivals\n\nWomen\n\nMen\n\nKids\n\nHome & Living\n\nFurniture\n\nFood\n\nCollection\n\nServices\n\nFabfamily\n\nSale\n\nFantastic Finds\n\nRecommended For You\n\nIndigo Cotton Linen Dab"
+}

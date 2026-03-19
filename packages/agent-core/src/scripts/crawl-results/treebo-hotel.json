@@ -1,0 +1,13 @@
+{
+  "skillName": "treebo-hotel",
+  "siteUrl": "https://www.treebo.com",
+  "crawledAt": "2026-03-16T14:46:57.213Z",
+  "success": true,
+  "selectors": {
+    "cardTitle": "[class*=\"title\"]",
+    "loginBtn": "a:has-text(\"Sign in\")"
+  },
+  "pageTitle": "Treebo: Best Budget Hotels in India | Online Hotel Booking",
+  "pageUrl": "https://www.treebo.com/",
+  "snapshotSummary": "Login to unlock upto 5% discount and earn Treebo Club Points of upto 4%\nclose\nphone_android\nSign in with Phone/Email\nkeyboard_arrow_right\nOur Brands\nMeetings & Events\nNew\nAbout Treebo Club\nSign In\nLocation\nExplore from 120+ cities\nCheck-in and Check-out\nRooms & Guests\nsearch\nBangalore\nPune\nHyderabad\nMumbai\nChennai\nKolkata\nNew Delhi\nNagpur\nNoida\nVisakhapatnam\nAll Cities\nMost Rewarding & Reliable Hotel Bookings\nGuaranteed Lowest Price\nRedeemable Treebo Club Points\n(1 point=₹1)\nExclusive Member Onl"
+}
