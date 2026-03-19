@@ -52,6 +52,7 @@ type RelaySendFn = (msg: TaskRelayMessage) => void;
 
 const BRIDGE_MCP_SCRIPT = join(__dirname, 'bridge-mcp-server.ts');
 const BRIDGE_MCP_SCRIPT_JS = join(__dirname, 'bridge-mcp-server.js');
+const PLAYWRIGHT_CHROME_SCRIPT = join(__dirname, '..', 'scripts', 'playwright-mcp-with-chrome.sh');
 
 const SYSTEM_PROMPT = `You are ShofferAI, an AI assistant that executes real browser tasks on behalf of users.
 You have Playwright MCP tools to control a Chrome browser AND Bridge MCP tools to communicate with the user.
@@ -147,20 +148,7 @@ export class TaskManager {
     // Build the prompt for Copilot CLI
     const prompt = this.buildPrompt(description, skill, extractedParams, conversationContext);
 
-    // Check Chrome-Debug is alive
-    const chromeAlive = await this.waitForCDP(this.options.chromeDebugPort, 2);
-    if (!chromeAlive) {
-      this.sendToRelay({
-        id: randomUUID(),
-        type: 'task_error',
-        taskId,
-        error: 'Chrome-Debug is not running. Start it with: ./apps/playwright/scripts/start-laptop.sh',
-        recoverable: false,
-      });
-      return;
-    }
-
-    // Build MCP config: Playwright + Bridge
+    // Build MCP config: Playwright (with auto-launched Chrome) + Bridge
     const mcpConfig = this.buildMcpConfig(taskId);
 
     // Spawn Copilot CLI
@@ -327,16 +315,14 @@ export class TaskManager {
     const command = isTsFile ? 'npx' : 'node';
     const args = isTsFile ? ['tsx', bridgeScript] : [bridgeScript];
 
+    // Use playwright-mcp-with-chrome.sh which launches its own Chrome
+    // with a dynamic port — no hardcoded CDP port needed
     return JSON.stringify({
       mcpServers: {
         playwright: {
           type: 'stdio',
-          command: 'npx',
-          args: [
-            '-y', '@playwright/mcp@latest',
-            '--cdp-endpoint', `http://127.0.0.1:${this.options.chromeDebugPort}`,
-            '--cdp-timeout', '60000',
-          ],
+          command: 'bash',
+          args: [PLAYWRIGHT_CHROME_SCRIPT],
         },
         bridge: {
           type: 'stdio',
