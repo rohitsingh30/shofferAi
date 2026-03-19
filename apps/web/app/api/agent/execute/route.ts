@@ -105,6 +105,22 @@ export async function POST(request: Request) {
               question: request.question,
               inputType: request.inputType,
               options: request.options,
+              // Rich input props
+              cards: request.cards,
+              show_quantity: request.show_quantity,
+              allow_custom: request.allow_custom,
+              multi_select: request.multi_select,
+              saved: request.saved,
+              mode: request.mode,
+              shortcuts: request.shortcuts,
+              counters: request.counters,
+              min: request.min,
+              max: request.max,
+              step: request.step,
+              presets: request.presets,
+              placeholder: request.placeholder,
+              format_hint: request.format_hint,
+              sections: request.sections,
             });
 
             // Wait for user to provide input via /api/agent/input

@@ -42,6 +42,22 @@ function ChatInterfaceInner() {
     question: string;
     inputType: string;
     options?: string[];
+    // Rich input props
+    cards?: Array<{ id: string; label: string; emoji?: string; image?: string; subtitle?: string; badge?: string }>;
+    show_quantity?: boolean;
+    allow_custom?: boolean;
+    multi_select?: boolean;
+    saved?: Array<{ label: string; address: string }>;
+    mode?: 'single' | 'range';
+    shortcuts?: string[];
+    counters?: Array<{ label: string; min?: number; max?: number; default?: number }>;
+    min?: number;
+    max?: number;
+    step?: number;
+    presets?: number[];
+    placeholder?: string;
+    format_hint?: string;
+    sections?: Array<Record<string, unknown>>;
   } | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartTotal, setCartTotal] = useState('');
@@ -110,16 +126,33 @@ function ChatInterfaceInner() {
         });
         break;
       }
-      case 'input_required':
+      case 'input_required': {
+        const p = event.payload;
         setPendingInput({
-          taskId: event.payload.taskId as string,
-          stepId: event.payload.stepId as string,
-          question: event.payload.question as string,
-          inputType: event.payload.inputType as string,
-          options: event.payload.options as string[] | undefined,
+          taskId: p.taskId as string,
+          stepId: p.stepId as string,
+          question: p.question as string,
+          inputType: p.inputType as string,
+          options: p.options as string[] | undefined,
+          cards: p.cards as typeof pendingInput extends null ? never : NonNullable<typeof pendingInput>['cards'],
+          show_quantity: p.show_quantity as boolean | undefined,
+          allow_custom: p.allow_custom as boolean | undefined,
+          multi_select: p.multi_select as boolean | undefined,
+          saved: p.saved as typeof pendingInput extends null ? never : NonNullable<typeof pendingInput>['saved'],
+          mode: p.mode as 'single' | 'range' | undefined,
+          shortcuts: p.shortcuts as string[] | undefined,
+          counters: p.counters as typeof pendingInput extends null ? never : NonNullable<typeof pendingInput>['counters'],
+          min: p.min as number | undefined,
+          max: p.max as number | undefined,
+          step: p.step as number | undefined,
+          presets: p.presets as number[] | undefined,
+          placeholder: p.placeholder as string | undefined,
+          format_hint: p.format_hint as string | undefined,
+          sections: p.sections as Array<Record<string, unknown>> | undefined,
         });
         setIsLoading(false);
         break;
+      }
       case 'payment_required':
         openL2({
           taskId: event.payload.taskId as string,
@@ -306,6 +339,21 @@ function ChatInterfaceInner() {
                     question={pendingInput.question}
                     inputType={pendingInput.inputType}
                     options={pendingInput.options}
+                    cards={pendingInput.cards}
+                    show_quantity={pendingInput.show_quantity}
+                    allow_custom={pendingInput.allow_custom}
+                    multi_select={pendingInput.multi_select}
+                    saved={pendingInput.saved}
+                    mode={pendingInput.mode}
+                    shortcuts={pendingInput.shortcuts}
+                    counters={pendingInput.counters}
+                    min={pendingInput.min}
+                    max={pendingInput.max}
+                    step={pendingInput.step}
+                    presets={pendingInput.presets}
+                    placeholder={pendingInput.placeholder}
+                    format_hint={pendingInput.format_hint}
+                    sections={pendingInput.sections as any}
                     onSubmit={handleInputResponse}
                   />
                 </div>

@@ -80,23 +80,111 @@ const AGENT_TOOLS: Tool[] = [
   {
     name: 'ask_user',
     description:
-      'Ask the user for input needed to continue the task (e.g., OTP code, choosing between options, clarification)',
+      'Ask the user for input needed to continue the task. Use the richest input_type for the data: card_grid for item selection with quantities, carousel for visual choices (cuisines, destinations), chip_bar for toggleable filters (Veg/Non-veg, sizes), address for delivery/pickup locations, calendar for dates, stepper for counts (guests, passengers), slider for budgets, text for free-form input, layout to combine multiple patterns in one intake.',
     input_schema: {
       type: 'object' as const,
       properties: {
         question: {
           type: 'string',
-          description: 'The question to ask the user',
+          description: 'The question or heading to display to the user',
         },
         input_type: {
           type: 'string',
-          enum: ['otp', 'confirmation', 'choice', 'freetext'],
-          description: 'The type of input expected',
+          enum: ['otp', 'confirmation', 'choice', 'freetext', 'card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'text', 'layout'],
+          description: 'The interaction pattern to render. Use layout to compose multiple patterns in sections.',
         },
         options: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Options to choose from (for choice type)',
+          description: 'Options for choice or chip_bar type',
+        },
+        cards: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              emoji: { type: 'string' },
+              image: { type: 'string' },
+              subtitle: { type: 'string' },
+              badge: { type: 'string' },
+            },
+            required: ['id', 'label'],
+          },
+          description: 'Visual cards for card_grid or carousel',
+        },
+        show_quantity: {
+          type: 'boolean',
+          description: 'Show quantity stepper on each card (card_grid)',
+        },
+        allow_custom: {
+          type: 'boolean',
+          description: 'Allow user to add custom items (card_grid, carousel)',
+        },
+        multi_select: {
+          type: 'boolean',
+          description: 'Allow multiple selections (card_grid, carousel, chip_bar)',
+        },
+        saved: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              address: { type: 'string' },
+            },
+          },
+          description: 'Saved addresses to show (address type)',
+        },
+        mode: {
+          type: 'string',
+          enum: ['single', 'range'],
+          description: 'Calendar mode: single date or date range',
+        },
+        shortcuts: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Quick-pick shortcut labels for calendar (e.g. "Today", "Tomorrow", "This weekend")',
+        },
+        counters: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              min: { type: 'number' },
+              max: { type: 'number' },
+              default: { type: 'number' },
+            },
+            required: ['label'],
+          },
+          description: 'Counter rows for stepper type',
+        },
+        min: { type: 'number', description: 'Slider minimum value' },
+        max: { type: 'number', description: 'Slider maximum value' },
+        step: { type: 'number', description: 'Slider step increment' },
+        presets: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Preset values for slider quick-pick',
+        },
+        placeholder: { type: 'string', description: 'Placeholder text for text input' },
+        format_hint: { type: 'string', description: 'Format hint (e.g. "ABCDE1234F" for PAN)' },
+        sections: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Section key in response JSON' },
+              label: { type: 'string', description: 'Section heading' },
+              type: { type: 'string', description: 'Widget type for this section' },
+              required: { type: 'boolean' },
+              collapsed: { type: 'boolean', description: 'Start collapsed for optional sections' },
+            },
+            required: ['name', 'label', 'type'],
+          },
+          description: 'Sections for layout type — each section inherits its own widget-specific props',
         },
       },
       required: ['question', 'input_type'],
@@ -222,6 +310,10 @@ export class AgentExecutor {
   private browseInstructionHistory: string[] = [];
   private readonly maxSameInstructionAttempts = 2;
   private activeLessons: LessonEntry[] = [];
+  // Loop detection: track tool call sequences to detect repeated cycles
+  private toolCallSequence: string[] = [];
+  private readonly loopDetectionWindow = 6; // check last N calls for repeating pattern
+  private readonly maxLoopCycles = 3; // break after this many repeated cycles
 
   constructor(private config: AgentConfig) {
     this.claude = config.llmClient || createLLMClient();
@@ -619,6 +711,22 @@ export class AgentExecutor {
         question: args.question as string,
         inputType: args.input_type as UserInputRequest['inputType'],
         options: args.options as string[] | undefined,
+        // Rich input props
+        cards: args.cards as UserInputRequest['cards'],
+        show_quantity: args.show_quantity as boolean | undefined,
+        allow_custom: args.allow_custom as boolean | undefined,
+        multi_select: args.multi_select as boolean | undefined,
+        saved: args.saved as UserInputRequest['saved'],
+        mode: args.mode as UserInputRequest['mode'],
+        shortcuts: args.shortcuts as string[] | undefined,
+        counters: args.counters as UserInputRequest['counters'],
+        min: args.min as number | undefined,
+        max: args.max as number | undefined,
+        step: args.step as number | undefined,
+        presets: args.presets as number[] | undefined,
+        placeholder: args.placeholder as string | undefined,
+        format_hint: args.format_hint as string | undefined,
+        sections: args.sections as UserInputRequest['sections'],
       });
       this.trackEvent({
         event: 'tool_call', category: 'tool',

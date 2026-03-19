@@ -62,13 +62,99 @@ export interface AgentMessage {
   createdAt: Date;
 }
 
+// --- Rich Input Pattern Types ---
+
+export interface CardItem {
+  id: string;
+  label: string;
+  emoji?: string;
+  image?: string;
+  subtitle?: string;
+  badge?: string;
+}
+
+export interface CounterConfig {
+  label: string;
+  min?: number;
+  max?: number;
+  default?: number;
+}
+
+export interface InputSavedAddress {
+  label: string;
+  address: string;
+}
+
+export type RichInputType =
+  | 'otp'
+  | 'confirmation'
+  | 'choice'
+  | 'freetext'
+  | 'payment'
+  | 'card_grid'
+  | 'carousel'
+  | 'chip_bar'
+  | 'address'
+  | 'calendar'
+  | 'stepper'
+  | 'slider'
+  | 'text'
+  | 'layout';
+
+export interface InputSection {
+  name: string;
+  label: string;
+  type: RichInputType;
+  required?: boolean;
+  collapsed?: boolean;
+  // card_grid / carousel props
+  cards?: CardItem[];
+  show_quantity?: boolean;
+  allow_custom?: boolean;
+  multi_select?: boolean;
+  // address props
+  saved?: InputSavedAddress[];
+  // calendar props
+  mode?: 'single' | 'range';
+  shortcuts?: string[];
+  // stepper props
+  counters?: CounterConfig[];
+  // slider props
+  min?: number;
+  max?: number;
+  step?: number;
+  presets?: number[];
+  // chip_bar / choice props
+  options?: string[];
+  // text props
+  placeholder?: string;
+  format_hint?: string;
+}
+
 export interface UserInputRequest {
   taskId: string;
   stepId: string;
   question: string;
-  inputType: 'otp' | 'confirmation' | 'choice' | 'freetext' | 'payment';
+  inputType: RichInputType;
   options?: string[];
   timeout?: number;
+  // Rich input props (passed through for new widget types)
+  cards?: CardItem[];
+  show_quantity?: boolean;
+  allow_custom?: boolean;
+  multi_select?: boolean;
+  saved?: InputSavedAddress[];
+  mode?: 'single' | 'range';
+  shortcuts?: string[];
+  counters?: CounterConfig[];
+  min?: number;
+  max?: number;
+  step?: number;
+  presets?: number[];
+  placeholder?: string;
+  format_hint?: string;
+  // Layout composite
+  sections?: InputSection[];
 }
 
 export interface UserInputResponse {

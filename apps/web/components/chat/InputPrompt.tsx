@@ -1,20 +1,66 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { CardGridInput } from './inputs/CardGridInput';
+import { CarouselInput } from './inputs/CarouselInput';
+import { ChipBarInput } from './inputs/ChipBarInput';
+import { AddressInput } from './inputs/AddressInput';
+import { CalendarInput } from './inputs/CalendarInput';
+import { StepperInput } from './inputs/StepperInput';
+import { SliderInput } from './inputs/SliderInput';
+import { TextInput as RichTextInput } from './inputs/TextInput';
+import { LayoutInput } from './inputs/LayoutInput';
 
 interface InputPromptProps {
   question: string;
   inputType: string;
   options?: string[];
   onSubmit: (value: string) => void;
+  // Rich input props
+  cards?: Array<{ id: string; label: string; emoji?: string; image?: string; subtitle?: string; badge?: string }>;
+  show_quantity?: boolean;
+  allow_custom?: boolean;
+  multi_select?: boolean;
+  saved?: Array<{ label: string; address: string }>;
+  mode?: 'single' | 'range';
+  shortcuts?: string[];
+  counters?: Array<{ label: string; min?: number; max?: number; default?: number }>;
+  min?: number;
+  max?: number;
+  step?: number;
+  presets?: number[];
+  placeholder?: string;
+  format_hint?: string;
+  sections?: Array<{
+    name: string;
+    label: string;
+    type: string;
+    required?: boolean;
+    collapsed?: boolean;
+    cards?: Array<{ id: string; label: string; emoji?: string; image?: string; subtitle?: string; badge?: string }>;
+    show_quantity?: boolean;
+    allow_custom?: boolean;
+    multi_select?: boolean;
+    options?: string[];
+    saved?: Array<{ label: string; address: string }>;
+    mode?: 'single' | 'range';
+    shortcuts?: string[];
+    counters?: Array<{ label: string; min?: number; max?: number; default?: number }>;
+    min?: number;
+    max?: number;
+    step?: number;
+    presets?: number[];
+    placeholder?: string;
+    format_hint?: string;
+  }>;
 }
 
-export function InputPrompt({ question, inputType, options, onSubmit }: InputPromptProps) {
+export function InputPrompt({ question, inputType, options, onSubmit, ...richProps }: InputPromptProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (inputType !== 'choice' && inputType !== 'confirmation') {
+    if (inputType !== 'choice' && inputType !== 'confirmation' && !isRichType(inputType)) {
       inputRef.current?.focus();
     }
   }, [inputType]);
@@ -32,31 +78,119 @@ export function InputPrompt({ question, inputType, options, onSubmit }: InputPro
     ? question.split('\n').filter(l => !/^\s*(?:[•\-*]|\d+[.)]\s)/.test(l)).join('\n').trim()
     : question;
 
+  // Pick icon based on type
+  const icon = inputType === 'otp' ? (
+    <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+    </svg>
+  ) : inputType === 'confirmation' ? (
+    <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ) : (
+    <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+    </svg>
+  );
+
+  // Render rich input widget
+  const renderRichInput = () => {
+    switch (inputType) {
+      case 'card_grid':
+        return (
+          <CardGridInput
+            cards={richProps.cards || []}
+            showQuantity={richProps.show_quantity}
+            allowCustom={richProps.allow_custom}
+            multiSelect={richProps.multi_select}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'carousel':
+        return (
+          <CarouselInput
+            cards={richProps.cards || []}
+            multiSelect={richProps.multi_select}
+            allowCustom={richProps.allow_custom}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'chip_bar':
+        return (
+          <ChipBarInput
+            options={options || []}
+            multiSelect={richProps.multi_select}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'address':
+        return (
+          <AddressInput
+            saved={richProps.saved}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'calendar':
+        return (
+          <CalendarInput
+            mode={richProps.mode}
+            shortcuts={richProps.shortcuts}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'stepper':
+        return (
+          <StepperInput
+            counters={richProps.counters || []}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'slider':
+        return (
+          <SliderInput
+            min={richProps.min}
+            max={richProps.max}
+            step={richProps.step}
+            presets={richProps.presets}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'text':
+        return (
+          <RichTextInput
+            placeholder={richProps.placeholder}
+            formatHint={richProps.format_hint}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'layout':
+        return (
+          <LayoutInput
+            sections={richProps.sections || []}
+            onSubmit={onSubmit}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="flex items-start gap-4">
       {/* Icon */}
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-500">
-        {inputType === 'otp' ? (
-          <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-          </svg>
-        ) : inputType === 'confirmation' ? (
-          <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        ) : (
-          <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-          </svg>
-        )}
+        {icon}
       </div>
 
       {/* Content */}
       <div className="flex-1 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
         <p className="mb-3 whitespace-pre-wrap text-sm font-medium leading-relaxed">{cleanQuestion}</p>
 
-        {/* Choice: clickable option cards */}
-        {inputType === 'choice' && options && options.length > 0 ? (
+        {/* Rich input types */}
+        {isRichType(inputType) ? (
+          renderRichInput()
+        ) : inputType === 'choice' && options && options.length > 0 ? (
+          /* Choice: clickable option cards */
           <div className="space-y-2">
             {options.map((option, i) => (
               <button
@@ -155,4 +289,9 @@ export function InputPrompt({ question, inputType, options, onSubmit }: InputPro
       </div>
     </div>
   );
+}
+
+const RICH_TYPES = new Set(['card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'text', 'layout']);
+function isRichType(type: string): boolean {
+  return RICH_TYPES.has(type);
 }
