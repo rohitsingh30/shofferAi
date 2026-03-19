@@ -217,7 +217,7 @@ Browse each skill's website, record the real UI flow via Playwright MCP, and com
 ```
 For each skill (sequential):
   1. Read SKILL.md → extract siteUrl, params, steps
-  2. Open site in browser1 (pool Chrome)
+  2. Open site in playwright (Chrome-Debug on 9225)
   3. Follow the SKILL.md steps using Playwright MCP
   4. Record every MCP action (navigate, click, type, snapshot)
   5. Compile recorded actions → native Playwright script
@@ -246,12 +246,12 @@ Read the SKILL.md to get `siteUrl` and step instructions. Then:
 
 **a) Navigate to the site:**
 ```
-mcp__browser1__browser_navigate({ url: siteUrl })
+mcp__playwright__browser_navigate({ url: siteUrl })
 ```
 
 **b) Take snapshot to see the page:**
 ```
-mcp__browser1__browser_snapshot
+mcp__playwright__browser_snapshot
 ```
 
 **c) Follow SKILL.md steps:**
@@ -441,78 +441,9 @@ Every step instruction MUST include:
 
 ### Important Rules
 
-- Use `browser1` (port 9222) for browsing — NOT `playwright` (that's the test browser)
+- Use `playwright` (port 9225) for all browsing — this is the single Chrome-Debug window with Profile 3
 - Take snapshots frequently — they contain the real accessibility tree with selectors
 - If a site requires login and the session expired, note it and move on
 - Don't spend more than 3 minutes per skill when batch-compiling
 - Sites that are down or behind paywalls: skip and note
 - Save progress frequently — don't lose work if something crashes
-
----
-
-## Mode E: Multi-Browser Parallel Test
-
-Test the Chrome Pool by spawning 3 independent orders from the chat UI and verifying each pool Chrome works on a different site with zero interference.
-
-### Prerequisites
-
-```bash
-curl -s http://localhost:8765 | python3 -m json.tool  # Pool status
-curl -s http://localhost:9225/json/version             # Test Chrome
-curl -s http://localhost:3000                           # Next.js
-```
-
-If anything is down:
-1. `POOL_SIZE=3 npm run laptop` — launches 3 Chrome windows (9222/9223/9224) + relay on 8765
-2. `cd apps/web && npx next dev` — chat UI on localhost:3000
-3. Launch a fresh Chrome for `playwright` MCP on an empty port (see Pre-Flight above)
-
-### MCP Tool Mapping
-
-| MCP Server | Chrome Port | Role |
-|------------|-------------|------|
-| `playwright` (mcp__playwright__*) | 9225+ | YOUR test browser — browse the chat UI only |
-| `browser1` (mcp__browser1__*) | 9222 | AGENT's Chrome Slot 0 — observe only |
-| `browser2` (mcp__browser2__*) | 9223 | AGENT's Chrome Slot 1 — observe only |
-| `browser3` (mcp__browser3__*) | 9224 | AGENT's Chrome Slot 2 — observe only |
-
-### Steps
-
-**1. Open chat UI and login** — Use `playwright` to browse `/login`, sign in, land on dashboard.
-
-**2. Send 3 orders from 3 separate chat tabs** using `playwright`:
-
-- Tab 1: `Book a hotel in Goa for March 22-23 under 4000/night on Booking.com`
-- Tab 2: `Order milk, bread and eggs from Blinkit to Sector 62 Noida`
-- Tab 3: `Order butter chicken from Zomato to Sector 62 Noida`
-
-**3. Verify slot assignment:**
-```bash
-curl -s http://localhost:8765 | python3 -m json.tool
-```
-Expected: `"busy": 3, "ready": 0`
-
-**4. Observe all 3 pool Chromes** (snapshot in parallel):
-```
-mcp__browser1__browser_snapshot
-mcp__browser2__browser_snapshot
-mcp__browser3__browser_snapshot
-```
-Each should be on a DIFFERENT website.
-
-**5. Take screenshots as proof** (all 3 in one call):
-```
-mcp__browser1__browser_take_screenshot({ filename: "slot0.png" })
-mcp__browser2__browser_take_screenshot({ filename: "slot1.png" })
-mcp__browser3__browser_take_screenshot({ filename: "slot2.png" })
-```
-
-**6. Interact with agent prompts** — answer `ask_user` questions in the correct chat tab via `playwright`, then snapshot browser1/2/3 again.
-
-### Critical Rules
-
-- **`playwright` = chat UI only** — NEVER browse localhost:3000 with browser1/2/3
-- **browser1/2/3 = agent's windows** — observe only, don't click/navigate
-- **Each browser is isolated** — Slot 0 never affects Slot 1 or Slot 2
-- **Parallel calls** — always snapshot all 3 in ONE message
-- **about:blank** = agent hasn't started browser work yet (still reasoning)

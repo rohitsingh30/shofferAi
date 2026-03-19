@@ -120,90 +120,41 @@ If anything is down:
 
 | MCP Server | Chrome Port | Role |
 |------------|-------------|------|
-| `playwright` (mcp__playwright__*) | 9225 | YOUR test browser — browse the chat UI only |
-| `browser1` (mcp__browser1__*) | 9222 | AGENT's Chrome Slot 0 — observe only |
-| `browser2` (mcp__browser2__*) | 9223 | AGENT's Chrome Slot 1 — observe only |
-| `browser3` (mcp__browser3__*) | 9224 | AGENT's Chrome Slot 2 — observe only |
+| `playwright` (mcp__playwright__*) | 9225 | Single Chrome-Debug window with Profile 3 (rsinghtomar3011@gmail.com) |
 
 ### Test Step 1: Open chat UI and login
 
 Use `playwright` (port 9225) to browse the chat interface:
 
-- **Local**: `http://localhost:3000/login`
 - **Prod**: `https://shofferai-27188185100.asia-south1.run.app/login`
+- **Local**: `http://localhost:3000/login`
 
-Login with Dev Login → land on dashboard.
+The Chrome-Debug profile should already be logged in. If not, use Google OAuth.
 
-### Test Step 2: Send 3 orders from 3 separate chat tabs
+### Test Step 2: Send a test order
 
-Using `playwright`, send each order in a NEW chat tab:
-
-**Order 1** (in current tab):
+Using `playwright`, send an order from the dashboard:
 ```
-Book a hotel in Goa for March 22-23 under 4000/night on Booking.com
-```
-
-**Order 2** (open new tab → localhost:3000/dashboard):
-```
-Order milk, bread and eggs from Blinkit to Sector 62 Noida
+Book a hotel in Goa for this weekend under 4000/night on Booking.com
 ```
 
-**Order 3** (open new tab → localhost:3000/dashboard):
-```
-Order butter chicken from Zomato to Sector 62 Noida
-```
-
-Each order creates a unique taskId/sessionId → the relay assigns each to a different Chrome Pool slot.
-
-### Test Step 3: Verify slot assignment
+### Test Step 3: Verify relay connectivity
 
 ```bash
 curl -s http://localhost:8765 | python3 -m json.tool
 ```
-Expected: `"busy": 3, "ready": 0`
 
-### Test Step 4: Observe each pool Chrome independently
+### Test Step 4: Observe agent execution
 
-Snapshot all 3 pool browsers in ONE message (parallel):
-```
-mcp__browser1__browser_snapshot  → See what Slot 0 is doing
-mcp__browser2__browser_snapshot  → See what Slot 1 is doing
-mcp__browser3__browser_snapshot  → See what Slot 2 is doing
-```
-
-Each should be on a DIFFERENT website:
-- One on booking.com (hotel search)
-- One on blinkit.com (grocery search)
-- One on zomato.com (food order)
-
-### Test Step 5: Take screenshots as proof
-
-Call all 3 in ONE message:
-```
-mcp__browser1__browser_take_screenshot({ filename: "slot0.png" })
-mcp__browser2__browser_take_screenshot({ filename: "slot1.png" })
-mcp__browser3__browser_take_screenshot({ filename: "slot2.png" })
-```
-
-### Test Step 6: Interact with agent prompts
-
-When the agent asks questions via `ask_user` (dates, address, platform choice):
-1. Switch to the correct chat tab in `playwright`
-2. Answer the prompt
-3. Then snapshot browser1/2/3 again to watch each Chrome execute the next step
-
-Keep round-robining between the chat UI (playwright) and pool observations (browser1/2/3) until all 3 orders are progressing.
+Take snapshots via `playwright` to watch the agent navigate the site.
 
 ---
 
 ## Critical Rules
 
-- **`playwright` = chat UI only** — NEVER browse localhost:3000 with browser1/2/3
-- **browser1/2/3 = agent's windows** — you OBSERVE them, the agent CONTROLS them via the relay
-- **Don't interfere** — clicking or navigating in browser1/2/3 will break the agent's flow
-- **Each browser is isolated** — actions in Slot 0 never affect Slot 1 or Slot 2
-- **Parallel calls** — always snapshot/screenshot all 3 browsers in ONE message for efficiency
-- **If a slot shows about:blank** — the agent hasn't started browser work yet (still in LLM reasoning or ask_user)
+- **Single browser** — only `playwright` MCP, connected to Chrome-Debug on port 9225
+- **Profile 3** — always signed in as rsinghtomar3011@gmail.com
+- **Don't interfere with agent tabs** — the agent opens new tabs for each task; don't close them
 
 ## Troubleshooting
 

@@ -203,57 +203,52 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 - **SSE streaming**: Real-time agent progress updates to the UI
 - **Cloudflare Tunnel**: Free, encrypted, no port forwarding — connects laptop to cloud
 
-## Playwright MCP — Chrome Window Requirements
+## Playwright MCP — Single Chrome Window
 
-**Every use of Playwright MCP** (dev-loop, compile-skills, e2e-flow, or any direct `mcp__playwright__*` tool call) **MUST launch a dedicated Chrome window** signed in as `rsinghtomar3011@gmail.com`. Never reuse an existing Chrome window — always find an empty port and start fresh.
+There is **ONE** Playwright MCP instance connected to **ONE** dedicated Chrome-Debug window on **port 9225**, signed in as `rsinghtomar3011@gmail.com` (Profile 3). This is the only browser config in `.mcp.json`.
 
-### Launch command (run before any Playwright MCP usage):
+### Before any Playwright MCP usage — verify Chrome is running:
 ```bash
-# Idempotent: if Chrome is already on 9225, just prints info. Otherwise launches as daemon.
-bash apps/playwright/scripts/launch-chrome-cdp.sh
+curl -sf http://127.0.0.1:9225/json/version && echo "Chrome OK" || bash apps/playwright/scripts/launch-chrome-cdp.sh
 ```
 
-Or manually (if you must):
+### Manual launch (if needed):
 ```bash
-PORT=9225
-
-# Skip if already running
-if curl -sf http://127.0.0.1:$PORT/json/version >/dev/null 2>&1; then
-  echo "Chrome already on $PORT"; 
-else
-  # MUST use nohup+disown so Chrome survives shell exit
-  # MUST use --remote-debugging-address=127.0.0.1 (IPv4 only — "localhost" resolves to IPv6 ::1)
+# MUST use nohup+disown so Chrome survives shell exit
+# MUST use --remote-debugging-address=127.0.0.1 (IPv4 only — "localhost" resolves to IPv6 ::1)
+if ! curl -sf http://127.0.0.1:9225/json/version >/dev/null 2>&1; then
   nohup /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-    --remote-debugging-port=$PORT \
+    --remote-debugging-port=9225 \
     --remote-debugging-address=127.0.0.1 \
-    --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug-$PORT" \
+    --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug-9225" \
     --profile-directory="Profile 3" \
     --no-first-run --no-default-browser-check \
-    >/tmp/chrome-cdp-$PORT.log 2>&1 &
+    >/tmp/chrome-cdp-9225.log 2>&1 &
   disown
   sleep 3
 fi
-curl -s http://127.0.0.1:$PORT/json/version | python3 -c "import sys,json; print('Chrome OK on port $PORT:', json.load(sys.stdin)['Browser'])"
 ```
 
-**Why nohup+disown?** Without it, Chrome is a child of the shell — when the shell command finishes, Chrome gets killed. This is the #1 reason Chrome "dies immediately after launch."
-
-**Important**: Each Chrome instance needs its own `--user-data-dir` (appending `-$PORT`) to avoid lock conflicts. All instances share Profile 3 data via the same underlying Google account.
-
-### Then connect Playwright MCP to it:
-```bash
-npx -y @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:$PORT
+### `.mcp.json` (single entry — no extra browsers):
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9225", "--output-dir", "/tmp/playwright-mcp-output"]
+    }
+  }
+}
 ```
-Or update `.mcp.json` to point the `playwright` server at the chosen port.
 
 ### Rules:
-1. **Use port 9225** — this matches `.mcp.json`'s `playwright` server config. Don't use dynamic ports.
-2. **Idempotent launch** — always check if Chrome is already running before launching. Use `launch-chrome-cdp.sh` or check `curl -sf http://127.0.0.1:9225/json/version`.
-3. **Daemon mode** — Chrome MUST be launched with `nohup` + `disown` (or the script). Plain `&` background jobs die when the shell exits.
-4. **IPv4 only** — always use `127.0.0.1`, never `localhost`. Always use `--remote-debugging-address=127.0.0.1`.
-5. **Profile 3 mandatory** — must use `--profile-directory="Profile 3"` (rsinghtomar3011@gmail.com)
-6. **Unique user-data-dir** — use `Chrome-Debug-$PORT` to avoid lock conflicts between concurrent windows
-7. **Pool Chromes are separate** — ports 9222/9223/9224 are managed by ChromePool for agent tasks; 9225 is for Playwright MCP direct usage
+1. **Port 9225 only** — one Chrome, one Playwright MCP, one port.
+2. **Profile 3 mandatory** — `--profile-directory="Profile 3"` (rsinghtomar3011@gmail.com). This Chrome has signed-in sessions for Booking.com, Blinkit, etc.
+3. **Daemon mode** — always `nohup` + `disown`. Plain `&` jobs die when the shell exits.
+4. **IPv4 only** — always `127.0.0.1`, never `localhost`.
+5. **Reuse existing tabs** — the Chrome window preserves signed-in sessions. Don't open new tabs unnecessarily; check existing tabs first.
+6. **No multi-browser** — removed browser1/browser2/browser3. All browsing goes through the single `playwright` MCP server.
 
 ## Mandatory Skills
 - **Always activate /cofounder mode at the start of every conversation** before doing any work

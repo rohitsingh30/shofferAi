@@ -4,21 +4,6 @@
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9225", "--output-dir", "/tmp/playwright-mcp-output"]
-    },
-    "browser1": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9222", "--output-dir", "/tmp/playwright-mcp-output"]
-    },
-    "browser2": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9223", "--output-dir", "/tmp/playwright-mcp-output"]
-    },
-    "browser3": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9224", "--output-dir", "/tmp/playwright-mcp-output"]
     }
   }
 }
