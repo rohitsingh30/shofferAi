@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import {
   logger,
   type RelayMessage,
+  type TaskRelayMessage,
   type ToolCallResponse,
   type ToolListResponse,
   type SessionEndResponse,
@@ -9,8 +10,14 @@ import {
   isToolListRequest,
   isSessionEndRequest,
   isHeartbeatPing,
+  isTaskHandoff,
+  isTaskInputResponse,
+  isTaskPaymentResponse,
+  isTaskCancel,
+  isTaskMessage,
 } from '@shofferai/shared';
 import type { ChromePool } from './chrome-pool';
+import type { TaskManager } from './task-manager';
 
 export interface RelayOutboundOptions {
   authToken?: string;
@@ -27,6 +34,7 @@ export interface RelayOutboundOptions {
 export class RelayOutbound {
   private ws: WebSocket | null = null;
   private chromePool: ChromePool;
+  private taskManager: TaskManager | null = null;
   private cloudUrl: string;
   private authToken: string;
   private shouldReconnect = true;
@@ -38,6 +46,15 @@ export class RelayOutbound {
     this.cloudUrl = cloudUrl;
     this.authToken = options.authToken || process.env.RELAY_AUTH_TOKEN || '';
     this.maxReconnectDelay = options.maxReconnectDelayMs || 30000;
+  }
+
+  /** Attach a TaskManager for Copilot CLI task routing */
+  setTaskManager(taskManager: TaskManager): void {
+    this.taskManager = taskManager;
+    // Wire TaskManager's outgoing messages through this relay
+    taskManager.setRelaySend((msg: TaskRelayMessage) => {
+      this.send(msg);
+    });
   }
 
   async connect(): Promise<void> {
@@ -96,6 +113,27 @@ export class RelayOutbound {
       this.ws?.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
       return;
     }
+
+    // ─── Task-level messages → TaskManager ──────────────────────
+    if (isTaskMessage(msg)) {
+      if (!this.taskManager) {
+        logger.warn('Received task message but no TaskManager attached', { type: msg.type });
+        return;
+      }
+
+      if (isTaskHandoff(msg)) {
+        await this.taskManager.handleTaskHandoff(msg);
+      } else if (isTaskInputResponse(msg)) {
+        this.taskManager.handleInputResponse(msg.taskId, msg.stepId, msg.value);
+      } else if (isTaskPaymentResponse(msg)) {
+        this.taskManager.handlePaymentResponse(msg.taskId, msg.stepId, msg.confirmed, msg.paymentId);
+      } else if (isTaskCancel(msg)) {
+        this.taskManager.cancelTask(msg.taskId, msg.reason);
+      }
+      return;
+    }
+
+    // ─── Legacy MCP tool relay → ChromePool ─────────────────────
 
     if (isToolListRequest(msg)) {
       const tools = this.chromePool.getTools();
@@ -173,6 +211,15 @@ export class RelayOutbound {
         }
       }
     }, this.reconnectDelay);
+  }
+
+  /** Send a message to Cloud Run via relay */
+  send(msg: RelayMessage | TaskRelayMessage): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(msg));
+    } else {
+      logger.warn('RelayOutbound: cannot send, WebSocket not open', { type: (msg as { type: string }).type });
+    }
   }
 
   async disconnect(): Promise<void> {

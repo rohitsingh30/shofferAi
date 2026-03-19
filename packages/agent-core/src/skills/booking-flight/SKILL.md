@@ -42,6 +42,16 @@ Chrome profile: rsinghtomar3011@gmail.com (Genius Level 1 member — may get fli
 
 ## Steps
 
+### Step 0: Collect travel details
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **from** (type: "text", required): Departure city/airport
+2. **to** (type: "text", required): Arrival city/airport
+3. **dates** (type: "calendar", required, mode: "range"): Travel dates with shortcuts (Today, Tomorrow, This weekend). Show "One-way only" option.
+4. **passengers** (type: "stepper", required): Counters for Adults (default 1), Children, Infants
+5. **class** (type: "chip_bar", collapsed): Economy, Business, First Class
+
+**CRITICAL**: Do NOT open the browser without from, to, and date. These are mandatory search fields.
+
 ### 1. Gather Travel Details
 - Confirm from city/airport, to city/airport, departure date. Use `ask_user` if any required param is missing.
 - Ask if one-way or round-trip. If round-trip, confirm return date.

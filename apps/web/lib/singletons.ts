@@ -4,7 +4,7 @@ import { RelayBridge } from './relay-bridge';
 import { CredentialVault } from './credential-vault';
 import { WorkflowEngine } from './workflow-engine';
 import { loadSkills, type SkillMetadata } from '@shofferai/agent-core';
-import type { MCPHostLike } from '@shofferai/shared';
+import type { MCPHostLike, TaskRelayMessage } from '@shofferai/shared';
 
 // Use globalThis to ensure singletons are shared across Next.js route bundles
 const g = globalThis as unknown as {
@@ -12,6 +12,8 @@ const g = globalThis as unknown as {
     callToolWithSession: RemoteMCPHost['callToolWithSession'];
     isConnected(): boolean;
     releaseSession(sessionId: string): Promise<void>;
+    sendTaskMessage(msg: TaskRelayMessage): void;
+    onTaskEvent(handler: (msg: TaskRelayMessage) => void): void;
   };
   relayBridge: RelayBridge;
   workflowEngine: WorkflowEngine;

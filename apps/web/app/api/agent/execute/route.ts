@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { AgentExecutor, type AgentCallbacks } from '@shofferai/agent-core';
+import { AgentExecutor, type AgentCallbacks, matchSkill } from '@shofferai/agent-core';
 import { CredentialInjector } from '@/lib/credential-vault';
-import { SessionMCPHost } from '@/lib/session-mcp-host';
 import { remoteMcpHost, workflowEngine, vault, skills } from '@/lib/singletons';
 import { track, trackTimed } from '@/lib/telemetry';
 import { getAuthUser } from '@/lib/auth-helper';
+import type {
+  TaskRelayMessage,
+  TaskHandoffMessage,
+  TaskInputResponseMessage,
+  TaskPaymentResponseMessage,
+} from '@shofferai/shared';
 
 async function ensureRelayConnected() {
   if (!remoteMcpHost.isConnected()) {
@@ -56,16 +62,25 @@ export async function POST(request: Request) {
         );
       }
 
+      // Cleanup function to remove task event listener
+      let taskEventCleanup: (() => void) | null = null;
+
       try {
         console.log('[execute] taskId=%s connecting relay...', taskId);
         await ensureRelayConnected();
-        // Per-request MCP host with tab isolation: each task gets its own browser tab
-        const mcpHost = new SessionMCPHost(remoteMcpHost, taskId);
+
+        // Match a skill for the user's request
+        const matchedSkill = matchSkill(skills, message);
+        console.log('[execute] taskId=%s matched skill: %s', taskId, matchedSkill?.name || 'none');
+
+        // ─── Chat LLM gathers requirements, then hands off ─────────
+        // Use AgentExecutor in "chat-only" mode — it will call handoff_to_browser_agent
+        // when it has gathered enough info from the user.
 
         const injector = new CredentialInjector(vault, userId);
 
         const agent = new AgentExecutor({
-          mcpHost,
+          mcpHost: remoteMcpHost,
           credentialInjector: injector,
           skills,
           vault,
@@ -87,6 +102,124 @@ export async function POST(request: Request) {
           },
         });
 
+        // ─── Handle task events from laptop ──────────────────────────
+        // When the laptop sends task_progress, task_input_required, etc.,
+        // forward them as SSE events to the frontend.
+        const pauseManager = workflowEngine.getPauseManager();
+
+        const handleTaskEvent = (msg: TaskRelayMessage) => {
+          // Only handle events for this task
+          if ('taskId' in msg && msg.taskId !== taskId) return;
+
+          switch (msg.type) {
+            case 'task_progress':
+              send('message', { content: msg.message });
+              if (msg.step) {
+                send('step_update', { action: msg.message, status: 'running' });
+              }
+              break;
+
+            case 'task_input_required':
+              console.log('[execute] taskId=%s TASK_INPUT_REQUIRED stepId=%s q=%s', taskId, msg.stepId, msg.question?.slice(0, 80));
+              send('input_required', {
+                taskId,
+                stepId: msg.stepId,
+                question: msg.question,
+                inputType: msg.inputType,
+                options: msg.options,
+                cards: msg.cards,
+                show_quantity: msg.show_quantity,
+                allow_custom: msg.allow_custom,
+                multi_select: msg.multi_select,
+                saved: msg.saved,
+                mode: msg.mode,
+                shortcuts: msg.shortcuts,
+                counters: msg.counters,
+                min: msg.min,
+                max: msg.max,
+                step: msg.step,
+                presets: msg.presets,
+                placeholder: msg.placeholder,
+                format_hint: msg.format_hint,
+                sections: msg.sections,
+              });
+              // Wait for user input then send back to laptop
+              pauseManager.waitForInput({
+                taskId,
+                stepId: msg.stepId,
+                question: msg.question,
+                inputType: msg.inputType,
+              }).then((response) => {
+                console.log('[execute] taskId=%s input received for stepId=%s', taskId, msg.stepId);
+                const inputMsg: TaskInputResponseMessage = {
+                  id: randomUUID(),
+                  type: 'task_input_response',
+                  taskId,
+                  stepId: msg.stepId,
+                  value: response.value,
+                };
+                remoteMcpHost.sendTaskMessage(inputMsg);
+              }).catch((err) => {
+                console.error('[execute] taskId=%s input error:', taskId, err);
+              });
+              break;
+
+            case 'task_payment_required':
+              console.log('[execute] taskId=%s TASK_PAYMENT_REQUIRED amount=%d', taskId, msg.amount);
+              send('payment_required', {
+                taskId,
+                stepId: msg.stepId,
+                bookingSummary: msg.bookingSummary,
+                amountCents: Math.round(msg.amount * 100),
+                serviceFeeCents: 0,
+                description: msg.description,
+              });
+              pauseManager.waitForInput({
+                taskId,
+                stepId: msg.stepId,
+                question: 'Waiting for payment',
+                inputType: 'payment',
+                timeout: 600000,
+              }).then((response) => {
+                console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
+                const paymentMsg: TaskPaymentResponseMessage = {
+                  id: randomUUID(),
+                  type: 'task_payment_response',
+                  taskId,
+                  stepId: msg.stepId,
+                  confirmed: response.value === 'confirmed',
+                };
+                remoteMcpHost.sendTaskMessage(paymentMsg);
+              }).catch((err) => {
+                console.error('[execute] taskId=%s payment error:', taskId, err);
+              });
+              break;
+
+            case 'task_complete':
+              console.log('[execute] taskId=%s TASK_COMPLETE: %s', taskId, msg.summary?.slice(0, 120));
+              send('complete', { summary: msg.summary });
+              workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB error:', e));
+              taskTimer.end({ success: true, metadata: { skillName: matchedSkill?.name } });
+              controller.close();
+              break;
+
+            case 'task_error':
+              console.error('[execute] taskId=%s TASK_ERROR: %s', taskId, msg.error);
+              send('error', { error: msg.error });
+              workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB error:', e));
+              taskTimer.end({ success: false, metadata: { error: msg.error } });
+              controller.close();
+              break;
+          }
+        };
+
+        remoteMcpHost.onTaskEvent(handleTaskEvent);
+        taskEventCleanup = () => {
+          // Remove our handler (simple approach — last handler wins)
+          remoteMcpHost.onTaskEvent(() => {});
+        };
+
+        // ─── AgentExecutor callbacks (chat-only mode) ────────────────
         const callbacks: AgentCallbacks = {
           onMessage(content) {
             console.log('[execute] taskId=%s message: %s', taskId, content?.slice(0, 100));
@@ -105,7 +238,6 @@ export async function POST(request: Request) {
               question: request.question,
               inputType: request.inputType,
               options: request.options,
-              // Rich input props
               cards: request.cards,
               show_quantity: request.show_quantity,
               allow_custom: request.allow_custom,
@@ -122,13 +254,7 @@ export async function POST(request: Request) {
               format_hint: request.format_hint,
               sections: request.sections,
             });
-
-            // Wait for user to provide input via /api/agent/input
-            const pauseManager = workflowEngine.getPauseManager();
-            const response = await pauseManager.waitForInput({
-              ...request,
-              taskId,
-            });
+            const response = await pauseManager.waitForInput({ ...request, taskId });
             console.log('[execute] taskId=%s input received for stepId=%s', taskId, request.stepId);
             return response;
           },
@@ -140,8 +266,6 @@ export async function POST(request: Request) {
               question: `${details.action}\n\n${details.description}`,
               inputType: 'confirmation',
             });
-
-            const pauseManager = workflowEngine.getPauseManager();
             const response = await pauseManager.waitForInput({
               taskId,
               stepId: 'confirm',
@@ -153,7 +277,6 @@ export async function POST(request: Request) {
           },
           async onPaymentRequired(details: { bookingSummary: string; amountInr: number; description: string }) {
             console.log('[execute] taskId=%s PAYMENT_REQUIRED amount=₹%d', taskId, details.amountInr);
-            // Send payment_required event to frontend — opens L2 panel
             send('payment_required', {
               taskId,
               bookingSummary: details.bookingSummary,
@@ -161,15 +284,12 @@ export async function POST(request: Request) {
               serviceFeeCents: 0,
               description: details.description,
             });
-
-            // Block until payment is verified
-            const pauseManager = workflowEngine.getPauseManager();
             const response = await pauseManager.waitForInput({
               taskId,
               stepId: 'payment',
               question: 'Waiting for payment confirmation',
               inputType: 'payment',
-              timeout: 600000, // 10 minutes
+              timeout: 600000,
             });
             console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
             return response.value === 'confirmed';
@@ -186,12 +306,40 @@ export async function POST(request: Request) {
             workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB updateStatus failed:', e));
             taskTimer.end({ success: false, metadata: { error } });
           },
+
+          // ─── Task handoff callback ─────────────────────────────────
+          // Called by AgentExecutor when it decides to hand off to the
+          // browser agent (Copilot CLI on the laptop).
+          async onTaskHandoff(handoff: {
+            description: string;
+            skill?: { name: string; siteUrl: string; instructions: string; requiresAuth: boolean; params: Array<{ name: string; required: boolean; hint: string }> };
+            extractedParams: Record<string, string>;
+            conversationContext?: string;
+          }) {
+            console.log('[execute] taskId=%s TASK_HANDOFF to laptop', taskId);
+            send('step_update', { action: 'Handing off to browser agent...', status: 'running' });
+
+            const handoffMsg: TaskHandoffMessage = {
+              id: randomUUID(),
+              type: 'task_handoff',
+              taskId,
+              userId,
+              description: handoff.description,
+              skill: handoff.skill,
+              extractedParams: handoff.extractedParams,
+              conversationContext: handoff.conversationContext,
+            };
+
+            remoteMcpHost.sendTaskMessage(handoffMsg);
+            // Don't close the stream — keep it open for task events from the laptop
+          },
         };
 
         await workflowEngine.addMessage(taskId, 'user', message);
         console.log('[execute] taskId=%s starting agent.execute()', taskId);
         await agent.execute(message, callbacks);
         console.log('[execute] taskId=%s agent.execute() finished', taskId);
+
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         const stack = error instanceof Error ? error.stack : '';
@@ -200,10 +348,10 @@ export async function POST(request: Request) {
         await workflowEngine.updateTaskStatus(taskId, 'failed');
         taskTimer.end({ success: false, metadata: { error: errorMsg } });
       } finally {
-        // Release Chrome slot on the laptop
-        console.log('[execute] taskId=%s stream closing, releasing session', taskId);
-        remoteMcpHost.releaseSession(taskId).catch(e => console.warn('[execute] releaseSession failed:', e));
-        controller.close();
+        if (taskEventCleanup) taskEventCleanup();
+        console.log('[execute] taskId=%s stream closing', taskId);
+        // Note: controller.close() may have already been called by task_complete/task_error
+        try { controller.close(); } catch { /* already closed */ }
       }
     },
   });

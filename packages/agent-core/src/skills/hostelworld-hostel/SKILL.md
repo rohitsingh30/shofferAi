@@ -39,6 +39,15 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+### Step 0: Collect booking details
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **destination** (type: "text", required): City or area name
+2. **dates** (type: "calendar", required, mode: "range"): Check-in and check-out dates with shortcuts (This weekend, Next weekend)
+3. **guests** (type: "stepper", required): Counters for Adults (default 2), Children (default 0), Rooms (default 1)
+4. **budget** (type: "slider", collapsed): Per-night budget, min 500, max 30000, presets [1000, 2000, 5000, 10000]
+
+**CRITICAL**: Do NOT open the browser without destination and dates. These are mandatory search fields.
+
 ### 1. Gather Stay Requirements
 - Confirm destination city, check-in date, check-out date. If any missing, use `ask_user`.
 - Ask about room type: dorm (mixed/female-only), private room, apartment.

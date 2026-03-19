@@ -38,6 +38,14 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+### Step 0: Collect bus journey details
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **from** (type: "text", required): Departure city
+2. **to** (type: "text", required): Arrival city
+3. **date** (type: "calendar", required, mode: "single"): Journey date
+
+**CRITICAL**: Do NOT open the browser without from, to, and date.
+
 ### 1. Gather Travel Details
 - Confirm from city, to city, travel date. If any missing, use `ask_user`.
 - Note bus type preference (AC/Non-AC, Sleeper/Seater, Volvo/Multi-axle).

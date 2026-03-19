@@ -3,6 +3,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import {
   logger,
   type RelayMessage,
+  type TaskRelayMessage,
   type ToolCallResponse,
   type ToolListResponse,
   type SessionEndResponse,
@@ -10,8 +11,14 @@ import {
   isToolListRequest,
   isSessionEndRequest,
   isHeartbeatPing,
+  isTaskHandoff,
+  isTaskInputResponse,
+  isTaskPaymentResponse,
+  isTaskCancel,
+  isTaskMessage,
 } from '@shofferai/shared';
 import type { ChromePool } from './chrome-pool';
+import type { TaskManager } from './task-manager';
 
 export interface RelayServerOptions {
   port: number;
@@ -21,7 +28,9 @@ export interface RelayServerOptions {
 export class RelayServer {
   private wss: WebSocketServer | null = null;
   private chromePool: ChromePool;
+  private taskManager: TaskManager | null = null;
   private options: RelayServerOptions;
+  private activeClient: WebSocket | null = null;
 
   constructor(chromePool: ChromePool, options: Partial<RelayServerOptions> = {}) {
     this.chromePool = chromePool;
@@ -29,6 +38,24 @@ export class RelayServer {
       port: options.port || 8765,
       authToken: options.authToken || process.env.RELAY_AUTH_TOKEN,
     };
+  }
+
+  /** Attach a TaskManager for Copilot CLI task routing */
+  setTaskManager(taskManager: TaskManager): void {
+    this.taskManager = taskManager;
+    // Wire TaskManager's outgoing messages through this relay
+    taskManager.setRelaySend((msg: TaskRelayMessage) => {
+      this.send(msg);
+    });
+  }
+
+  /** Send a message to the connected Cloud Run client */
+  send(msg: RelayMessage | TaskRelayMessage): void {
+    if (this.activeClient && this.activeClient.readyState === WebSocket.OPEN) {
+      this.activeClient.send(JSON.stringify(msg));
+    } else {
+      logger.warn('RelayServer: no active client to send to', { type: (msg as { type: string }).type });
+    }
   }
 
   async start(): Promise<void> {
@@ -65,6 +92,7 @@ export class RelayServer {
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       const clientIp = req.socket.remoteAddress;
       logger.info(`Relay client connected from ${clientIp}`);
+      this.activeClient = ws;
 
       ws.on('message', async (data: Buffer) => {
         try {
@@ -78,6 +106,7 @@ export class RelayServer {
 
       ws.on('close', () => {
         logger.info('Relay client disconnected');
+        if (this.activeClient === ws) this.activeClient = null;
       });
 
       ws.on('error', (error) => {
@@ -98,6 +127,27 @@ export class RelayServer {
       ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
       return;
     }
+
+    // ─── Task-level messages → TaskManager ──────────────────────
+    if (isTaskMessage(msg)) {
+      if (!this.taskManager) {
+        logger.warn('Received task message but no TaskManager attached', { type: msg.type });
+        return;
+      }
+
+      if (isTaskHandoff(msg)) {
+        await this.taskManager.handleTaskHandoff(msg);
+      } else if (isTaskInputResponse(msg)) {
+        this.taskManager.handleInputResponse(msg.taskId, msg.stepId, msg.value);
+      } else if (isTaskPaymentResponse(msg)) {
+        this.taskManager.handlePaymentResponse(msg.taskId, msg.stepId, msg.confirmed, msg.paymentId);
+      } else if (isTaskCancel(msg)) {
+        this.taskManager.cancelTask(msg.taskId, msg.reason);
+      }
+      return;
+    }
+
+    // ─── Legacy MCP tool relay → ChromePool ─────────────────────
 
     if (isToolListRequest(msg)) {
       const tools = this.chromePool.getTools();

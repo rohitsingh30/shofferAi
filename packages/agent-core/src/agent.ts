@@ -27,6 +27,13 @@ export interface AgentCallbacks {
   onPaymentRequired?: (details: { bookingSummary: string; amountInr: number; description: string }) => Promise<boolean>;
   onComplete: (summary: string) => void;
   onError: (error: string) => void;
+  /** Called when the chat LLM decides to hand off execution to the browser agent (Copilot CLI on laptop) */
+  onTaskHandoff?: (handoff: {
+    description: string;
+    skill?: { name: string; siteUrl: string; instructions: string; requiresAuth: boolean; params: Array<{ name: string; required: boolean; hint: string }> };
+    extractedParams: Record<string, string>;
+    conversationContext?: string;
+  }) => Promise<void>;
 }
 
 export type TelemetryTracker = (data: {
@@ -285,6 +292,29 @@ const AGENT_TOOLS: Tool[] = [
         },
       },
       required: ['items', 'total'],
+    },
+  },
+  {
+    name: 'handoff_to_browser_agent',
+    description:
+      'Hand off a browser task to the autonomous browser agent running on the operator laptop. ' +
+      'Use this AFTER you have gathered all necessary information from the user. ' +
+      'The browser agent will execute the task autonomously using Playwright MCP and communicate ' +
+      'back to the user for choices, confirmations, and payment. ' +
+      'You do NOT need to handle browser actions yourself — just describe the complete task.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_description: {
+          type: 'string',
+          description: 'Complete description of what the browser agent should do. Include all details gathered from the user (dates, location, budget, items, preferences, etc.)',
+        },
+        extracted_params: {
+          type: 'object',
+          description: 'Key-value pairs of extracted parameters (e.g. {"destination": "Goa", "check_in": "22 March", "budget": "4000"})',
+        },
+      },
+      required: ['task_description'],
     },
   },
 ];
@@ -769,6 +799,46 @@ export class AgentExecutor {
         description: (args.details as string) || '',
       });
       return { confirmed };
+    }
+
+    if (name === 'handoff_to_browser_agent') {
+      const taskDescription = args.task_description as string;
+      const extractedParams = (args.extracted_params as Record<string, string>) || {};
+
+      callbacks.onStepUpdate({
+        action: 'Handing off to browser agent...',
+        status: 'running',
+      });
+
+      if (callbacks.onTaskHandoff) {
+        await callbacks.onTaskHandoff({
+          description: taskDescription,
+          skill: this.matchedSkill ? {
+            name: this.matchedSkill.name,
+            siteUrl: this.matchedSkill.siteUrl,
+            instructions: this.matchedSkill.instructions,
+            requiresAuth: this.matchedSkill.requiresAuth,
+            params: this.matchedSkill.params,
+          } : undefined,
+          extractedParams,
+          conversationContext: this.conversation.getMessages()
+            .filter((m: { role: string; content: unknown }) => m.role !== 'system')
+            .map((m: { role: string; content: unknown }) => `${m.role}: ${typeof m.content === 'string' ? m.content.slice(0, 200) : '[tool use]'}`)
+            .join('\n'),
+        });
+
+        this.trackEvent({
+          event: 'tool_call', category: 'tool',
+          userId: this.config.userContext.userId, taskId: this.taskId,
+          success: true,
+          metadata: { tool: 'handoff_to_browser_agent', skill: this.matchedSkill?.name },
+        });
+
+        return { handoff: 'sent', message: 'Task handed off to the browser agent. The agent will now execute the task autonomously and communicate with the user as needed.' };
+      }
+
+      // Fallback: if no handoff callback, report error
+      return { error: 'Task handoff not available — no browser agent connected' };
     }
 
     if (name === 'collect_payment') {

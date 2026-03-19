@@ -37,6 +37,16 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
+### Step 0: Collect journey details
+Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+1. **from** (type: "text", required): From station name or code
+2. **to** (type: "text", required): To station name or code
+3. **date** (type: "calendar", required, mode: "single"): Journey date. IRCTC opens bookings 120 days ahead.
+4. **class** (type: "chip_bar", required): SL, 3A, 2A, 1A, CC, EC
+5. **quota** (type: "chip_bar", collapsed): General (default), Tatkal, Ladies
+
+**CRITICAL**: Do NOT open the browser without from, to, date, and class.
+
 ### 1. Gather Travel Details
 - Confirm: from station, to station, travel date, class preference.
 - If missing, use `ask_user`. Convert relative dates to actual.

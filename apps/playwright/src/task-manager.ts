@@ -1,0 +1,725 @@
+import { spawn, type ChildProcess } from 'child_process';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
+import { createInterface } from 'readline';
+import { randomUUID } from 'crypto';
+import WebSocket, { WebSocketServer } from 'ws';
+import { createServer, type Server as HttpServer } from 'http';
+import {
+  logger,
+  type TaskHandoffMessage,
+  type TaskRelayMessage,
+  type BridgeMessage,
+  type BridgeOutgoingMessage,
+  isBridgeRegister,
+  isBridgeAskUser,
+  isBridgeRequestPayment,
+  isBridgeProgress,
+  isBridgeComplete,
+  isBridgeError,
+} from '@shofferai/shared';
+
+// ─── Types ────────────────────────────────────────────────────────────────
+
+interface RunningTask {
+  taskId: string;
+  userId: string;
+  agentProcess: ChildProcess;
+  bridgeWs: WebSocket | null;
+  startedAt: number;
+  status: 'starting' | 'running' | 'complete' | 'error';
+}
+
+export interface TaskManagerOptions {
+  /** Port range for Bridge MCP local WebSocket server */
+  bridgePortRange?: [number, number];
+  /** Path to gh copilot binary */
+  copilotBin?: string;
+  /** Default model for Copilot CLI */
+  model?: string;
+  /** CDP port for persistent Chrome-Debug (default 9222) */
+  chromeDebugPort?: number;
+  /** Task timeout in ms (default 10 minutes) */
+  taskTimeoutMs?: number;
+  /** Max concurrent tasks */
+  maxConcurrent?: number;
+}
+
+type RelaySendFn = (msg: TaskRelayMessage) => void;
+
+// ─── Constants ────────────────────────────────────────────────────────────
+
+const BRIDGE_MCP_SCRIPT = join(__dirname, 'bridge-mcp-server.ts');
+const BRIDGE_MCP_SCRIPT_JS = join(__dirname, 'bridge-mcp-server.js');
+
+const SYSTEM_PROMPT = `You are ShofferAI, an AI assistant that executes real browser tasks on behalf of users.
+You have Playwright MCP tools to control a Chrome browser AND Bridge MCP tools to communicate with the user.
+
+Chrome is pre-authenticated as rsinghtomar3011@gmail.com (Booking.com Genius account).
+
+RULES:
+1. First call browser_navigate to go to the target URL — this opens a NEW tab automatically
+2. After navigating, ALWAYS call browser_snapshot to read the page — do NOT retry navigation if the page loaded
+3. Do NOT login to booking.com — Chrome is already signed in
+4. Use send_progress to keep the user informed about what you're doing
+5. Use ask_user when you need the user's input (e.g., choosing a hotel, providing OTP)
+6. Use confirm_action before any irreversible action (order, payment)
+7. Use request_payment when payment is required — WAIT for the payment to be confirmed before placing any order
+8. Use browser_snapshot to read pages, browser_click to click, browser_type to type
+9. Include prices, quantities, and totals when presenting options to the user
+10. If browser_navigate succeeds (no error), the page IS loaded — take a snapshot to see it
+11. NEVER retry navigation more than twice — if it fails twice, report the error via send_progress
+12. When the task is complete, give a clear summary of what was accomplished`;
+
+// ─── TaskManager ──────────────────────────────────────────────────────────
+
+export class TaskManager {
+  private tasks = new Map<string, RunningTask>();
+  private bridgeWss: WebSocketServer | null = null;
+  private bridgeHttpServer: HttpServer | null = null;
+  private bridgePort = 0;
+  private relaySend: RelaySendFn | null = null;
+  private options: Required<TaskManagerOptions>;
+  private taskTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+  constructor(options: TaskManagerOptions = {}) {
+    this.options = {
+      bridgePortRange: options.bridgePortRange || [9400, 9499],
+      copilotBin: options.copilotBin || process.env.COPILOT_BIN || 'gh',
+      model: options.model || process.env.COPILOT_MODEL || 'claude-sonnet-4.6',
+      chromeDebugPort: options.chromeDebugPort || Number(process.env.CHROME_DEBUG_PORT) || 9222,
+      taskTimeoutMs: options.taskTimeoutMs || 10 * 60_000,
+      maxConcurrent: options.maxConcurrent || 5,
+    };
+  }
+
+  /** Start the local WebSocket server for Bridge MCP connections */
+  async initialize(): Promise<void> {
+    this.bridgePort = await this.findFreePort();
+    if (!this.bridgePort) {
+      throw new Error('TaskManager: no free port for Bridge WS server');
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      this.bridgeHttpServer = createServer();
+      this.bridgeWss = new WebSocketServer({ server: this.bridgeHttpServer });
+
+      this.bridgeWss.on('connection', (ws) => {
+        this.handleBridgeConnection(ws);
+      });
+
+      this.bridgeHttpServer.on('error', reject);
+      this.bridgeHttpServer.listen(this.bridgePort, '127.0.0.1', () => {
+        logger.info(`TaskManager: Bridge WS server listening on 127.0.0.1:${this.bridgePort}`);
+        resolve();
+      });
+    });
+  }
+
+  /** Set the relay send function (called by relay-outbound or relay-server) */
+  setRelaySend(fn: RelaySendFn): void {
+    this.relaySend = fn;
+  }
+
+  /** Handle a task handoff from Cloud Run */
+  async handleTaskHandoff(msg: TaskHandoffMessage): Promise<void> {
+    const { taskId, userId, description, skill, extractedParams, conversationContext } = msg;
+
+    if (this.tasks.size >= this.options.maxConcurrent) {
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_error',
+        taskId,
+        error: 'Too many concurrent tasks. Try again shortly.',
+        recoverable: true,
+      });
+      return;
+    }
+
+    if (this.tasks.has(taskId)) {
+      logger.warn(`TaskManager: task ${taskId} already exists, ignoring duplicate handoff`);
+      return;
+    }
+
+    logger.info(`TaskManager: received handoff for task ${taskId}`, { userId, skill: skill?.name });
+
+    // Build the prompt for Copilot CLI
+    const prompt = this.buildPrompt(description, skill, extractedParams, conversationContext);
+
+    // Check Chrome-Debug is alive
+    const chromeAlive = await this.waitForCDP(this.options.chromeDebugPort, 2);
+    if (!chromeAlive) {
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_error',
+        taskId,
+        error: 'Chrome-Debug is not running. Start it with: ./apps/playwright/scripts/start-laptop.sh',
+        recoverable: false,
+      });
+      return;
+    }
+
+    // Build MCP config: Playwright + Bridge
+    const mcpConfig = this.buildMcpConfig(taskId);
+
+    // Spawn Copilot CLI
+    try {
+      const agentProcess = this.spawnCopilotCLI(prompt, mcpConfig, taskId);
+
+      const task: RunningTask = {
+        taskId,
+        userId,
+        agentProcess,
+        bridgeWs: null,
+        startedAt: Date.now(),
+        status: 'starting',
+      };
+      this.tasks.set(taskId, task);
+
+      // Set task timeout
+      const timeoutId = setTimeout(() => {
+        this.handleTaskTimeout(taskId);
+      }, this.options.taskTimeoutMs);
+      this.taskTimeouts.set(taskId, timeoutId);
+
+      // Send initial progress
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_progress',
+        taskId,
+        message: 'Agent starting...',
+        step: 'init',
+      });
+
+      // Monitor process output and exit
+      this.monitorProcess(taskId, agentProcess);
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Failed to spawn agent';
+      logger.error(`TaskManager: failed to spawn for task ${taskId}`, { error: errMsg });
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_error',
+        taskId,
+        error: errMsg,
+        recoverable: false,
+      });
+    }
+  }
+
+  /** Route an input response from Cloud Run to the appropriate Bridge MCP */
+  handleInputResponse(taskId: string, stepId: string, value: string): void {
+    const task = this.tasks.get(taskId);
+    if (!task?.bridgeWs || task.bridgeWs.readyState !== WebSocket.OPEN) {
+      logger.warn(`TaskManager: no bridge connection for task ${taskId}`);
+      return;
+    }
+    task.bridgeWs.send(JSON.stringify({
+      type: 'bridge_input_response',
+      taskId,
+      stepId,
+      value,
+    }));
+  }
+
+  /** Route a payment response from Cloud Run to the appropriate Bridge MCP */
+  handlePaymentResponse(taskId: string, stepId: string, confirmed: boolean, paymentId?: string): void {
+    const task = this.tasks.get(taskId);
+    if (!task?.bridgeWs || task.bridgeWs.readyState !== WebSocket.OPEN) {
+      logger.warn(`TaskManager: no bridge connection for task ${taskId}`);
+      return;
+    }
+    task.bridgeWs.send(JSON.stringify({
+      type: 'bridge_payment_response',
+      taskId,
+      stepId,
+      confirmed,
+      paymentId,
+    }));
+  }
+
+  /** Cancel a running task */
+  cancelTask(taskId: string, reason?: string): void {
+    const task = this.tasks.get(taskId);
+    if (!task) return;
+
+    // Notify Bridge MCP
+    if (task.bridgeWs && task.bridgeWs.readyState === WebSocket.OPEN) {
+      task.bridgeWs.send(JSON.stringify({
+        type: 'bridge_cancel',
+        taskId,
+        reason,
+      }));
+    }
+
+    // Kill the process
+    this.cleanupTask(taskId);
+  }
+
+  getStatus(): { running: number; maxConcurrent: number; bridgePort: number } {
+    return {
+      running: this.tasks.size,
+      maxConcurrent: this.options.maxConcurrent,
+      bridgePort: this.bridgePort,
+    };
+  }
+
+  async shutdown(): Promise<void> {
+    // Cancel all tasks
+    for (const taskId of this.tasks.keys()) {
+      this.cleanupTask(taskId);
+    }
+
+    // Close Bridge WS server
+    if (this.bridgeWss) {
+      this.bridgeWss.close();
+      this.bridgeWss = null;
+    }
+    if (this.bridgeHttpServer) {
+      this.bridgeHttpServer.close();
+      this.bridgeHttpServer = null;
+    }
+    logger.info('TaskManager: shut down');
+  }
+
+  // ─── Private: Prompt Building ─────────────────────────────────────────
+
+  private buildPrompt(
+    description: string,
+    skill: TaskHandoffMessage['skill'],
+    extractedParams: Record<string, string>,
+    conversationContext?: string,
+  ): string {
+    const parts: string[] = [];
+
+    parts.push(`TASK: ${description}`);
+
+    if (Object.keys(extractedParams).length > 0) {
+      parts.push('\nEXTRACTED PARAMETERS:');
+      for (const [key, value] of Object.entries(extractedParams)) {
+        parts.push(`- ${key}: ${value}`);
+      }
+    }
+
+    if (skill) {
+      parts.push(`\nSKILL: ${skill.name}`);
+      parts.push(`WEBSITE: ${skill.siteUrl}`);
+      if (skill.requiresAuth) {
+        parts.push('NOTE: This site requires authentication. Login first if not already signed in.');
+      }
+      parts.push(`\nINSTRUCTIONS:\n${skill.instructions}`);
+    }
+
+    if (conversationContext) {
+      parts.push(`\nCONVERSATION CONTEXT:\n${conversationContext}`);
+    }
+
+    return parts.join('\n');
+  }
+
+  private buildMcpConfig(taskId: string): string {
+    const bridgeScript = existsSync(BRIDGE_MCP_SCRIPT_JS)
+      ? BRIDGE_MCP_SCRIPT_JS
+      : BRIDGE_MCP_SCRIPT;
+
+    // Determine the runner: .ts files need tsx, .js files use node
+    const isTsFile = bridgeScript.endsWith('.ts');
+    const command = isTsFile ? 'npx' : 'node';
+    const args = isTsFile ? ['tsx', bridgeScript] : [bridgeScript];
+
+    return JSON.stringify({
+      mcpServers: {
+        playwright: {
+          type: 'stdio',
+          command: 'npx',
+          args: [
+            '-y', '@playwright/mcp@latest',
+            '--cdp-endpoint', `http://127.0.0.1:${this.options.chromeDebugPort}`,
+            '--cdp-timeout', '60000',
+          ],
+        },
+        bridge: {
+          type: 'stdio',
+          command,
+          args,
+          env: {
+            BRIDGE_WS_PORT: String(this.bridgePort),
+            BRIDGE_TASK_ID: taskId,
+          },
+        },
+      },
+    });
+  }
+
+  private spawnCopilotCLI(prompt: string, mcpConfig: string, taskId: string): ChildProcess {
+    const args = [
+      'copilot', '--',
+      '-p', prompt,
+      '-s', SYSTEM_PROMPT,
+      '--model', this.options.model,
+      '--allow-all',
+      '--no-ask-user',
+      '--output-format', 'json',
+      '--additional-mcp-config', mcpConfig,
+    ];
+
+    logger.info(`TaskManager: spawning Copilot CLI for task ${taskId}`, {
+      model: this.options.model,
+      promptLength: prompt.length,
+    });
+
+    const proc = spawn(this.options.copilotBin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        BRIDGE_WS_PORT: String(this.bridgePort),
+        BRIDGE_TASK_ID: taskId,
+      },
+    });
+
+    return proc;
+  }
+
+  // ─── Private: Process Monitoring ──────────────────────────────────────
+
+  private monitorProcess(taskId: string, proc: ChildProcess): void {
+    let stderrOutput = '';
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      stderrOutput += chunk.toString();
+      if (stderrOutput.length > 8192) stderrOutput = stderrOutput.slice(-8192);
+    });
+
+    const rl = createInterface({ input: proc.stdout! });
+    let resultYielded = false;
+    let lastMessage = '';
+
+    rl.on('line', (line) => {
+      if (!line.trim()) return;
+      try {
+        const event = JSON.parse(line);
+        this.handleCopilotEvent(taskId, event, { resultYielded, lastMessage });
+        if (event.type === 'result') resultYielded = true;
+        if (event.type === 'assistant.message' && event.data?.content) {
+          lastMessage = event.data.content;
+        }
+      } catch { /* skip non-JSON lines */ }
+    });
+
+    proc.on('close', (code) => {
+      logger.info(`TaskManager: Copilot CLI exited for task ${taskId}`, { code });
+
+      const task = this.tasks.get(taskId);
+      if (task && task.status !== 'complete' && task.status !== 'error') {
+        if (!resultYielded) {
+          const errMsg = stderrOutput.trim()
+            || (code ? `Agent exited with code ${code}` : 'Agent produced no response');
+          this.sendToRelay({
+            id: randomUUID(),
+            type: 'task_error',
+            taskId,
+            error: errMsg,
+            recoverable: false,
+          });
+        }
+        this.cleanupTask(taskId);
+      }
+    });
+
+    proc.on('error', (error) => {
+      logger.error(`TaskManager: process error for task ${taskId}`, { error: error.message });
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_error',
+        taskId,
+        error: `Process error: ${error.message}`,
+        recoverable: false,
+      });
+      this.cleanupTask(taskId);
+    });
+  }
+
+  private handleCopilotEvent(
+    taskId: string,
+    event: { type: string; data?: Record<string, unknown>; exitCode?: number },
+    state: { resultYielded: boolean; lastMessage: string },
+  ): void {
+    const type = event.type;
+    const data = event.data || {};
+
+    if (type === 'assistant.message') {
+      const content = data.content as string;
+      if (content && content !== state.lastMessage) {
+        // Forward as progress message (the user sees this in chat)
+        this.sendToRelay({
+          id: randomUUID(),
+          type: 'task_progress',
+          taskId,
+          message: content,
+        });
+      }
+    } else if (type === 'assistant.tool_call') {
+      const toolName = (data.toolName || data.name || 'tool') as string;
+      // Don't forward bridge tool calls as progress (Bridge MCP handles those)
+      if (!toolName.includes('bridge') && !toolName.includes('ask_user')
+        && !toolName.includes('request_payment') && !toolName.includes('send_progress')
+        && !toolName.includes('confirm_action')) {
+        this.sendToRelay({
+          id: randomUUID(),
+          type: 'task_progress',
+          taskId,
+          message: this.friendlyToolName(toolName, data.input as Record<string, unknown> || data.arguments as Record<string, unknown>),
+          step: toolName,
+        });
+      }
+    } else if (type === 'result') {
+      const task = this.tasks.get(taskId);
+      const code = data.exitCode ?? event.exitCode;
+      if (code && code !== 0) {
+        if (task) task.status = 'error';
+        this.sendToRelay({
+          id: randomUUID(),
+          type: 'task_error',
+          taskId,
+          error: `Agent exited with code ${code}`,
+          recoverable: false,
+        });
+      } else {
+        if (task) task.status = 'complete';
+        this.sendToRelay({
+          id: randomUUID(),
+          type: 'task_complete',
+          taskId,
+          summary: state.lastMessage || 'Task completed',
+        });
+      }
+      this.cleanupTask(taskId);
+    }
+  }
+
+  private friendlyToolName(toolName: string, input?: Record<string, unknown>): string {
+    const name = toolName.replace('mcp__playwright__', '').replace('playwright__', '');
+    switch (name) {
+      case 'browser_navigate': return `Navigating to ${input?.url || 'page'}`;
+      case 'browser_snapshot': return 'Reading page content';
+      case 'browser_click': return `Clicking ${input?.element || 'element'}`;
+      case 'browser_type': return 'Typing text';
+      case 'browser_tabs': return `Tab action: ${input?.action || 'manage'}`;
+      case 'browser_take_screenshot': return 'Taking screenshot';
+      case 'browser_wait_for': return 'Waiting for page';
+      case 'browser_select_option': return 'Selecting option';
+      case 'browser_navigate_back': return 'Going back';
+      case 'browser_fill_form': return 'Filling form';
+      default: return `Browser: ${name}`;
+    }
+  }
+
+  // ─── Private: Bridge MCP WebSocket ────────────────────────────────────
+
+  private handleBridgeConnection(ws: WebSocket): void {
+    logger.debug('TaskManager: Bridge MCP connection received');
+
+    ws.on('message', (data) => {
+      let msg: BridgeOutgoingMessage;
+      try {
+        msg = JSON.parse(data.toString());
+      } catch {
+        logger.error('TaskManager: invalid JSON from bridge');
+        return;
+      }
+
+      this.handleBridgeMessage(ws, msg);
+    });
+
+    ws.on('close', () => {
+      // Find and clean up the task associated with this bridge
+      for (const [, task] of this.tasks) {
+        if (task.bridgeWs === ws) {
+          task.bridgeWs = null;
+          logger.debug(`TaskManager: bridge disconnected for task ${task.taskId}`);
+          break;
+        }
+      }
+    });
+  }
+
+  private handleBridgeMessage(ws: WebSocket, msg: BridgeOutgoingMessage): void {
+    if (isBridgeRegister(msg)) {
+      const task = this.tasks.get(msg.taskId);
+      if (task) {
+        task.bridgeWs = ws;
+        task.status = 'running';
+        ws.send(JSON.stringify({ type: 'bridge_registered', taskId: msg.taskId }));
+        logger.info(`TaskManager: bridge registered for task ${msg.taskId}`);
+      } else {
+        logger.warn(`TaskManager: bridge registered for unknown task ${msg.taskId}`);
+        ws.close();
+      }
+      return;
+    }
+
+    if (isBridgeAskUser(msg)) {
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_input_required',
+        taskId: msg.taskId,
+        stepId: msg.stepId,
+        question: msg.question,
+        inputType: msg.inputType,
+        options: msg.options,
+        cards: msg.cards,
+        show_quantity: msg.show_quantity,
+        allow_custom: msg.allow_custom,
+        multi_select: msg.multi_select,
+        saved: msg.saved,
+        mode: msg.mode,
+        shortcuts: msg.shortcuts,
+        counters: msg.counters,
+        min: msg.min,
+        max: msg.max,
+        step: msg.step,
+        presets: msg.presets,
+        placeholder: msg.placeholder,
+        format_hint: msg.format_hint,
+        sections: msg.sections,
+      });
+      return;
+    }
+
+    if (isBridgeRequestPayment(msg)) {
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_payment_required',
+        taskId: msg.taskId,
+        stepId: msg.stepId,
+        amount: msg.amount,
+        description: msg.description,
+        bookingSummary: msg.bookingSummary,
+      });
+      return;
+    }
+
+    if (isBridgeProgress(msg)) {
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_progress',
+        taskId: msg.taskId,
+        message: msg.message,
+        step: msg.step,
+      });
+      return;
+    }
+
+    if (isBridgeComplete(msg)) {
+      const task = this.tasks.get(msg.taskId);
+      if (task) task.status = 'complete';
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_complete',
+        taskId: msg.taskId,
+        summary: msg.summary,
+        result: msg.result,
+      });
+      this.cleanupTask(msg.taskId);
+      return;
+    }
+
+    if (isBridgeError(msg)) {
+      const task = this.tasks.get(msg.taskId);
+      if (task) task.status = 'error';
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_error',
+        taskId: msg.taskId,
+        error: msg.error,
+        recoverable: msg.recoverable,
+      });
+      if (!msg.recoverable) {
+        this.cleanupTask(msg.taskId);
+      }
+      return;
+    }
+  }
+
+  // ─── Private: Utilities ───────────────────────────────────────────────
+
+  private sendToRelay(msg: TaskRelayMessage): void {
+    if (!this.relaySend) {
+      logger.warn('TaskManager: no relay send function set, dropping message', { type: msg.type });
+      return;
+    }
+    this.relaySend(msg);
+  }
+
+  private handleTaskTimeout(taskId: string): void {
+    const task = this.tasks.get(taskId);
+    if (!task || task.status === 'complete' || task.status === 'error') return;
+
+    logger.warn(`TaskManager: task ${taskId} timed out`);
+    this.sendToRelay({
+      id: randomUUID(),
+      type: 'task_error',
+      taskId,
+      error: 'Task timed out',
+      recoverable: false,
+    });
+    this.cancelTask(taskId, 'timeout');
+  }
+
+  private cleanupTask(taskId: string): void {
+    const task = this.tasks.get(taskId);
+    if (!task) return;
+
+    // Clear timeout
+    const timeoutId = this.taskTimeouts.get(taskId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      this.taskTimeouts.delete(taskId);
+    }
+
+    // Kill agent process
+    try {
+      if (!task.agentProcess.killed) {
+        task.agentProcess.kill('SIGTERM');
+        setTimeout(() => {
+          try { if (!task.agentProcess.killed) task.agentProcess.kill('SIGKILL'); } catch { /* */ }
+        }, 3000);
+      }
+    } catch { /* already dead */ }
+
+    // Close bridge WS
+    if (task.bridgeWs && task.bridgeWs.readyState === WebSocket.OPEN) {
+      task.bridgeWs.close();
+    }
+
+    this.tasks.delete(taskId);
+    logger.info(`TaskManager: cleaned up task ${taskId}`);
+  }
+
+  private async waitForCDP(port: number, maxRetries = 5): Promise<boolean> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/json/version`, {
+          signal: AbortSignal.timeout(2000),
+        });
+        if (res.ok) return true;
+      } catch { /* not ready */ }
+      if (i < maxRetries - 1) await new Promise(r => setTimeout(r, 1000));
+    }
+    return false;
+  }
+
+  private async findFreePort(): Promise<number> {
+    const [min, max] = this.options.bridgePortRange;
+    const net = await import('net');
+    for (let port = min; port <= max; port++) {
+      const free = await new Promise<boolean>((resolve) => {
+        const server = net.createServer();
+        server.once('error', () => resolve(false));
+        server.once('listening', () => { server.close(); resolve(true); });
+        server.listen(port, '127.0.0.1');
+      });
+      if (free) return port;
+    }
+    return 0;
+  }
+}

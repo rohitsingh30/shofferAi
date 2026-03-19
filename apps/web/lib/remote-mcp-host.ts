@@ -1,4 +1,4 @@
-import { logger, BrowserError, type MCPTool, type AnthropicTool, type MCPHostLike } from '@shofferai/shared';
+import { logger, BrowserError, type MCPTool, type AnthropicTool, type MCPHostLike, type TaskRelayMessage } from '@shofferai/shared';
 import { RelayClient } from './relay-client';
 
 export class RemoteMCPHost implements MCPHostLike {
@@ -80,6 +80,16 @@ export class RemoteMCPHost implements MCPHostLike {
 
   async releaseSession(sessionId: string): Promise<void> {
     await this.relayClient.releaseSession(sessionId);
+  }
+
+  /** Send a task-level message to the laptop */
+  sendTaskMessage(msg: TaskRelayMessage): void {
+    this.relayClient.sendTaskMessage(msg);
+  }
+
+  /** Register a handler for incoming task events from the laptop */
+  onTaskEvent(handler: (msg: TaskRelayMessage) => void): void {
+    this.relayClient.onTaskEvent(handler);
   }
 
   async disconnect(): Promise<void> {

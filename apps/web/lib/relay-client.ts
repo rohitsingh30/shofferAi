@@ -5,12 +5,14 @@ import {
   BrowserError,
   type MCPToolInfo,
   type RelayMessage,
+  type TaskRelayMessage,
   type ToolCallRequest,
   type ToolListRequest,
   type SessionEndRequest,
   isToolCallResponse,
   isToolListResponse,
   isHeartbeatPong,
+  isTaskMessage,
 } from '@shofferai/shared';
 import { track } from './telemetry';
 
@@ -39,6 +41,7 @@ export class RelayClient {
   private shouldReconnect = true;
   private lastPongAt = Date.now();
   private options: Required<RelayClientOptions>;
+  private taskEventHandler: ((msg: TaskRelayMessage) => void) | null = null;
 
   constructor(options: RelayClientOptions = {}) {
     this.options = {
@@ -116,6 +119,16 @@ export class RelayClient {
       return;
     }
 
+    // Route task-level messages to the task event handler
+    if (isTaskMessage(msg)) {
+      if (this.taskEventHandler) {
+        this.taskEventHandler(msg as TaskRelayMessage);
+      } else {
+        logger.warn('RelayClient: received task message but no handler set', { type: msg.type });
+      }
+      return;
+    }
+
     if (isToolCallResponse(msg) || isToolListResponse(msg)) {
       const pending = this.pending.get(msg.id);
       if (pending) {
@@ -177,6 +190,19 @@ export class RelayClient {
     // Fire and forget — don't wait for ack
     this.ws.send(JSON.stringify(request));
     logger.debug('Sent session_end', { sessionId });
+  }
+
+  /** Send a task-level message to the laptop */
+  sendTaskMessage(msg: TaskRelayMessage): void {
+    if (!this.ws || !this.connected) {
+      throw new BrowserError('RelayClient: not connected');
+    }
+    this.ws.send(JSON.stringify(msg));
+  }
+
+  /** Register a handler for incoming task events from the laptop */
+  onTaskEvent(handler: (msg: TaskRelayMessage) => void): void {
+    this.taskEventHandler = handler;
   }
 
   async listTools(): Promise<MCPToolInfo[]> {

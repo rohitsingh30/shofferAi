@@ -8,9 +8,11 @@ import {
   type MCPHostLike,
   type MCPToolInfo,
   type RelayMessage,
+  type TaskRelayMessage,
   isToolCallResponse,
   isToolListResponse,
   isHeartbeatPong,
+  isTaskMessage,
 } from '@shofferai/shared';
 
 interface PendingRequest {
@@ -33,6 +35,7 @@ export class RelayBridge implements MCPHostLike {
   private toolCallTimeoutMs = 60000;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private lastPongAt = Date.now();
+  private taskEventHandler: ((msg: TaskRelayMessage) => void) | null = null;
 
   /**
    * Called by the custom server when a laptop WebSocket connects.
@@ -92,6 +95,16 @@ export class RelayBridge implements MCPHostLike {
   private handleMessage(msg: RelayMessage): void {
     if (isHeartbeatPong(msg)) {
       this.lastPongAt = Date.now();
+      return;
+    }
+
+    // Route task-level messages (from laptop) to the task event handler
+    if (isTaskMessage(msg)) {
+      if (this.taskEventHandler) {
+        this.taskEventHandler(msg as TaskRelayMessage);
+      } else {
+        logger.warn('RelayBridge: received task message but no handler set', { type: msg.type });
+      }
       return;
     }
 
@@ -206,6 +219,20 @@ export class RelayBridge implements MCPHostLike {
       sessionId,
     }));
     logger.debug('RelayBridge sent session_end', { sessionId });
+  }
+
+  /** Send a task-level message to the laptop (task_handoff, task_input_response, etc.) */
+  sendTaskMessage(msg: TaskRelayMessage): void {
+    if (!this.laptopSocket || !this.connected) {
+      throw new BrowserError('RelayBridge: laptop not connected');
+    }
+    this.laptopSocket.send(JSON.stringify(msg));
+    logger.debug('RelayBridge sent task message', { type: msg.type, taskId: (msg as { taskId?: string }).taskId });
+  }
+
+  /** Register a handler for incoming task events from the laptop */
+  onTaskEvent(handler: (msg: TaskRelayMessage) => void): void {
+    this.taskEventHandler = handler;
   }
 
   async disconnect(): Promise<void> {
