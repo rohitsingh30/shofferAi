@@ -434,6 +434,11 @@ export class TaskManager {
     const type = event.type;
     const data = event.data || {};
 
+    // Log ALL events for debugging MCP visibility
+    logger.info(`[copilot-event] task=${taskId.slice(0,8)} type=${type}`, {
+      dataKeys: Object.keys(data),
+    });
+
     if (type === 'assistant.message') {
       const content = data.content as string;
       if (content && content !== state.lastMessage) {
@@ -445,16 +450,17 @@ export class TaskManager {
           message: content,
         });
       }
-    } else if (type === 'assistant.tool_call') {
+    } else if (type === 'assistant.tool_call' || type === 'tool.execution_start') {
       const toolName = (data.toolName || data.name || 'tool') as string;
       const toolArgs = (data.input || data.arguments || {}) as Record<string, unknown>;
 
       // Emit to MCP log stream for real-time visibility
+      const cleanName = toolName.replace('mcp__playwright__', '').replace('playwright__', '');
       mcpToolEvents.emit('mcp_tool', {
         type: 'tool_start',
         timestamp: new Date().toISOString(),
         sessionId: taskId.slice(0, 12),
-        toolName: toolName.replace('mcp__playwright__', '').replace('playwright__', ''),
+        toolName: cleanName,
         args: truncateToolArgs(toolArgs),
       });
 
@@ -470,6 +476,19 @@ export class TaskManager {
           step: toolName,
         });
       }
+    } else if (type === 'tool.execution_complete') {
+      const toolCallId = data.toolCallId as string || '';
+      const success = data.success as boolean;
+      const resultStr = typeof data.result === 'string' ? data.result : JSON.stringify(data.result ?? '');
+
+      mcpToolEvents.emit('mcp_tool', {
+        type: success ? 'tool_end' : 'tool_error',
+        timestamp: new Date().toISOString(),
+        sessionId: taskId.slice(0, 12),
+        toolName: toolCallId,
+        resultSummary: resultStr.slice(0, 300),
+        error: success ? undefined : resultStr.slice(0, 300),
+      });
     } else if (type === 'result') {
       const task = this.tasks.get(taskId);
       const code = data.exitCode ?? event.exitCode;
