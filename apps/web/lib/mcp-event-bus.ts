@@ -66,6 +66,9 @@ function summarizeResult(result: unknown): string {
   return json.length > 300 ? json.slice(0, 300) + '…' : json;
 }
 
-// Singleton — shared across all requests in the same Next.js process
-export const mcpEventBus = new McpEventBus();
+// Use globalThis to ensure a true singleton across Next.js module scopes
+// (same pattern as PrismaClient in Next.js — webpack chunks break module singletons)
+const globalForMcp = globalThis as unknown as { __mcpEventBus?: McpEventBus };
+export const mcpEventBus = globalForMcp.__mcpEventBus ?? new McpEventBus();
+globalForMcp.__mcpEventBus = mcpEventBus;
 mcpEventBus.setMaxListeners(50);
