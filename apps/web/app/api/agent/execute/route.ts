@@ -13,6 +13,7 @@ import type {
   TaskPaymentResponseMessage,
 } from '@shofferai/shared';
 
+/** Lazy relay connection — only needed when agent actually tries to use the browser */
 async function ensureRelayConnected() {
   if (!remoteMcpHost.isConnected()) {
     console.log('[execute] Relay not connected, connecting...');
@@ -66,8 +67,9 @@ export async function POST(request: Request) {
       let taskEventCleanup: (() => void) | null = null;
 
       try {
-        console.log('[execute] taskId=%s connecting relay...', taskId);
-        await ensureRelayConnected();
+        // Don't eagerly connect relay — chat LLM can ask clarifying questions without it.
+        // Relay is only needed when handoff_to_browser_agent or browse_website is called.
+        console.log('[execute] taskId=%s starting (relay connection deferred)', taskId);
 
         // Match a skill for the user's request
         const matchedSkill = matchSkill(skills, message);
@@ -318,6 +320,18 @@ export async function POST(request: Request) {
           }) {
             console.log('[execute] taskId=%s TASK_HANDOFF to laptop', taskId);
             send('step_update', { action: 'Handing off to browser agent...', status: 'running' });
+
+            // Lazy relay connection — only connect when we actually need the laptop
+            try {
+              await ensureRelayConnected();
+            } catch (relayErr) {
+              const msg = relayErr instanceof Error ? relayErr.message : 'Relay connection failed';
+              console.error('[execute] taskId=%s relay connect failed during handoff: %s', taskId, msg);
+              send('error', { error: `Cannot reach browser agent: ${msg}. Make sure the laptop relay is running.` });
+              await workflowEngine.updateTaskStatus(taskId, 'failed');
+              taskTimer.end({ success: false, metadata: { error: msg } });
+              return;
+            }
 
             const handoffMsg: TaskHandoffMessage = {
               id: randomUUID(),
