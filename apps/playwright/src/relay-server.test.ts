@@ -10,17 +10,22 @@ vi.mock('@shofferai/shared', async () => {
   };
 });
 
-function createMockMcpHost() {
+function createMockChromePool() {
   return {
     getTools: vi.fn(() => [
       { name: 'browser_click', description: 'Click element', inputSchema: { type: 'object' } },
       { name: 'browser_type', description: 'Type text', inputSchema: { type: 'object' } },
     ]),
-    getToolsAsAnthropicFormat: vi.fn(),
     callTool: vi.fn(async () => ({ success: true })),
-    isMCPTool: vi.fn(),
-    connect: vi.fn(),
-    disconnect: vi.fn(),
+    releaseSlot: vi.fn(),
+    getStatus: vi.fn(() => ({
+      maxSlots: 3,
+      active: 1,
+      ready: 1,
+      busy: 0,
+      error: 0,
+      queueLength: 0,
+    })),
   };
 }
 
@@ -43,13 +48,13 @@ function sendAndReceive(ws: WebSocket, msg: object): Promise<any> {
 }
 
 describe('RelayServer', () => {
-  let mcpHost: ReturnType<typeof createMockMcpHost>;
+  let chromePool: ReturnType<typeof createMockChromePool>;
   let server: RelayServer;
   let port: number;
   let clients: WebSocket[];
 
   beforeEach(async () => {
-    mcpHost = createMockMcpHost();
+    chromePool = createMockChromePool();
     // Use port 0 to get random available port
     port = 9800 + Math.floor(Math.random() * 200);
     clients = [];
@@ -63,7 +68,7 @@ describe('RelayServer', () => {
   });
 
   it('starts server and accepts connections without auth', async () => {
-    server = new RelayServer(mcpHost as any, { port });
+    server = new RelayServer(chromePool as any, { port });
     await server.start();
 
     const ws = await connectClient(port);
@@ -72,14 +77,14 @@ describe('RelayServer', () => {
   });
 
   it('rejects connections with invalid auth token', async () => {
-    server = new RelayServer(mcpHost as any, { port, authToken: 'secret' });
+    server = new RelayServer(chromePool as any, { port, authToken: 'secret' });
     await server.start();
 
     await expect(connectClient(port, 'wrong-token')).rejects.toThrow();
   });
 
   it('accepts connections with valid auth token', async () => {
-    server = new RelayServer(mcpHost as any, { port, authToken: 'secret' });
+    server = new RelayServer(chromePool as any, { port, authToken: 'secret' });
     await server.start();
 
     const ws = await connectClient(port, 'secret');
@@ -88,7 +93,7 @@ describe('RelayServer', () => {
   });
 
   it('responds to tool_list requests with MCPHost tools', async () => {
-    server = new RelayServer(mcpHost as any, { port });
+    server = new RelayServer(chromePool as any, { port });
     await server.start();
 
     const ws = await connectClient(port);
@@ -106,7 +111,7 @@ describe('RelayServer', () => {
   });
 
   it('responds to tool_call requests with MCPHost result', async () => {
-    server = new RelayServer(mcpHost as any, { port });
+    server = new RelayServer(chromePool as any, { port });
     await server.start();
 
     const ws = await connectClient(port);
@@ -121,12 +126,12 @@ describe('RelayServer', () => {
 
     expect(response.type).toBe('tool_result');
     expect(response.result).toEqual({ success: true });
-    expect(mcpHost.callTool).toHaveBeenCalledWith('browser_click', { selector: '#btn' });
+    expect(chromePool.callTool).toHaveBeenCalledWith(undefined, 'browser_click', { selector: '#btn' });
   });
 
   it('responds to tool_call with error when MCPHost throws', async () => {
-    mcpHost.callTool.mockRejectedValueOnce(new Error('Browser crashed'));
-    server = new RelayServer(mcpHost as any, { port });
+    chromePool.callTool.mockRejectedValueOnce(new Error('Browser crashed'));
+    server = new RelayServer(chromePool as any, { port });
     await server.start();
 
     const ws = await connectClient(port);
@@ -145,7 +150,7 @@ describe('RelayServer', () => {
   });
 
   it('responds to ping with pong', async () => {
-    server = new RelayServer(mcpHost as any, { port });
+    server = new RelayServer(chromePool as any, { port });
     await server.start();
 
     const ws = await connectClient(port);

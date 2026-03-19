@@ -16,6 +16,7 @@ interface ChromeSlot {
   assignedSessionId: string | null;
   lastActivityAt: number;
   state: SlotState;
+  cdpFailCount: number; // consecutive CDP health check failures
 }
 
 interface QueueEntry {
@@ -76,6 +77,7 @@ export class ChromePool {
   private sessionMap = new Map<string, number>(); // sessionId → slot index
   private waitQueue: QueueEntry[] = [];
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+  private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   private options: ChromePoolOptions;
   private tools: ReturnType<MCPHost['getTools']> = [];
   private nextSlotIndex = 0;
@@ -117,6 +119,8 @@ export class ChromePool {
     });
 
     this.cleanupInterval = setInterval(() => this.cleanupIdleSlots(), 60_000);
+    // Periodic CDP health check — catches frozen Chrome before tool calls fail
+    this.healthCheckInterval = setInterval(() => this.healthCheckSlots(), 15_000);
   }
 
   private createSlot(): ChromeSlot {
@@ -130,6 +134,7 @@ export class ChromePool {
       assignedSessionId: null,
       lastActivityAt: 0,
       state: 'idle',
+      cdpFailCount: 0,
     };
   }
 
@@ -438,6 +443,43 @@ export class ChromePool {
     entry.resolve(slot);
   }
 
+  /** Periodic CDP health check — detects frozen/unresponsive Chrome */
+  private async healthCheckSlots(): Promise<void> {
+    for (const slot of this.slots) {
+      if (slot.state !== 'ready' && slot.state !== 'busy') continue;
+      if (!slot.port) continue;
+
+      try {
+        const res = await fetch(`http://127.0.0.1:${slot.port}/json/version`, {
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) {
+          slot.cdpFailCount = 0;
+          continue;
+        }
+      } catch {
+        // CDP not responding
+      }
+
+      slot.cdpFailCount++;
+      logger.warn(`Slot ${slot.index} CDP health check failed`, {
+        port: slot.port,
+        failCount: slot.cdpFailCount,
+        state: slot.state,
+      });
+
+      // 3 consecutive failures (45s) → recover the slot
+      if (slot.cdpFailCount >= 3) {
+        logger.error(`Slot ${slot.index} Chrome unresponsive for ${slot.cdpFailCount} checks — recovering`);
+        slot.state = 'error';
+        slot.cdpFailCount = 0;
+        this.recoverSlot(slot).catch(err => {
+          logger.error(`Slot ${slot.index} health-triggered recovery failed`, { error: String(err) });
+        });
+      }
+    }
+  }
+
   private async cleanupIdleSlots(): Promise<void> {
     const now = Date.now();
     for (const slot of this.slots) {
@@ -520,6 +562,10 @@ export class ChromePool {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
+    }
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
     }
 
     // Reject all queued entries

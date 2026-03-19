@@ -36,7 +36,7 @@ INSTANCE_ID="mcp-$$-$(date +%s)"
 USER_DATA_DIR="${BASE_USER_DATA_DIR}-${INSTANCE_ID}"
 LOG_FILE="/tmp/chrome-mcp-${INSTANCE_ID}.log"
 
-# Clean up on exit (Chrome process + cloned dir)
+# Pre-exec cleanup (for errors before exec)
 cleanup() {
   if [ -n "${CHROME_PID:-}" ] && kill -0 "$CHROME_PID" 2>/dev/null; then
     kill "$CHROME_PID" 2>/dev/null || true
@@ -97,7 +97,54 @@ ELAPSED=0
 while [ $ELAPSED -lt 5 ]; do
   if curl -sf "$CDP_URL/json/version" >/dev/null 2>&1; then
     echo "✅ Chrome-Debug ready on port $PORT — signed in as rsinghtomar3011@gmail.com (Profile 3)" >&2
-    # exec replaces this shell — when Playwright MCP exits, cleanup trap fires
+
+    # --- Watchdog: monitor Chrome health, kill MCP if Chrome dies ---
+    # After exec, the shell PID becomes the MCP process. The watchdog runs
+    # as a background subshell that survives exec. It monitors Chrome PID
+    # and CDP health. If either fail, it kills MCP so the CLI host sees the
+    # server die and can restart it.
+    SHELL_PID=$$
+    (
+      CDP_FAILS=0
+      CYCLE=0
+      while true; do
+        sleep 5
+        CYCLE=$((CYCLE + 1))
+
+        # Check Chrome process alive
+        if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+          echo "⚠️  Chrome (PID $CHROME_PID) died — killing MCP to trigger restart" >&2
+          kill "$SHELL_PID" 2>/dev/null
+          rm -rf "$USER_DATA_DIR" 2>/dev/null
+          exit 1
+        fi
+
+        # Check MCP still alive (normal exit = we should clean up)
+        if ! kill -0 "$SHELL_PID" 2>/dev/null; then
+          kill "$CHROME_PID" 2>/dev/null
+          rm -rf "$USER_DATA_DIR" 2>/dev/null
+          exit 0
+        fi
+
+        # CDP health check every 3 cycles (15s) — catches frozen Chrome
+        if [ "$((CYCLE % 3))" = "0" ]; then
+          if ! curl -sf --connect-timeout 3 "$CDP_URL/json/version" >/dev/null 2>&1; then
+            CDP_FAILS=$((CDP_FAILS + 1))
+            if [ "$CDP_FAILS" -ge 3 ]; then
+              echo "⚠️  Chrome CDP unresponsive for 3 checks — killing Chrome + MCP" >&2
+              kill "$CHROME_PID" 2>/dev/null
+              kill "$SHELL_PID" 2>/dev/null
+              rm -rf "$USER_DATA_DIR" 2>/dev/null
+              exit 1
+            fi
+          else
+            CDP_FAILS=0
+          fi
+        fi
+      done
+    ) &
+
+    # exec replaces this shell with MCP — watchdog keeps running independently
     exec npx -y @playwright/mcp@latest --cdp-endpoint "$CDP_URL" --output-dir /tmp/playwright-mcp-output
   fi
   sleep 0.5
