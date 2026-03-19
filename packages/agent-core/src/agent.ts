@@ -11,7 +11,7 @@ import {
   type UserInputResponse,
   type FillCredentialRequest,
 } from '@shofferai/shared';
-import type { SkillMetadata } from './skills/types';
+import type { SkillMetadata, LessonStore, LessonEntry } from './skills/types';
 import { loadSkills, matchSkill } from './skills/loader';
 import { ScriptRecorder } from './scripts/recorder';
 import { ScriptPlayer } from './scripts/player';
@@ -44,6 +44,7 @@ export interface AgentConfig {
   credentialInjector: CredentialInjectorLike;
   llmClient?: LLMClient;
   skills?: SkillMetadata[];
+  lessonStore?: LessonStore;
   trackEvent?: TelemetryTracker;
   taskId?: string;
   userContext: {
@@ -213,6 +214,10 @@ export class AgentExecutor {
   private allSkills: SkillMetadata[];
   private trackEvent: TelemetryTracker;
   private taskId: string | undefined;
+  private consecutiveBrowseFailures = 0;
+  private readonly maxConsecutiveBrowseFailures = 3;
+  private lastBrowseError: string | null = null;
+  private activeLessons: LessonEntry[] = [];
 
   constructor(private config: AgentConfig) {
     this.claude = config.llmClient || createLLMClient();
@@ -237,7 +242,18 @@ export class AgentExecutor {
     if (this.allSkills.length > 0) {
       this.matchedSkill = matchSkill(this.allSkills, userMessage);
       if (this.matchedSkill) {
-        this.systemPrompt = buildSystemPrompt(this.config.userContext, this.allSkills, this.matchedSkill);
+        // Load lessons learned from past executions for this skill
+        if (this.config.lessonStore) {
+          try {
+            this.activeLessons = await this.config.lessonStore.loadForSkill(this.matchedSkill.name, 10);
+            if (this.activeLessons.length > 0) {
+              logger.info('Loaded lessons for skill', { skillName: this.matchedSkill.name, count: this.activeLessons.length });
+            }
+          } catch (err) {
+            logger.warn('Failed to load lessons', { error: err });
+          }
+        }
+        this.systemPrompt = buildSystemPrompt(this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons);
         logger.info('Skill matched', { skillName: this.matchedSkill.name });
         callbacks.onStepUpdate({
           action: `Using skill: ${this.matchedSkill.name}`,
@@ -434,9 +450,13 @@ export class AgentExecutor {
           break;
         }
 
-        // Send any text blocks to frontend (when tool calls are also present)
+        // Send text blocks to frontend ONLY if they contain meaningful content,
+        // not just narration of browser actions ("Let me navigate to...", "I'll click on...")
         for (const block of textBlocks) {
-          callbacks.onMessage(block.text);
+          const text = block.text.trim();
+          if (text && !this.isNarrationText(text)) {
+            callbacks.onMessage(text);
+          }
         }
 
         // Process tool calls
@@ -489,10 +509,41 @@ export class AgentExecutor {
     // browse_website: LLM describes what to do, we execute it via Playwright MCP
     if (name === 'browse_website') {
       const instruction = args.instruction as string;
-      callbacks.onStepUpdate({ action: instruction, status: 'running' });
+
+      // Circuit breaker: stop after repeated browser connection failures
+      if (this.consecutiveBrowseFailures >= this.maxConsecutiveBrowseFailures) {
+        const failMsg = `Browser unavailable after ${this.consecutiveBrowseFailures} consecutive failures. The browser relay may be offline — please try again later.`;
+        callbacks.onError(failMsg);
+        throw new Error(failMsg);
+      }
+
+      // Suppress ALL browse_website step_updates — these are low-level actions.
+      // Only report_step milestones and ask_user/confirm_action pauses are shown to user.
       const toolStart = Date.now();
       try {
         const result = await this.executeBrowserInstruction(instruction);
+
+        // Auto-save lesson: if this succeeded after a previous failure, record the recovery
+        if (this.lastBrowseError && this.matchedSkill && this.config.lessonStore) {
+          const errorPattern = this.lastBrowseError.slice(0, 200);
+          const resolution = `Succeeded with: ${instruction.slice(0, 200)}`;
+          this.config.lessonStore.save({
+            skillId: this.matchedSkill.name,
+            errorPattern,
+            resolution,
+            source: 'auto',
+            confidence: 0.5,
+            successCount: 1,
+            failureCount: 0,
+            lastUsedAt: new Date(),
+            createdAt: new Date(),
+            expiresAt: null,
+          }).catch((err) => logger.warn('Failed to save lesson', { error: err }));
+          logger.info('Auto-saved lesson from error recovery', { skillId: this.matchedSkill.name, errorPattern: errorPattern.slice(0, 80) });
+        }
+
+        this.consecutiveBrowseFailures = 0;
+        this.lastBrowseError = null;
         this.trackEvent({
           event: 'tool_call', category: 'tool',
           userId: this.config.userContext.userId, taskId: this.taskId,
@@ -501,13 +552,20 @@ export class AgentExecutor {
         });
         return result;
       } catch (error) {
+        this.consecutiveBrowseFailures++;
         const msg = error instanceof Error ? error.message : 'Browser action failed';
+        this.lastBrowseError = msg;
         this.trackEvent({
           event: 'tool_call', category: 'tool',
           userId: this.config.userContext.userId, taskId: this.taskId,
           durationMs: Date.now() - toolStart, success: false,
-          metadata: { tool: 'browse_website', error: msg },
+          metadata: { tool: 'browse_website', error: msg, consecutiveFailures: this.consecutiveBrowseFailures },
         });
+        if (this.consecutiveBrowseFailures >= this.maxConsecutiveBrowseFailures) {
+          const failMsg = `Browser unavailable after ${this.consecutiveBrowseFailures} consecutive failures: ${msg}`;
+          callbacks.onError(failMsg);
+          throw new Error(failMsg);
+        }
         return { error: msg };
       }
     }
@@ -605,8 +663,11 @@ export class AgentExecutor {
 
     // Handle MCP tools (Playwright browser actions)
     if (this.mcpHost.isMCPTool(name)) {
-      const friendlyAction = this.getFriendlyActionName(name, args);
-      callbacks.onStepUpdate({ action: friendlyAction, status: 'running' });
+      // Only show user-meaningful actions, not internal reads/waits
+      if (!this.isInternalBrowserAction(name)) {
+        const friendlyAction = this.getFriendlyActionName(name, args);
+        callbacks.onStepUpdate({ action: friendlyAction, status: 'running' });
+      }
       const mcpStart = Date.now();
       try {
         const result = await this.mcpHost.callTool(name, args);
@@ -846,6 +907,25 @@ export class AgentExecutor {
       }
     }
     return null;
+  }
+
+  /** Returns true for low-level browser actions that shouldn't clutter user progress.
+   *  ALL MCP browser actions are internal — only report_step milestones are shown. */
+  private isInternalBrowserAction(_toolName: string): boolean {
+    return true;
+  }
+
+  /** Detects LLM narration text that shouldn't be shown to the user (e.g. "Let me navigate to...", "I'll search for...") */
+  private isNarrationText(text: string): boolean {
+    const lower = text.toLowerCase().trim();
+    const narrationPatterns = [
+      /^(let me|i'll|i will|i'm going to|now i'll|now let me|i'm now|i need to|i'm about to|first,? i'll|next,? i'll)\s+(navigate|go to|open|click|search|type|browse|check|look|read|scroll|select|visit|head to|dismiss|refresh|fill|submit|wait|load|close|handle|verify|proceed)/,
+      /^(navigating|going|opening|clicking|searching|typing|browsing|checking|looking|reading|scrolling|loading|heading|dismissing|refreshing|filling|submitting|waiting|closing|handling|verifying|proceeding)\s+(to|for|at|on|the|through|a |an )/,
+      /^(sure|okay|alright|great|perfect)[,.!]?\s*(let me|i'll|i will|now)/,
+      /^(now |first |next )?(i('ll| will| need to| am going to|'m going to) )?(open|navigate|go|click|search|type|dismiss|scroll|refresh|read|check|look|fill|submit|wait|load|close|handle|verify|proceed)/,
+      /^(searching|looking) for (hotels|flights|products|items|rooms|options)/,
+    ];
+    return narrationPatterns.some(p => p.test(lower));
   }
 
   private getFriendlyActionName(toolName: string, args: Record<string, unknown>): string {

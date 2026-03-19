@@ -93,6 +93,10 @@ function ChatInterfaceInner() {
           }
         }
 
+        // Only show milestone steps (completed report_step) and pause states.
+        // Hide low-level "running" browser actions to reduce noise.
+        if (status === 'running') break;
+
         setCurrentSteps((prev) => {
           const step: StepInfo = { action, status };
           const idx = prev.findIndex((s) => s.action === step.action);

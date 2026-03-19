@@ -44,10 +44,13 @@ Chrome profile: rsinghtomar3011@gmail.com (Genius Level 1 member).
 
 ## Steps
 
-### 1. Gather Requirements
-- Confirm you have: destination, check-in date, check-out date, number of guests.
-- If any required param is missing, use `ask_user` to get it. Do NOT proceed without destination + dates.
+### 1. Gather ALL Requirements Upfront
+- Check what the user already provided: destination, check-in date, check-out date, guests, budget.
+- If ANY required params are missing, use ONE SINGLE `ask_user` call to collect ALL missing info at once.
+  Example (if destination + dates missing): "I need a few details to search for hotels:\n• Destination (city or area, e.g. Goa, Mumbai)\n• Check-in date (e.g. 22 March)\n• Check-out date (e.g. 24 March)\n• Number of guests (default: 2 adults)\n• Max budget per night (optional, e.g. under ₹4000)"
+- Do NOT ask one question at a time. Ask everything in a single prompt.
 - Default guests to 2 adults if not specified. Skip budget filtering if not specified.
+- Parse natural dates: "this weekend" = upcoming Saturday + Sunday, "tomorrow" = next day.
 
 ### 2. Navigate & Dismiss Popups
 - Open a NEW tab and navigate to `https://www.booking.com`

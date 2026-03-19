@@ -1,4 +1,5 @@
-import type { SkillMetadata } from '../skills/types';
+import type { SkillMetadata, LessonEntry } from '../skills/types';
+import { formatLessonsForPrompt } from '../skills/lessons';
 
 export const SYSTEM_PROMPT = `You are ShofferAI, a personal AI assistant that helps users complete real tasks on websites.
 
@@ -39,7 +40,10 @@ Report completion of each skill step for progress tracking.
 3. NEVER ask the user a question as plain text. ALWAYS use the ask_user tool for ANY question — OTP codes, delivery address, choices, clarification. If you need information from the user, call ask_user. Do NOT embed questions in your text response.
 4. Always login to a website BEFORE browsing products
 5. Include prices, quantities, and totals when presenting options
-6. If something fails, try a different approach — don't repeat the same action`;
+6. If something fails, try a different approach — don't repeat the same action
+7. Do NOT narrate your browser actions to the user. Do NOT say "I'm navigating to...", "Let me click on...", "Now I'll search for...". Only message the user when you have something meaningful: results found, choices to make, order confirmations, or errors. Between those moments, work SILENTLY — the user sees a progress indicator automatically.
+8. **Ask ALL clarification questions UPFRONT in a SINGLE ask_user call.** Before starting any browser work, check what information you still need (destination, dates, budget, preferences, etc.) and ask for ALL of it at once. Format your single question with all the missing fields clearly listed. NEVER ask one question, wait for the answer, then ask another — that wastes the user's time. Example: "I need a few details to search for hotels:\n• Destination (e.g. Goa, Mumbai)\n• Check-in date\n• Check-out date\n• Budget per night (optional)\n• Number of guests (default: 2 adults)"
+9. **After collecting user input, execute ALL browser actions silently until you have results to show, a choice for the user to make, or need payment confirmation.** Do not send intermediate status messages like "Searching..." or "Loading results...". Just do the work and present the outcome.`;
 
 export function buildSystemPrompt(
   userContext: {
@@ -50,6 +54,7 @@ export function buildSystemPrompt(
   },
   allSkills?: SkillMetadata[],
   activeSkill?: SkillMetadata,
+  lessons?: LessonEntry[],
 ): string {
   const parts = [SYSTEM_PROMPT];
 
@@ -87,6 +92,14 @@ export function buildSystemPrompt(
   if (activeSkill) {
     const today = new Date().toISOString().split('T')[0];
     parts.push(`## ACTIVE SKILL: ${activeSkill.name}\nToday's date: ${today}\n\n${activeSkill.instructions}`);
+  }
+
+  // Level 3: Lessons learned from past executions (only for active skill)
+  if (lessons && lessons.length > 0) {
+    const lessonText = formatLessonsForPrompt(lessons);
+    if (lessonText) {
+      parts.push(lessonText);
+    }
   }
 
   return parts.join('\n\n');
