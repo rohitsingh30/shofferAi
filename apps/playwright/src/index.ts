@@ -125,6 +125,17 @@ async function main() {
     }
   });
 
+  logServer.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      logger.warn(`MCP Log port ${MCP_LOG_PORT} in use, trying ${MCP_LOG_PORT + 1}`);
+      logServer.listen(MCP_LOG_PORT + 1, '127.0.0.1', () => {
+        logger.info(`MCP Log stream: http://localhost:${MCP_LOG_PORT + 1}/logs/mcp`);
+      });
+    } else {
+      logger.error('MCP Log server failed', { error: err.message });
+    }
+  });
+
   logServer.listen(MCP_LOG_PORT, '127.0.0.1', () => {
     logger.info(`MCP Log stream: http://localhost:${MCP_LOG_PORT}/logs/mcp`);
   });
