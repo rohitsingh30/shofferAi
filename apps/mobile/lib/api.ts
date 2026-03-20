@@ -134,7 +134,9 @@ export async function executeAgent(
     if (signal) {
       signal.addEventListener('abort', () => {
         cleanup();
-        reject(new DOMException('The operation was aborted.', 'AbortError'));
+        const err = new Error('The operation was aborted.');
+        err.name = 'AbortError';
+        reject(err);
       });
     }
 
