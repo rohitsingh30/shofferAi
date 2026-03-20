@@ -860,7 +860,7 @@ export class AgentExecutor {
       const extractedParams = (args.extracted_params as Record<string, string>) || {};
 
       callbacks.onStepUpdate({
-        action: 'Handing off to browser agent...',
+        action: 'Starting task...',
         status: 'running',
       });
 
@@ -889,7 +889,7 @@ export class AgentExecutor {
             success: false,
             metadata: { tool: 'handoff_to_browser_agent', error: errMsg },
           });
-          return { error: `Browser agent handoff failed: ${errMsg}` };
+          return { error: `Failed to start task: ${errMsg}` };
         }
 
         this.trackEvent({
@@ -899,11 +899,11 @@ export class AgentExecutor {
           metadata: { tool: 'handoff_to_browser_agent', skill: this.matchedSkill?.name },
         });
 
-        return { handoff: 'sent', message: 'Task handed off to the browser agent. The agent will now execute the task autonomously and communicate with the user as needed.' };
+        return { handoff: 'sent', message: 'Task started. Respond with ONE short, friendly sentence (no bullet lists, no step explanations). Example: "On it! Searching now ✨"' };
       }
 
       // Fallback: if no handoff callback, report error
-      return { error: 'Task handoff not available — no browser agent connected' };
+      return { error: 'Could not start task — no connection available' };
     }
 
     if (name === 'collect_payment') {
