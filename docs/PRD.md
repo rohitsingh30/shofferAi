@@ -336,6 +336,7 @@ The operator's Chrome profile must have:
 | **Event handler singleton** | Concurrent tasks break (events lost) | Map<taskId, handler> in RelayBridge/RelayClient |
 | **Re-asking items already in message** | "What do you want to buy?" when user said "milk and bread" | System prompt OVERRIDE + extract-first Step 0 |
 | **ask_user renders as progress card** | User can't respond to input prompts | Removed onStepUpdate before onInputRequired |
+| **Playwright mock keychain kills sessions** | Chrome appears logged out of every site | Launch Chrome ourselves + connect via CDP (bypass Playwright's --use-mock-keychain) |
 
 ### Open
 

@@ -405,4 +405,23 @@ After making changes:
 
 ---
 
+## 26. Playwright MCP Mock Keychain Breaks Chrome Sessions
+
+**What happens:** Chrome window opened by Playwright MCP during handoff appears completely logged out of every site (Swiggy, Booking.com, etc.) — even though the cloned Chrome-Debug Profile 3 has valid Cookies file with all sessions.
+
+**Root cause:** Playwright's `launchPersistentContext()` adds `--use-mock-keychain` and `--password-store=basic` as default Chrome args. On macOS, Chrome encrypts ALL cookies using the macOS Keychain. Mock keychain = Chrome can't decrypt cookies = every site appears logged out.
+
+These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitches.js` lines 81-82. Playwright MCP's `browserContextFactory.js` also hardcodes `ignoreDefaultArgs: ["--disable-extensions"]` which overwrites any `ignoreDefaultArgs` from our config. So there's NO config-based way to remove mock keychain.
+
+**The fix (2026-03-20):**
+1. Changed `playwright-mcp-with-chrome.sh` to launch Chrome OURSELVES (not via Playwright)
+2. Our Chrome launch has NO mock-keychain flags — uses real macOS Keychain
+3. Parse the CDP port from Chrome's stderr (`DevTools listening on ws://127.0.0.1:PORT/...`)
+4. Pass `cdpEndpoint: "http://127.0.0.1:PORT"` in the Playwright MCP config
+5. Playwright MCP CONNECTS to our Chrome via CDP instead of launching its own
+
+**Rule:** NEVER let Playwright launch Chrome when you need real cookie sessions. Always launch Chrome yourself and connect Playwright via CDP. This applies to both `playwright-mcp-with-chrome.sh` and any future MCP launch scripts. Verify with: `ps aux | grep Chrome | grep mock-keychain` — should return nothing for your Chrome process.
+
+---
+
 *Last updated: 2026-03-20*

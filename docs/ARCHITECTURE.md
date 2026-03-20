@@ -646,29 +646,32 @@ shofferai/
 
 ### Chrome Launch (Lazy)
 
-Chrome is launched **lazily** — only when the first Playwright tool call arrives. No eager Chrome on startup.
+Chrome launched by the script uses real macOS Keychain (not Playwright's mock keychain). Playwright MCP connects via CDP.
 
 **Copilot CLI / Claude Desktop path** (`.mcp.json` → `playwright-mcp-with-chrome.sh`):
 ```
 .mcp.json invokes playwright-mcp-with-chrome.sh:
-  1. APFS-clone Chrome-Debug profile dir (instant, preserves sessions)
+  1. Selective copy of Chrome-Debug/Profile 3 session data (~26MB)
   2. Remove singleton lock files from clone
-  3. Generate Playwright MCP config JSON (channel: chrome, Profile 3, stealth args)
-  4. Start Playwright MCP with --config + --init-script stealth-init.js
-  5. Chrome launches lazily on first tool call (not on startup)
-  6. Cleanup cloned dir on exit
+  3. Launch Chrome ourselves with --remote-debugging-port=0 (NO Playwright launch)
+  4. Parse CDP port from Chrome stderr (DevTools listening on ws://127.0.0.1:PORT)
+  5. Generate config with cdpEndpoint → Playwright MCP CONNECTS to our Chrome
+  6. Start Playwright MCP with --config + --init-script stealth-init.js
+  7. Cleanup: kill Chrome + remove cloned dir on exit
 ```
+WHY we launch Chrome ourselves: Playwright adds `--use-mock-keychain` and `--password-store=basic`
+which blocks macOS Keychain access. Chrome cookies are Keychain-encrypted → mock keychain = logged out.
 
 **Relay path** (`start-laptop.sh` → ChromePool):
 ```
 ChromePool launches Chrome lazily per task:
   1. Clone session files from Chrome-Debug/Profile 3
   2. Launch Chrome with --remote-debugging-port=0 (OS-assigned port)
-  3. Connect MCPHost via CDP
+  3. Connect MCPHost via CDP (no mock keychain — ChromePool launches Chrome directly)
   4. Auto-release after 15 min idle
 ```
 
-**Profile 3** = `rsinghtomar3011@gmail.com` (Booking.com Genius Level 1). Chrome encrypts cookies per macOS Keychain (per-user, not per-dir) — APFS clones preserve all signed-in sessions.
+**Profile 3** = `rsinghtomar3011@gmail.com` (Booking.com Genius Level 1). Chrome encrypts cookies via macOS Keychain (per-user, not per-dir) — cloned dirs preserve all signed-in sessions AS LONG AS Chrome is launched without `--use-mock-keychain`.
 
 ---
 

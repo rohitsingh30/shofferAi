@@ -251,6 +251,12 @@ export class ChromePool {
 
     mkdirSync(profileDir, { recursive: true });
 
+    // Copy top-level Local State (has cookie encryption key reference on macOS)
+    const localStateSrc = join(this.options.profileSourceDir, 'Local State');
+    if (existsSync(localStateSrc)) {
+      cpSync(localStateSrc, join(slot.userDataDir, 'Local State'), { force: true });
+    }
+
     // Remove stale singleton files
     for (const lock of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
       const lockPath = join(slot.userDataDir, lock);

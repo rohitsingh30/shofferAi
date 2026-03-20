@@ -84,6 +84,8 @@ Everything browser-related. **This is where the actual web tasks happen.**
 | **TaskManager** | Bridge WS for Copilot CLI tasks (dynamic port 9400-9499) | Always started by `start-laptop.sh` (both modes) |
 
 > **No manual Chrome launch needed.** ChromePool handles everything — it clones the Chrome-Debug profile, launches Chrome with an OS-assigned port, and connects Playwright MCP automatically.
+>
+> **⚠️ IMPORTANT:** Chrome MUST be launched without Playwright's default `--use-mock-keychain` flag. This flag blocks macOS Keychain access, making all encrypted cookies unreadable (every site appears logged out). Both ChromePool and `playwright-mcp-with-chrome.sh` launch Chrome directly (not via Playwright) to avoid this.
 
 ---
 

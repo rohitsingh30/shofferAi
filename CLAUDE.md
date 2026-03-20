@@ -212,9 +212,13 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 3. Generates a unique instance ID (`mcp-$$-timestamp`)
 4. **Selective copy** of Chrome-Debug session data (~26MB in <1s) — copies only Cookies, Local Storage, Preferences, Extensions. Skips 6.8GB of regeneratable caches (Service Worker, IndexedDB, GPUCache, etc.)
 5. Removes stale lock files from the copy
-6. Generates a config JSON with Chrome launch args (Profile 3 / rsinghtomar3011@gmail.com)
-7. Runs `playwright-mcp --config <config> --init-script stealth-init.js` (Chrome launches lazily on first tool call)
-8. Cleanup trap removes copy + config on exit
+6. **Launches Chrome ourselves** with `--remote-debugging-port=0` — NO Playwright launch (avoids `--use-mock-keychain` which blocks macOS Keychain cookie decryption)
+7. Parses CDP port from Chrome's stderr (`DevTools listening on ws://127.0.0.1:PORT/...`)
+8. Generates config JSON with `cdpEndpoint: "http://127.0.0.1:PORT"` — Playwright MCP CONNECTS to our Chrome
+9. Runs `playwright-mcp --config <config> --init-script stealth-init.js`
+10. Cleanup trap kills Chrome + removes copy + config on exit
+
+**CRITICAL**: Playwright's `launchPersistentContext()` adds `--use-mock-keychain` and `--password-store=basic` which prevent macOS Keychain access. This makes ALL cookies unreadable — Chrome appears logged out of every site. That's why we launch Chrome ourselves and connect via CDP.
 
 **IMPORTANT**: `playwright-mcp` is installed globally (`npm install -g @playwright/mcp`) — not via `npx @latest`. This eliminates npm registry lookups and prevents slow/failed startups. Update with: `./apps/playwright/scripts/update-playwright-mcp.sh`
 

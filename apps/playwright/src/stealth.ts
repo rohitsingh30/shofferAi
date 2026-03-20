@@ -21,9 +21,12 @@ import { logger } from '@shofferai/shared';
 export const STEALTH_CHROME_ARGS: string[] = [
   '--disable-blink-features=AutomationControlled',
   '--disable-infobars',
-  '--disable-features=AutomationControlled',
+  // Suppress Google identity "Verify it's you" prompts on cloned profiles
+  '--disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching',
   '--disable-ipc-flooding-protection',
   '--disable-popup-blocking',
+  '--noerrdialogs',
+  '--disable-gaia-services',
 ];
 
 // ---------------------------------------------------------------------------

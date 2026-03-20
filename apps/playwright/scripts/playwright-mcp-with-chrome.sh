@@ -65,10 +65,13 @@ done
 # Chrome regenerates caches (Service Worker, IndexedDB, GPUCache, etc.) on its own.
 USER_DATA_DIR="${BASE_USER_DATA_DIR}-${INSTANCE_ID}"
 CONFIG_FILE="/tmp/playwright-mcp-config-${INSTANCE_ID}.json"
+CDP_PORT_FILE="/tmp/playwright-mcp-cdp-port-${INSTANCE_ID}"
+CHROME_PID=""
 
 cleanup() {
-  rm -rf "$USER_DATA_DIR" 2>/dev/null || true
-  rm -f "$CONFIG_FILE" 2>/dev/null || true
+  echo "🧹 Cleaning up Chrome + cloned profile..." >&2
+  [ -n "$CHROME_PID" ] && kill $CHROME_PID 2>/dev/null || true
+  rm -rf "$USER_DATA_DIR" "$CONFIG_FILE" "$CDP_PORT_FILE" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -98,42 +101,76 @@ rm -f "$USER_DATA_DIR/SingletonLock" \
       "$USER_DATA_DIR/SingletonSocket" \
       "$USER_DATA_DIR/SingletonCookie" 2>/dev/null || true
 
-# --- Generate Playwright MCP config ---
-# Playwright MCP will launch Chrome lazily on first tool call using these settings.
-# Config schema: @playwright/mcp config.d.ts → browser.launchOptions is Playwright's BrowserLaunchOptions.
+# --- Launch Chrome ourselves (NOT via Playwright) ---
+# WHY: Playwright's launchPersistentContext adds --use-mock-keychain and
+# --password-store=basic by default. These flags prevent Chrome from accessing
+# the macOS Keychain, which means encrypted cookies can't be decrypted.
+# Result: all saved sessions (Swiggy, Booking.com, etc.) appear logged out.
+# By launching Chrome ourselves, we control ALL flags — no mock keychain.
+
+CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+"$CHROME_BIN" \
+  --remote-debugging-port=0 \
+  --remote-debugging-address=127.0.0.1 \
+  --user-data-dir="$USER_DATA_DIR" \
+  --profile-directory="$PROFILE" \
+  --no-first-run \
+  --no-default-browser-check \
+  --disable-sync \
+  --disable-default-apps \
+  --disable-blink-features=AutomationControlled \
+  --disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching \
+  --disable-infobars \
+  --disable-ipc-flooding-protection \
+  --disable-popup-blocking \
+  --disable-background-timer-throttling \
+  --disable-backgrounding-occluded-windows \
+  --disable-renderer-backgrounding \
+  --noerrdialogs \
+  --disable-gaia-services \
+  about:blank 2>"$CDP_PORT_FILE" &
+
+CHROME_PID=$!
+
+# Parse the CDP port from Chrome's stderr (DevTools listening on ws://127.0.0.1:PORT/...)
+CDP_PORT=""
+for i in $(seq 1 30); do
+  if [ -f "$CDP_PORT_FILE" ]; then
+    CDP_PORT=$(grep -oE 'ws://127\.0\.0\.1:[0-9]+' "$CDP_PORT_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true)
+    if [ -n "$CDP_PORT" ]; then
+      break
+    fi
+  fi
+  sleep 0.3
+done
+
+if [ -z "$CDP_PORT" ]; then
+  echo "❌ Failed to get CDP port from Chrome (PID $CHROME_PID)" >&2
+  exit 1
+fi
+
+echo "🌐 Chrome launched (PID $CHROME_PID, CDP port $CDP_PORT, Profile 3 / rsinghtomar3011@gmail.com)" >&2
+
+# --- Generate Playwright MCP config with CDP endpoint ---
+# Since we launched Chrome ourselves, tell Playwright MCP to CONNECT to it
+# via CDP instead of launching its own browser. This avoids mock keychain.
 cat > "$CONFIG_FILE" <<JSONEOF
 {
   "browser": {
     "browserName": "chromium",
-    "userDataDir": "$USER_DATA_DIR",
-    "launchOptions": {
-      "channel": "chrome",
-      "args": [
-        "--profile-directory=$PROFILE",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "--disable-blink-features=AutomationControlled",
-        "--disable-features=AutomationControlled",
-        "--disable-infobars",
-        "--disable-ipc-flooding-protection",
-        "--disable-popup-blocking",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding"
-      ]
-    }
+    "cdpEndpoint": "http://127.0.0.1:${CDP_PORT}"
   }
 }
 JSONEOF
 
-echo "⏳ Playwright MCP starting (Chrome launches lazily on first tool call)..." >&2
+echo "⏳ Playwright MCP connecting to Chrome via CDP (port $CDP_PORT)..." >&2
 
 # Run Playwright MCP as a foreground process (not exec) so the EXIT trap fires on exit.
 # Uses globally-installed binary — no npm registry lookup, instant startup.
-# --config: our Chrome profile + launch args (Profile 3 / rsinghtomar3011@gmail.com)
+# --cdp-endpoint not needed as it's in the config.
 # --init-script: stealth anti-bot-detection patches (evaluated before any page JS)
 # --output-dir: where screenshots/traces go
-# No --cdp-endpoint → Playwright MCP launches Chrome lazily on first tool call.
 "$PLAYWRIGHT_MCP" \
   --config "$CONFIG_FILE" \
   --init-script "$SCRIPT_DIR/stealth-init.js" \
