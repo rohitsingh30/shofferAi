@@ -343,4 +343,18 @@ After making changes:
 
 ---
 
+## 22. ask_user Rendering as Step Card Instead of Interactive InputPrompt
+
+**What happens:** When the agent calls `ask_user`, the UI shows a grey "Waiting for your input 0/1" progress card with the question text, but NO interactive elements (no address buttons, no text field, no Continue button). The user cannot respond. The task hangs indefinitely.
+
+**Root cause:** `agent.ts` fired `onStepUpdate({ status: 'paused_for_input' })` BEFORE `onInputRequired()`. This sent TWO SSE events: first `step_update` (renders TaskProgress card), then `input_required` (renders InputPrompt). The TaskProgress card dominated the UI, making InputPrompt invisible or inaccessible.
+
+**The fix (2026-03-20):**
+1. Removed `onStepUpdate('paused_for_input')` from both the direct `ask_user` handler (line 790) and auto-conversion path (line 596) in `agent.ts`
+2. Added `setCurrentSteps([])` in ChatInterface when `input_required` arrives — clears any lingering progress cards
+
+**Rule:** `ask_user` should ONLY fire `onInputRequired()`, never `onStepUpdate()`. The InputPrompt component is the interactive UI for user input. TaskProgress is for displaying non-interactive progress. Never mix them.
+
+---
+
 *Last updated: 2026-03-20*
