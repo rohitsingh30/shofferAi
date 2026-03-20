@@ -40,6 +40,13 @@ export class RelayOutbound {
   private shouldReconnect = true;
   private reconnectDelay = 1000;
   private maxReconnectDelay: number;
+  private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private lastDataAt = Date.now();
+
+  /** Ping every 20s to keep connection alive and detect dead sockets */
+  private static readonly HEALTH_CHECK_INTERVAL_MS = 20000;
+  /** If no data received for 45s, consider the connection dead */
+  private static readonly DEAD_CONNECTION_TIMEOUT_MS = 45000;
 
   constructor(chromePool: ChromePool, cloudUrl: string, options: RelayOutboundOptions = {}) {
     this.chromePool = chromePool;
@@ -76,12 +83,15 @@ export class RelayOutbound {
 
       this.ws.on('open', () => {
         this.reconnectDelay = 1000;
+        this.lastDataAt = Date.now();
         logger.info('Connected to Cloud Run relay', { url: this.cloudUrl });
+        this.startHealthCheck();
         resolved = true;
         resolve();
       });
 
       this.ws.on('message', async (data: Buffer) => {
+        this.lastDataAt = Date.now();
         try {
           const msg: RelayMessage = JSON.parse(data.toString());
           await this.handleMessage(msg);
@@ -91,8 +101,14 @@ export class RelayOutbound {
         }
       });
 
+      // Native WebSocket pong frames (response to our ws.ping()) also count as activity
+      this.ws.on('pong', () => {
+        this.lastDataAt = Date.now();
+      });
+
       this.ws.on('close', () => {
         logger.info('Disconnected from Cloud Run relay');
+        this.stopHealthCheck();
         if (this.shouldReconnect) {
           this.scheduleReconnect();
         }

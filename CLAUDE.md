@@ -271,6 +271,16 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 # The operator starts this manually — do NOT attempt to start or health-check it programmatically.
 ```
 
+**How to verify relay is running (if needed):**
+```bash
+# PRIMARY CHECK — if ports 9400-9499 are LISTEN, relay IS alive
+lsof -iTCP -sTCP:LISTEN -P 2>/dev/null | grep -E ":(9[0-4][0-9]{2})"
+# Do NOT trust /tmp/shofferai-relay.log — it may be from a previous run.
+# start-laptop.sh writes to terminal stdout, NOT to that log file.
+```
+
+**After deploying to Cloud Run, wait 30 seconds before E2E testing.** The deploy restarts the container, dropping the laptop's WebSocket. The relay auto-reconnects (1-30s backoff). Testing immediately will fail with "Cannot reach browser agent."
+
 **localhost is NOT for testing.** Only use localhost for rapid CSS/layout iteration. All functional testing (messages, agent flow, scripts) must go through prod.
 
 ## Environment

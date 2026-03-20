@@ -289,4 +289,38 @@ After making changes:
 
 ---
 
+## 19. Misdiagnosing Relay Status from Stale Log Files
+
+**What happens:** Agent reads `/tmp/shofferai-relay.log` to check relay status, sees "Goodbye." or "Shutting down", and concludes the relay is dead. But the current relay was started via `start-laptop.sh` which uses `exec npx tsx` — stdout goes to the **terminal**, not to that log file. The log file is from a previous daemon-mode run. Agent then repeatedly insists the relay is down, frustrating the operator.
+
+**Examples:**
+- Relay PID was alive, ports 9400/9401 LISTENING — but agent read stale log and said "Goodbye means it's dead"
+- Agent ignored `lsof` port evidence in favor of a log file modified 50 minutes ago
+- Agent kept saying "please restart the relay" when it was already running
+
+**How to ACTUALLY check relay status:**
+1. **Primary check:** `lsof -iTCP -sTCP:LISTEN -P 2>/dev/null | grep -E ":(9[0-4][0-9]{2})"` — if ports 9400-9499 are LISTEN, relay IS running
+2. **Process check:** `ps aux | grep "index.ts" | grep -v grep` — look for the Node process
+3. **Do NOT trust** `/tmp/shofferai-relay.log` — it may be from a previous run
+4. The `start-laptop.sh` script writes to terminal stdout, not to a log file
+
+**Rule:** Check LISTENING PORTS first, not log files. If ports 9400-9499 are listening, the relay is alive regardless of what any log file says. Never tell the operator to restart the relay without first checking `lsof`.
+
+---
+
+## 20. Testing E2E Immediately After Cloud Run Deploy (Race Condition)
+
+**What happens:** Agent deploys to Cloud Run, then immediately tests E2E. The deploy kills the old container (dropping the laptop's WebSocket connection). The laptop relay auto-reconnects with exponential backoff (1s → 2s → 4s), but if the test starts before reconnection completes, it fails with "Cannot reach browser agent."
+
+**Examples:**
+- Deployed compiled script changes → tested within 10 seconds → "couldn't reach the browser"
+- Relay was alive but Cloud Run had a fresh RelayBridge with no laptop connection yet
+- Agent blamed the relay when the real cause was deployment timing
+
+**Root cause:** Cloud Run deploy → new container → new `RelayBridge` instance (connected=false) → laptop relay detects close → reconnects with backoff → gap of 1-30 seconds where no laptop is connected.
+
+**Rule:** After deploying to Cloud Run, WAIT at least 30 seconds before running an E2E test. The laptop relay needs time to detect the dropped connection and reconnect to the new container. If the first attempt fails with a relay error, wait 30 seconds and retry once before investigating further.
+
+---
+
 *Last updated: 2026-03-20*
