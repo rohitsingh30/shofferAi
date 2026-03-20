@@ -464,18 +464,10 @@ export class TaskManager {
         args: truncateToolArgs(toolArgs),
       });
 
-      // Don't forward bridge tool calls as progress (Bridge MCP handles those)
-      if (!toolName.includes('bridge') && !toolName.includes('ask_user')
-        && !toolName.includes('request_payment') && !toolName.includes('send_progress')
-        && !toolName.includes('confirm_action')) {
-        this.sendToRelay({
-          id: randomUUID(),
-          type: 'task_progress',
-          taskId,
-          message: this.friendlyToolName(toolName, data.input as Record<string, unknown> || data.arguments as Record<string, unknown>),
-          step: toolName,
-        });
-      }
+      // Tool calls are NOT forwarded to the user chat — they go only to the
+      // MCP log stream above (mcpToolEvents.emit). The user should see only
+      // LLM text messages, ask_user prompts, and confirm_action prompts.
+      // See REPEATING-MISTAKES.md #14.
     } else if (type === 'tool.execution_complete') {
       const toolCallId = data.toolCallId as string || '';
       const success = data.success as boolean;

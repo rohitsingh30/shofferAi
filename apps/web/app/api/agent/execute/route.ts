@@ -125,9 +125,10 @@ export async function POST(request: Request) {
 
           switch (msg.type) {
             case 'task_progress':
-              send('message', { content: msg.message });
-              if (msg.step) {
-                send('step_update', { action: msg.message, status: 'running' });
+              // Only forward LLM text messages (no step field) as chat bubbles.
+              // Tool call progress (has step field) goes only to MCP logs, not to the user.
+              if (!msg.step) {
+                send('message', { content: msg.message });
               }
               break;
 

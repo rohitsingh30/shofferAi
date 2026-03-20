@@ -273,6 +273,7 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 - Dev server on port 3000, relay server on port 8765 (server mode) or outbound to Cloud Run (prod mode), TaskManager bridge always on port 9400
 
 ## Docs
+- `docs/REPEATING-MISTAKES.md` — **READ FIRST** — Known agent anti-patterns and repeating mistakes
 - `docs/PRD.md` — Product requirements document
 - `docs/ARCHITECTURE.md` — Detailed system architecture with Mermaid diagrams
 - `docs/WORKFLOWS.md` — E2E workflow documentation per skill
