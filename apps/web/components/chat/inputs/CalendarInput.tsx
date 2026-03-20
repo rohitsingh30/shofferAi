@@ -337,7 +337,11 @@ export function CalendarInput({
         type="button"
         onClick={handleSubmit}
         disabled={!canSubmit}
-        className="mt-3 w-full rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+        className={`mt-3 w-full rounded-xl px-5 py-2.5 text-sm font-medium transition-all ${
+          canSubmit
+            ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 active:scale-[0.98]'
+            : 'bg-white/[0.04] text-zinc-600 cursor-not-allowed'
+        }`}
       >
         Continue →
       </button>

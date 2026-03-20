@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageBubble, type Message } from './MessageBubble';
 import { TaskProgress, type StepInfo } from './TaskProgress';
+import { ThinkingIndicator } from './ThinkingIndicator';
 import { InputPrompt } from './InputPrompt';
 import { CartSummary, type CartItem } from './CartSummary';
 import { L2PaymentProvider, useL2Payment } from './L2PaymentContext';
@@ -428,17 +429,8 @@ function ChatInterfaceInner() {
               )}
 
               {isLoading && currentSteps.length === 0 && (
-                <div className="flex items-start gap-3.5 animate-fade-in">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-violet-500">
-                    <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div className="typing-indicator flex items-center gap-1.5 pt-2.5">
-                    <span className="h-2 w-2 rounded-full bg-primary/60" />
-                    <span className="h-2 w-2 rounded-full bg-primary/60" />
-                    <span className="h-2 w-2 rounded-full bg-primary/60" />
-                  </div>
+                <div className="animate-fade-in">
+                  <ThinkingIndicator />
                 </div>
               )}
             </div>

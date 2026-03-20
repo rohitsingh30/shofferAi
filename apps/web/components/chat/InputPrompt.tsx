@@ -177,115 +177,123 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
 
   return (
     <div className="flex items-start gap-3.5">
-      {/* Icon */}
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 shadow-md shadow-amber-500/20">
+      {/* Icon — uses violet to match the theme, amber only for OTP */}
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl shadow-md ${
+        inputType === 'otp'
+          ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/20'
+          : inputType === 'confirmation'
+          ? 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-500/20'
+          : 'bg-gradient-to-br from-cyan-500 to-blue-500 shadow-cyan-500/20'
+      }`}>
         {icon}
       </div>
 
       {/* Content */}
-      <div className="flex-1 rounded-2xl rounded-tl-md border border-amber-500/15 bg-amber-500/[0.04] p-4">
-        <p className="mb-3 whitespace-pre-wrap text-sm font-medium leading-relaxed">{cleanQuestion}</p>
+      <div className="flex-1 rounded-2xl rounded-tl-md bg-white/[0.03] ring-1 ring-white/[0.06] overflow-hidden">
+        <div className="p-4">
+          <p className="mb-3 whitespace-pre-wrap text-[14px] font-medium leading-relaxed text-zinc-200">{cleanQuestion}</p>
 
-        {/* Rich input types */}
-        {isRichType(inputType) ? (
-          renderRichInput()
-        ) : inputType === 'choice' && options && options.length > 0 ? (
-          /* Choice: clickable option cards */
-          <div className="space-y-2">
-            {options.map((option, i) => (
+          {/* Rich input types */}
+          {isRichType(inputType) ? (
+            renderRichInput()
+          ) : inputType === 'choice' && options && options.length > 0 ? (
+            /* Choice: clickable option cards */
+            <div className="space-y-1.5">
+              {options.map((option, i) => (
+                <button
+                  key={i}
+                  onClick={() => onSubmit(option)}
+                  className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-left text-sm transition-all duration-200 hover:border-primary/30 hover:bg-primary/[0.06] active:scale-[0.99]"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-xs font-medium text-zinc-400 transition-all group-hover:bg-primary group-hover:text-white group-hover:shadow-lg group-hover:shadow-primary/20">
+                    {i + 1}
+                  </span>
+                  <span className="text-zinc-300 transition-colors group-hover:text-white">
+                    {option}
+                  </span>
+                  <svg className="ml-auto h-4 w-4 text-transparent transition-all group-hover:text-primary/60 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </button>
+              ))}
+              {/* Freetext fallback for choice */}
+              <form onSubmit={handleSubmit} className="mt-3 flex gap-2">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder="Or type something else..."
+                  className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                />
+                <button
+                  type="submit"
+                  disabled={!value.trim()}
+                  className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 disabled:opacity-30"
+                >
+                  Send
+                </button>
+              </form>
+            </div>
+          ) : inputType === 'confirmation' ? (
+            /* Confirmation: Yes / Cancel */
+            <div className="flex gap-2.5">
               <button
-                key={i}
-                onClick={() => onSubmit(option)}
-                className="group flex w-full items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left text-sm transition-all duration-150 hover:border-primary/40 hover:bg-primary/10"
+                onClick={() => onSubmit('yes')}
+                className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white/20 text-xs font-medium text-muted-foreground transition-colors group-hover:border-primary group-hover:bg-primary group-hover:text-white">
-                  {i + 1}
-                </span>
-                <span className="text-foreground/80 transition-colors group-hover:text-foreground">
-                  {option}
-                </span>
-                <svg className="ml-auto h-4 w-4 text-muted-foreground/0 transition-all group-hover:text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
+                ✓ Yes, proceed
               </button>
-            ))}
-            {/* Freetext fallback for choice */}
-            <form onSubmit={handleSubmit} className="mt-3 flex gap-2">
+              <button
+                onClick={() => onSubmit('no')}
+                className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-zinc-200"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : inputType === 'otp' ? (
+            /* OTP: monospace 6-digit input */
+            <form onSubmit={handleSubmit} className="flex items-center gap-3">
+              <input
+                ref={inputRef}
+                type="text"
+                value={value}
+                onChange={(e) => setValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="••••••"
+                className="w-44 rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-3 text-center font-mono text-xl tracking-[0.5em] text-white placeholder:text-zinc-700 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/30"
+                maxLength={6}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+              />
+              <button
+                type="submit"
+                disabled={!value.trim()}
+                className="rounded-xl bg-primary px-5 py-3 text-sm font-medium text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 disabled:opacity-30"
+              >
+                Verify
+              </button>
+            </form>
+          ) : (
+            /* Freetext: standard text input */
+            <form onSubmit={handleSubmit} className="flex gap-2">
               <input
                 ref={inputRef}
                 type="text"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder="Or type something else..."
-                className="flex-1 rounded-lg border border-border bg-input px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Type your response..."
+                className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/30"
               />
               <button
                 type="submit"
                 disabled={!value.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-40"
+                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 disabled:opacity-30"
               >
                 Send
               </button>
             </form>
-          </div>
-        ) : inputType === 'confirmation' ? (
-          /* Confirmation: Yes / Cancel */
-          <div className="flex gap-2">
-            <button
-              onClick={() => onSubmit('yes')}
-              className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20"
-            >
-              Yes, proceed
-            </button>
-            <button
-              onClick={() => onSubmit('no')}
-              className="rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-medium transition-colors hover:bg-white/[0.06]"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : inputType === 'otp' ? (
-          /* OTP: monospace 6-digit input */
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={value}
-              onChange={(e) => setValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
-              className="w-40 rounded-lg border border-border bg-input px-4 py-2.5 text-center font-mono text-lg tracking-[0.4em] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              maxLength={6}
-              autoComplete="one-time-code"
-              inputMode="numeric"
-            />
-            <button
-              type="submit"
-              disabled={!value.trim()}
-              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-40"
-            >
-              Verify
-            </button>
-          </form>
-        ) : (
-          /* Freetext: standard text input */
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Type your response..."
-              className="flex-1 rounded-lg border border-border bg-input px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            <button
-              type="submit"
-              disabled={!value.trim()}
-              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-40"
-            >
-              Send
-            </button>
-          </form>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
