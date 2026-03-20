@@ -231,12 +231,10 @@ For each skill (sequential):
 
 ### Step 0: Verify prerequisites
 
-```bash
-# TaskManager bridge (always running in both outbound and server modes)
-curl -s http://localhost:9400 2>/dev/null && echo "✅ Relay running" || echo "❌ Relay not running — run /start-laptop"
-```
+The operator starts the laptop relay manually — **do NOT attempt to start or health-check it programmatically**.
+Just confirm with the user that it's running before proceeding.
 
-If not running, use `/start-laptop` first.
+If not running, ask the user to run `./apps/playwright/scripts/start-laptop.sh` in a separate terminal.
 
 ### Step 1: Get the skill queue
 
@@ -315,12 +313,8 @@ Pick ONE existing skill and improve it by testing E2E through the **real Shoffer
 
 ### Step 0: Prerequisites
 
-**Laptop relay MUST be running.** If not, use `/start-laptop` first.
-
-```bash
-# Verify relay is up (TaskManager bridge on port 9400, always active in both modes)
-curl -s http://localhost:9400 2>/dev/null && echo "✅ Relay running" || echo "❌ Relay not running — run /start-laptop"
-```
+**Laptop relay MUST be running.** The operator starts it manually — do NOT attempt to start or health-check it programmatically.
+Ask the user to confirm the relay is running before proceeding.
 
 ### Step 1: Pick a Skill
 

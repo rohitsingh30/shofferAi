@@ -81,7 +81,7 @@ Everything browser-related. **This is where the actual web tasks happen.**
 | **Playwright MCP** | 20+ browser tools (click, type, navigate, snapshot...) | Started by `start-laptop.sh` |
 | **RelayOutbound** | Connects OUT to Cloud Run via WSS | Started by `start-laptop.sh` (when `RELAY_CLOUD_URL` is set) |
 | **RelayServer** | Accepts connections from local dev (port 8765) | Started by `start-laptop.sh` (when `RELAY_CLOUD_URL` is NOT set) |
-| **TaskManager** | Bridge WS for Copilot CLI tasks (port 9400) | Always started by `start-laptop.sh` (both modes) |
+| **TaskManager** | Bridge WS for Copilot CLI tasks (dynamic port 9400-9499) | Always started by `start-laptop.sh` (both modes) |
 
 > **No manual Chrome launch needed.** ChromePool handles everything — it clones the Chrome-Debug profile, launches Chrome with an OS-assigned port, and connects Playwright MCP automatically.
 
@@ -122,8 +122,8 @@ sequenceDiagram
 
 | Env Var | Mode | Who Connects | Use Case |
 |---------|------|-------------|----------|
-| `RELAY_CLOUD_URL` is set | **Outbound** | Laptop → Cloud Run (WSS) | **Production** (no port 8765, TaskManager on :9400) |
-| `RELAY_CLOUD_URL` is NOT set | **Server** | Cloud Run → Laptop (WS :8765) | **Local dev** (TaskManager also on :9400) |
+| `RELAY_CLOUD_URL` is set | **Outbound** | Laptop → Cloud Run (WSS) | **Production** (no port 8765, TaskManager on dynamic port) |
+| `RELAY_CLOUD_URL` is NOT set | **Server** | Cloud Run → Laptop (WS :8765) | **Local dev** (TaskManager on dynamic port) |
 
 ---
 
@@ -140,7 +140,7 @@ graph TD
     B -->|"No"| D["RelayServer listens<br/>on ws://localhost:8765"]
     C --> E["ChromePool bootstraps<br/>(1 warm slot, rest on demand)"]
     D --> E
-    E --> G["TaskManager bridge<br/>on port 9400 (always)"]
+    E --> G["TaskManager bridge<br/>on dynamic port (9400-9499)"]
     G --> F["✅ Cloud Run logs:<br/>'laptop connected, N tools'"]
     
     style A fill:#e8f5e9,stroke:#2e7d32
@@ -171,7 +171,7 @@ graph TD
 # Terminal 1: Start laptop relay (server mode — no RELAY_CLOUD_URL)
 ./apps/playwright/scripts/start-laptop.sh
 # → RelayServer listens on ws://localhost:8765
-# → TaskManager bridge always on port 9400
+# → TaskManager bridge on dynamic port (9400-9499, printed in logs)
 
 # Terminal 2: Start Next.js dev server
 cd apps/web && npx next dev
@@ -270,7 +270,7 @@ ChromePool automatically clones the Chrome-Debug profile directory for each Chro
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Terminal 1: ./start-laptop.sh       → RelayServer :8765     │
-│             (TaskManager bridge always on :9400)             │
+│             (TaskManager bridge on dynamic port 9400-9499)    │
 │  Terminal 2: cd apps/web && npx next dev → Next.js :3000     │
 │                                                              │
 │  No RELAY_CLOUD_URL needed for local dev                     │

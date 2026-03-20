@@ -116,7 +116,7 @@ graph TB
 **Two Relay Modes:**
 - **Dev** (no `RELAY_CLOUD_URL`): `RelayServer` listens on `ws://localhost:8765`, Cloud Run's `RemoteMCPHost` connects OUT to it
 - **Prod** (`RELAY_CLOUD_URL` set): `RelayOutbound` connects directly to Cloud Run via WSS — **no tunnel needed**, no port 8765
-- **Both modes**: `TaskManager` bridge WS always listens on port **9400** (range 9400-9499)
+- **Both modes**: `TaskManager` bridge WS listens on a dynamic port (first available in range 9400-9499). Port is printed in relay startup logs. **Do not hardcode or curl-check this port.**
 
 **LLM's role**: Chat with user, reason about steps, call MCP tools via relay. The LLM NEVER touches the browser directly — it sends tool calls that get relayed to the laptop's Playwright MCP.
 
@@ -197,7 +197,7 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 - **Auto-ask_user**: If the LLM outputs a question as text instead of calling the `ask_user` tool, the agent auto-converts it to an interactive input prompt
 - **Payment before booking**: Agent pauses via `PauseResumeManager`, L2 panel collects Razorpay payment, agent resumes
 - **SSE streaming**: Real-time agent progress updates to the UI — internal tool calls are filtered by `isInternalToolLabel()` (three layers: task-manager → execute/route → frontend)
-- **MCP tool log stream**: Tool execution events go to `mcpToolEvents` → `http://localhost:9401/logs/mcp` (SSE), not to the user chat
+- **MCP tool log stream**: Tool execution events go to `mcpToolEvents` → MCP log stream (dynamic port, printed in relay logs), not to the user chat
 - **Direct relay**: Laptop connects OUT to Cloud Run via WSS (`RelayOutbound`) — no Cloudflare Tunnel needed
 
 ## Playwright MCP — Chrome Launching
@@ -258,10 +258,10 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 - **NEVER open target websites (swiggy.com, booking.com, etc.) directly** — always go through the chat UI so the full pipeline is tested: User → Chat → Agent → Relay → Chrome → Target Site
 - The agent handles login on target sites via Chrome Profile 3 (signed-in sessions)
 
-**Before testing, ensure laptop relay is running:**
+**Before testing, ensure laptop relay is running** (operator starts it manually):
 ```bash
 ./apps/playwright/scripts/start-laptop.sh
-# Verify: curl -s http://localhost:9400 (TaskManager bridge, always active)
+# The operator starts this manually — do NOT attempt to start or health-check it programmatically.
 ```
 
 **UI Development**: Use `localhost:3000` only for frontend iteration. After UI changes, deploy and verify on prod.
@@ -272,7 +272,7 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 - `AZURE_OPENAI_API_KEY` — Azure OpenAI API key
 - `LLM_MODEL` — Azure deployment name (default `gpt-5.1-chat`)
 - `RELAY_MODE=local` for dev, `RELAY_MODE=cloud` for production
-- Dev server on port 3000, relay server on port 8765 (server mode) or outbound to Cloud Run (prod mode), TaskManager bridge always on port 9400
+- Dev server on port 3000, relay server on port 8765 (server mode) or outbound to Cloud Run (prod mode). TaskManager bridge uses a dynamic port (9400-9499 range, printed in logs).
 
 ## Docs
 - `docs/REPEATING-MISTAKES.md` — **READ FIRST** — Known agent anti-patterns and repeating mistakes

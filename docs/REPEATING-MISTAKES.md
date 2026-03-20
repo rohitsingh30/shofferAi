@@ -27,7 +27,7 @@
 - `TaskManager` required a hardcoded Chrome port instead of using `playwright-mcp-with-chrome.sh`
 - User repeatedly asked "why there still 3?" / "why we still launching 3 ports?"
 
-**Rule:** Always use `--remote-debugging-port=0` and parse the actual port from stderr. Never hardcode port numbers. The only fixed ports are: dev relay 8765, TaskManager bridge 9400.
+**Rule:** Always use `--remote-debugging-port=0` and parse the actual port from stderr. Never hardcode port numbers. The only fixed port is dev relay 8765. TaskManager bridge and MCP log ports are dynamic (9400-9499 range, printed in relay startup logs).
 
 ---
 

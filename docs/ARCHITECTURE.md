@@ -43,7 +43,7 @@ graph TB
     subgraph LAPTOP["💻 Operator Laptop"]
         direction TB
         RS["📡 RelayServer / RelayOutbound<br/>Port 8765 (dev) or outbound WSS (prod)"]
-        TM["📋 TaskManager<br/>Bridge WS Port 9400"]
+        TM["📋 TaskManager<br/>Bridge WS (dynamic port)"]
         MCP["🎭 MCPHost<br/>Playwright MCP (stdio)"]
         POOL["🏊 ChromePool<br/>Tab Management"]
         CHROME["🌐 Chrome Debug<br/>CDP Port 9222<br/>Profile 3 (signed-in)"]
@@ -90,7 +90,7 @@ graph TB
     
     subgraph ALWAYS["📋 Always Running"]
         direction TB
-        TM["TaskManager bridge<br/>WS on port 9400"]
+        TM["TaskManager bridge<br/>WS on dynamic port (9400-9499)"]
     end
     
     subgraph PROTO["📋 Shared Relay Protocol"]
@@ -106,7 +106,7 @@ graph TB
 |------|--------------|-------|----------|
 | **Dev** (no `RELAY_CLOUD_URL`) | Cloud connects OUT | `RemoteMCPHost` (`apps/web/lib/relay-client.ts`) | Local development, ws://localhost:8765 |
 | **Prod** (`RELAY_CLOUD_URL` set) | Laptop connects OUT | `RelayOutbound` (`apps/playwright/src/relay-outbound.ts`) | Production, no Cloudflare Tunnel needed |
-| **Both modes** | TaskManager bridge | `TaskManager` (`apps/playwright/src/task-manager.ts`) | Always on port 9400 (range 9400-9499) |
+| **Both modes** | TaskManager bridge | `TaskManager` (`apps/playwright/src/task-manager.ts`) | Dynamic port (first available in 9400-9499 range, printed in logs) |
 
 **Shared Protocol** (defined in `packages/shared/src/relay.ts`):
 - `ToolCallRequest` / `ToolCallResponse` — UUID-correlated tool execution
@@ -558,8 +558,8 @@ shofferai/
 │       │   ├── mcp-host.ts                ← Local MCPHost (Playwright MCP stdio)
 │       │   ├── relay-server.ts            ← RelayServer (WS server on port 8765, dev mode only)
 │       │   ├── relay-outbound.ts         ← RelayOutbound (connects to Cloud Run, prod mode)
-│       │   ├── task-manager.ts           ← TaskManager (bridge WS on port 9400, isInternalToolLabel filter)
-│       │   └── chrome-pool.ts            ← ChromePool + mcpToolEvents (tool log stream on port 9401)
+│       │   ├── task-manager.ts           ← TaskManager (bridge WS on dynamic port 9400-9499, isInternalToolLabel filter)
+│       │   └── chrome-pool.ts            ← ChromePool + mcpToolEvents (tool log stream on dynamic port)
 │       └── scripts/
 │           ├── start-debug-chrome.sh      ← Launch Chrome Debug with Profile 3
 │           └── setup-chrome-profile.sh    ← Sync Chrome profile sessions
@@ -631,7 +631,7 @@ shofferai/
 │                                                           │
 │  Outbound mode: RelayOutbound → wss://Cloud Run (prod)     │
 │  Server mode:   RelayServer on :8765 (dev only)            │
-│  TaskManager:   Bridge WS on :9400 (always active)         │
+│  TaskManager:   Bridge WS on dynamic port (9400-9499)       │
 │  Chrome:        OS-assigned ephemeral port via ChromePool   │
 │  ChromePool ← Per-task tab isolation                      │
 │                                                           │
@@ -713,7 +713,7 @@ LaunchAgent (com.shofferai.chrome-debug) starts on login:
 | **Chrome Debug** | ✅ Running | OS-assigned ephemeral CDP port, Profile 3 (signed-in accounts) |
 | **RelayServer** | Conditional | Port 8765, only in dev/server mode (no `RELAY_CLOUD_URL`) |
 | **RelayOutbound** | Conditional | Connects to Cloud Run WSS, only in prod/outbound mode (`RELAY_CLOUD_URL` set) |
-| **TaskManager** | ✅ Running | Bridge WS on port 9400 (always active in both modes) |
+| **TaskManager** | ✅ Running | Bridge WS on dynamic port (9400-9499, printed in relay startup logs) |
 | **MCPHost** | ✅ Running | Playwright MCP via stdio, connects to Chrome CDP |
 | **ChromePool** | ✅ Running | Per-task tab isolation |
 | **Cloudflare Tunnel** | Manual | Must be started manually for prod connectivity |

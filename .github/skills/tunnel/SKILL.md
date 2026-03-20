@@ -22,7 +22,7 @@ npm run laptop
 Use this when Cloud Run needs to connect OUT to your laptop (old `RELAY_MODE=local` pattern, or for testing).
 
 ### Prerequisites
-- Relay must be running in server mode (no `RELAY_CLOUD_URL`): `curl localhost:8765` should return pool status, `curl localhost:9400` for TaskManager bridge
+- Relay must be running in server mode (no `RELAY_CLOUD_URL`): `curl localhost:8765` should return pool status. TaskManager bridge runs on a dynamic port (check relay startup logs).
 - If not, run `/start-laptop` (Option B) first
 
 ### Step 1: Start Cloudflare Tunnel

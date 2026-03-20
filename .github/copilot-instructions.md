@@ -98,7 +98,7 @@ Only natural language messages reach the chat UI. Internal tool labels are filte
 - **Layer 2** (`execute/route.ts`): Defense-in-depth filter on `task_progress` before SSE
 - **Layer 3** (`ChatInterface.tsx`): Frontend hides `step_update` with `status: 'running'`
 
-Tool execution events go to `mcpToolEvents` → MCP log stream (port 9401), not user chat.
+Tool execution events go to `mcpToolEvents` → MCP log stream (dynamic port, printed in relay logs), not user chat.
 
 ### Relay message flow
 ```
@@ -149,7 +149,7 @@ User credentials are AES-256-GCM encrypted at rest. `CredentialInjector` decrypt
 - `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` — LLM access
 - `LLM_MODEL` — Azure deployment name (default `gpt-5.1-chat`)
 - `RELAY_MODE=local` for dev, `RELAY_MODE=cloud` for production
-- Ports: dev server 3000, relay 8765 (dev), TaskManager bridge 9400, MCP logs 9401
+- Ports: dev server 3000, relay 8765 (dev). TaskManager bridge and MCP logs use dynamic ports (9400-9499 range, printed in relay startup logs).
 
 ## Reference Docs
 

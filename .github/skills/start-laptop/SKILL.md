@@ -48,16 +48,15 @@ Unset `RELAY_CLOUD_URL` before running start-laptop.sh:
 unset RELAY_CLOUD_URL
 ./apps/playwright/scripts/start-laptop.sh
 # → RelayServer listens on ws://localhost:8765 (server mode only)
-# → TaskManager bridge always on port 9400
+# → TaskManager bridge on dynamic port (9400-9499, printed in logs)
 # Then: cd apps/web && npx next dev
 ```
 
 ### Step 3: Verify
 
-```bash
-# Check relay health (TaskManager bridge — always active in both modes)
-curl -s http://localhost:9400 2>/dev/null && echo "✅ Relay running (TaskManager bridge on :9400)" || echo "❌ Relay not running"
+The operator verifies by checking the relay startup logs in the terminal where the script was launched. Bridge and MCP log ports are dynamic (9400-9499 range) and printed in the startup output.
 
+```bash
 # Server mode only (dev without RELAY_CLOUD_URL): RelayServer on port 8765
 curl -s http://localhost:8765 2>/dev/null | python3 -m json.tool && echo "(server mode)" || true
 
@@ -75,7 +74,7 @@ Cloud URL:   wss://... | N/A (local)
 Pool:        lazy (max N slots, M active)
 Tools:       22 Playwright MCP tools available
 Connection:  ✓ Connected to Cloud Run | ✓ Listening on :8765 (server mode)
-TaskManager: ✓ Bridge WS on :9400
+TaskManager: ✓ Bridge WS on :<dynamic port>
 ──────────────────────────────────────
 ```
 

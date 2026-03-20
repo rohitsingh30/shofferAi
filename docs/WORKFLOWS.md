@@ -343,7 +343,7 @@ Internal tool calls and status labels are **filtered out** before reaching the c
 | `Browser: <toolname>` | `Browser: report_intent` | `logger.info` in relay terminal |
 | Raw tool names | `browser_navigate`, `mcp__playwright__browser_click` | `logger.info` in relay terminal |
 | Status labels | `Agent starting...`, `Thinking...` | `logger.info` in relay terminal |
-| Tool execution events | `assistant.tool_call`, `tool.execution_start` | `mcpToolEvents` → `http://localhost:9401/logs/mcp` (SSE) |
+| Tool execution events | `assistant.tool_call`, `tool.execution_start` | `mcpToolEvents` → MCP log stream (dynamic port, printed in relay logs) |
 
 **Three-layer filtering** prevents internal details from reaching users:
 1. **task-manager.ts**: `isInternalToolLabel()` filters `assistant.message` events at the source

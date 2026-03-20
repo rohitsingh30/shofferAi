@@ -13,8 +13,9 @@ Run ALL of these checks and report a single status table:
 
 ### 1. Laptop Relay
 ```bash
-# TaskManager bridge (always active in both outbound and server modes)
-curl -s http://localhost:9400 2>/dev/null && echo "RELAY: ✅ Running (TaskManager bridge on :9400)" || echo "RELAY: ❌ Not running — run /start-laptop"
+# The operator starts the relay manually. Do NOT try to health-check dynamic ports.
+# Just ask the user to confirm it's running, or check relay startup logs in their terminal.
+echo "RELAY: Ask operator to confirm relay is running (started via start-laptop.sh)"
 
 # Server mode only (dev without RELAY_CLOUD_URL)
 curl -s http://localhost:8765 2>/dev/null | python3 -m json.tool && echo "(RelayServer — server mode)" || true
