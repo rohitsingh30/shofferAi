@@ -22,16 +22,6 @@ interface AddressInputProps {
 const ICON_MAP: Record<string, string> = { Home: '🏠', Office: '🏢', Other: '📍' };
 const LABEL_PRESETS = ['Home', 'Office', 'Other'];
 
-// Indian states list for autofill fallback
-const INDIAN_STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Delhi', 'Chandigarh', 'Puducherry', 'Jammu and Kashmir', 'Ladakh',
-];
-
 async function lookupPincode(pincode: string): Promise<{ city: string; state: string } | null> {
   try {
     const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
@@ -97,7 +87,6 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
   const [label, setLabel] = useState('');
   const [flatNo, setFlatNo] = useState('');
   const [line1, setLine1] = useState('');
-  const [line2, setLine2] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
@@ -131,17 +120,16 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
   const handleSubmit = useCallback(() => {
     if (mode === 'saved' && selectedIdx !== null && saved[selectedIdx]) {
       onSubmit(JSON.stringify(saved[selectedIdx]));
-    } else if (mode === 'new' && line1.trim() && city.trim() && pincode.trim()) {
+    } else if (mode === 'new' && line1.trim() && pincode.trim()) {
       const addressObj = {
         label: label.trim() || 'Custom',
         flatNo: flatNo.trim() || undefined,
         line1: line1.trim(),
-        line2: line2.trim() || undefined,
         city: city.trim(),
         state: state.trim(),
         pincode: pincode.trim(),
         contactNumber: contactNumber.trim() || undefined,
-        address: [flatNo.trim(), line1.trim(), line2.trim(), city.trim(), state.trim(), pincode.trim()]
+        address: [flatNo.trim(), line1.trim(), city.trim(), state.trim(), pincode.trim()]
           .filter(Boolean)
           .join(', '),
       };
@@ -149,11 +137,11 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
       // Auto-save in background
       saveAddressToProfile(addressObj);
     }
-  }, [mode, selectedIdx, saved, label, flatNo, line1, line2, city, state, pincode, contactNumber, onSubmit]);
+  }, [mode, selectedIdx, saved, label, flatNo, line1, city, state, pincode, contactNumber, onSubmit]);
 
   const canSubmit =
     (mode === 'saved' && selectedIdx !== null) ||
-    (mode === 'new' && line1.trim() && city.trim() && pincode.trim());
+    (mode === 'new' && line1.trim() && pincode.trim());
 
   const inputClass =
     'w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none focus:border-primary/60 transition-colors';
@@ -254,89 +242,48 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
           {/* Address Line 1 */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-white/60">
-              Address Line 1 <span className="text-destructive">*</span>
+              Address <span className="text-destructive">*</span>
             </label>
             <input
               type="text"
-              placeholder="Street, building, society name"
+              placeholder="Street, building, society, area, landmark"
               value={line1}
               onChange={(e) => { setLine1(e.target.value); setMode('new'); }}
               className={inputClass}
             />
           </div>
 
-          {/* Address Line 2 */}
+          {/* Pincode */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/60">Address Line 2</label>
-            <input
-              type="text"
-              placeholder="Area, landmark (optional)"
-              value={line2}
-              onChange={(e) => { setLine2(e.target.value); setMode('new'); }}
-              className={inputClass}
-            />
-          </div>
-
-          {/* Pincode + City row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-white/60">
-                Pincode <span className="text-destructive">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="6-digit pincode"
-                  value={pincode}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                    setPincode(val);
-                    setMode('new');
-                  }}
-                  inputMode="numeric"
-                  maxLength={6}
-                  className={inputClass}
-                />
-                {pincodeLoading && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">
-                    ⏳
-                  </span>
-                )}
-              </div>
-              {pincodeError && (
-                <p className="mt-1 text-xs text-amber-400">{pincodeError}</p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-white/60">
-                City <span className="text-destructive">*</span>
-              </label>
+            <label className="mb-1.5 block text-xs font-medium text-white/60">
+              Pincode <span className="text-destructive">*</span>
+            </label>
+            <div className="relative">
               <input
                 type="text"
-                placeholder={pincodeLoading ? 'Auto-filling…' : 'City / District'}
-                value={city}
-                onChange={(e) => { setCity(e.target.value); setMode('new'); }}
+                placeholder="6-digit pincode"
+                value={pincode}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setPincode(val);
+                  setMode('new');
+                }}
+                inputMode="numeric"
+                maxLength={6}
                 className={inputClass}
               />
+              {pincodeLoading && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">
+                  ⏳
+                </span>
+              )}
             </div>
-          </div>
-
-          {/* State */}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/60">State</label>
-            <input
-              type="text"
-              placeholder={pincodeLoading ? 'Auto-filling…' : 'State'}
-              value={state}
-              onChange={(e) => { setState(e.target.value); setMode('new'); }}
-              list="state-suggestions"
-              className={inputClass}
-            />
-            <datalist id="state-suggestions">
-              {INDIAN_STATES.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
+            {pincodeError && (
+              <p className="mt-1 text-xs text-amber-400">{pincodeError}</p>
+            )}
+            {city && !pincodeLoading && (
+              <p className="mt-1 text-xs text-white/40">{[city, state].filter(Boolean).join(', ')}</p>
+            )}
           </div>
 
           {/* Contact Number */}
