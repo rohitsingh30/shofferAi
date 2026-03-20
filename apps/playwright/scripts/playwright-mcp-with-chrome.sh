@@ -1,35 +1,38 @@
 #!/bin/bash
-# playwright-mcp-with-chrome.sh — Lazy Playwright MCP launcher
+# playwright-mcp-with-chrome.sh — Singleton Playwright MCP launcher
 #
-# LAZY LAUNCH: Chrome is NOT started on script startup. Instead, Playwright MCP
-# launches Chrome on-demand when the first tool call arrives. This is critical
-# because Copilot CLI spawns 2 MCP server instances from .mcp.json — with eager
-# launch we'd get 2 Chrome windows, but only 1 is ever used. With lazy launch,
-# only the instance that receives tool calls opens Chrome.
+# SINGLETON CHROME: Only ONE Chrome instance is shared by ALL MCP server
+# processes. Copilot CLI spawns 2 MCP servers from .mcp.json, and the user
+# may have multiple CLI sessions open — all share a single Chrome window.
 #
 # How it works:
-#   1. Resolve globally-installed playwright-mcp binary (no npx, no network)
-#   2. Clean up any orphaned Chrome-Debug clones from previous crashes
-#   3. Selective copy of Chrome-Debug session data (~26MB, <1s vs 13s full clone)
-#   4. Remove stale lock files from the copy
-#   5. Generate a Playwright MCP config JSON with Chrome launch options
-#   6. Start Playwright MCP with --config (no --cdp-endpoint → lazy browser launch)
-#   7. Playwright MCP launches Chrome only on first tool call
-#   8. On exit, clean up the copied dir and temp config
+#   1. Acquire atomic lock (mkdir — atomic on all filesystems)
+#   2. Check if singleton Chrome is already running (PID file + kill -0)
+#   3. If not running: selective-copy profile, launch Chrome, write PID/port
+#   4. If already running: read existing CDP port, skip Chrome launch
+#   5. Register self as client (reference counting), release lock
+#   6. Start Playwright MCP connected to shared Chrome via CDP
+#   7. On exit: unregister; if last client, kill Chrome + clean up
 #
-# Selective copy preserves all signed-in sessions (Cookies, Local Storage,
-# Preferences, etc.) while skipping large caches Chrome regenerates on its own
-# (Service Worker, IndexedDB, GPUCache — saves ~6.8GB → 26MB).
-#
-# IMPORTANT: Uses globally-installed playwright-mcp binary (not npx @latest)
-# to eliminate npm registry lookups and avoid slow/failed startups.
-# Update with: npm install -g @playwright/mcp@<version>
+# Chrome is launched manually (not by Playwright MCP) to avoid the
+# --use-mock-keychain flag that prevents macOS Keychain cookie decryption.
 #
 # Called by .mcp.json — no manual Chrome launch needed.
 
 set -euo pipefail
 
-# --- Resolve playwright-mcp binary (global install, no npx) ---
+# ─── Singleton state ─────────────────────────────────────────────────
+SINGLETON_DIR="/tmp/shofferai-chrome-singleton"
+LOCK_DIR="${SINGLETON_DIR}/.lock"
+PID_FILE="${SINGLETON_DIR}/chrome.pid"
+PORT_FILE="${SINGLETON_DIR}/cdp.port"
+PROFILE_DIR="${SINGLETON_DIR}/profile"
+CLIENTS_DIR="${SINGLETON_DIR}/clients"
+CONFIG_FILE="/tmp/playwright-mcp-config-$$.json"
+
+mkdir -p "$SINGLETON_DIR" "$CLIENTS_DIR"
+
+# ─── Resolve playwright-mcp binary (global install, no npx) ─────────
 PLAYWRIGHT_MCP=""
 if command -v playwright-mcp >/dev/null 2>&1; then
   PLAYWRIGHT_MCP="$(command -v playwright-mcp)"
@@ -41,120 +44,189 @@ fi
 
 if [ -z "$PLAYWRIGHT_MCP" ]; then
   echo "❌ playwright-mcp not found! Install with: npm install -g @playwright/mcp" >&2
-  echo "   Then restart the CLI session." >&2
   exit 1
 fi
 
-PLAYWRIGHT_MCP_VERSION="$("$PLAYWRIGHT_MCP" --version 2>&1 || echo 'unknown')"
-echo "🎭 playwright-mcp $PLAYWRIGHT_MCP_VERSION" >&2
+echo "🎭 playwright-mcp $("$PLAYWRIGHT_MCP" --version 2>&1 || echo 'unknown')" >&2
 
 PROFILE="Profile 3"
 BASE_USER_DATA_DIR="$HOME/Library/Application Support/Google/Chrome-Debug"
-INSTANCE_ID="mcp-$$-$(date +%s)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+I_LAUNCHED_CHROME=false
 
-# --- Clean up orphaned Chrome-Debug clones from previous crashes (>1 hour old) ---
-find "$HOME/Library/Application Support/Google" -maxdepth 1 -name "Chrome-Debug-mcp-*" -type d -mmin +60 2>/dev/null | while read -r stale_dir; do
-  echo "🧹 Removing stale clone: $(basename "$stale_dir")" >&2
-  rm -rf "$stale_dir" 2>/dev/null || true
-done
+# ─── Lock helpers (atomic mkdir) ─────────────────────────────────────
+acquire_lock() {
+  local attempts=0
+  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    sleep 0.2
+    attempts=$((attempts + 1))
+    if [ $attempts -gt 50 ]; then
+      echo "⚠️  Force-clearing stale lock" >&2
+      rm -rf "$LOCK_DIR"
+      mkdir "$LOCK_DIR" 2>/dev/null || true
+      break
+    fi
+  done
+}
 
-# --- Selective copy of Chrome profile (only session-critical files) ---
-# Full APFS clone of 6.8GB Chrome-Debug takes ~13s. Selective copy of only
-# the files needed for signed-in sessions takes <1s (~26MB).
-# Chrome regenerates caches (Service Worker, IndexedDB, GPUCache, etc.) on its own.
-USER_DATA_DIR="${BASE_USER_DATA_DIR}-${INSTANCE_ID}"
-CONFIG_FILE="/tmp/playwright-mcp-config-${INSTANCE_ID}.json"
-CDP_PORT_FILE="/tmp/playwright-mcp-cdp-port-${INSTANCE_ID}"
-CHROME_PID=""
+release_lock() {
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
 
+# ─── Client registration (reference counting) ────────────────────────
+register_client() { echo "$$" > "$CLIENTS_DIR/$$"; }
+unregister_client() { rm -f "$CLIENTS_DIR/$$"; }
+
+count_live_clients() {
+  local count=0
+  for f in "$CLIENTS_DIR"/*; do
+    [ -f "$f" ] || continue
+    local pid
+    pid=$(cat "$f" 2>/dev/null) || continue
+    if kill -0 "$pid" 2>/dev/null; then
+      count=$((count + 1))
+    else
+      rm -f "$f"
+    fi
+  done
+  echo "$count"
+}
+
+# ─── Cleanup on exit ─────────────────────────────────────────────────
 cleanup() {
-  echo "🧹 Cleaning up Chrome + cloned profile..." >&2
-  [ -n "$CHROME_PID" ] && kill $CHROME_PID 2>/dev/null || true
-  rm -rf "$USER_DATA_DIR" "$CONFIG_FILE" "$CDP_PORT_FILE" 2>/dev/null || true
+  unregister_client
+  rm -f "$CONFIG_FILE"
+
+  local live
+  live=$(count_live_clients)
+  if [ "$live" -eq 0 ] && [ -f "$PID_FILE" ]; then
+    local chrome_pid
+    chrome_pid=$(cat "$PID_FILE" 2>/dev/null) || true
+    echo "🧹 Last client — killing Chrome (PID ${chrome_pid:-?})" >&2
+    [ -n "$chrome_pid" ] && kill "$chrome_pid" 2>/dev/null || true
+    rm -rf "$SINGLETON_DIR"
+  fi
 }
 trap cleanup EXIT INT TERM
 
-echo "📋 Copying Chrome session data → ${INSTANCE_ID} (~26MB selective copy)..." >&2
-mkdir -p "$USER_DATA_DIR/$PROFILE"
-
-# Top-level: Local State has the encryption key reference for cookies
-cp "$BASE_USER_DATA_DIR/Local State" "$USER_DATA_DIR/" 2>/dev/null || true
-cp "$BASE_USER_DATA_DIR/First Run" "$USER_DATA_DIR/" 2>/dev/null || true
-
-# Profile 3: copy everything EXCEPT large regeneratable caches
-rsync -a \
-  --exclude='Service Worker' \
-  --exclude='IndexedDB' \
-  --exclude='GPUCache' \
-  --exclude='DawnWebGPUCache' \
-  --exclude='DawnGraphiteCache' \
-  --exclude='DawnWebGPUBlobCache' \
-  --exclude='Code Cache' \
-  --exclude='Cache' \
-  --exclude='ScriptCache' \
-  --exclude='blob_storage' \
-  "$BASE_USER_DATA_DIR/$PROFILE/" "$USER_DATA_DIR/$PROFILE/"
-
-# Remove lock files so Chrome doesn't think another instance owns the profile
-rm -f "$USER_DATA_DIR/SingletonLock" \
-      "$USER_DATA_DIR/SingletonSocket" \
-      "$USER_DATA_DIR/SingletonCookie" 2>/dev/null || true
-
-# --- Launch Chrome ourselves (NOT via Playwright) ---
-# WHY: Playwright's launchPersistentContext adds --use-mock-keychain and
-# --password-store=basic by default. These flags prevent Chrome from accessing
-# the macOS Keychain, which means encrypted cookies can't be decrypted.
-# Result: all saved sessions (Swiggy, Booking.com, etc.) appear logged out.
-# By launching Chrome ourselves, we control ALL flags — no mock keychain.
-
-CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-
-"$CHROME_BIN" \
-  --remote-debugging-port=0 \
-  --remote-debugging-address=127.0.0.1 \
-  --user-data-dir="$USER_DATA_DIR" \
-  --profile-directory="$PROFILE" \
-  --no-first-run \
-  --no-default-browser-check \
-  --disable-sync \
-  --disable-default-apps \
-  --disable-blink-features=AutomationControlled \
-  --disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching \
-  --disable-infobars \
-  --disable-ipc-flooding-protection \
-  --disable-popup-blocking \
-  --disable-background-timer-throttling \
-  --disable-backgrounding-occluded-windows \
-  --disable-renderer-backgrounding \
-  --noerrdialogs \
-  --disable-gaia-services \
-  about:blank 2>"$CDP_PORT_FILE" &
-
-CHROME_PID=$!
-
-# Parse the CDP port from Chrome's stderr (DevTools listening on ws://127.0.0.1:PORT/...)
-CDP_PORT=""
-for i in $(seq 1 30); do
-  if [ -f "$CDP_PORT_FILE" ]; then
-    CDP_PORT=$(grep -oE 'ws://127\.0\.0\.1:[0-9]+' "$CDP_PORT_FILE" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true)
-    if [ -n "$CDP_PORT" ]; then
-      break
-    fi
-  fi
-  sleep 0.3
+# ─── Remove orphaned Chrome-Debug clones from old per-instance approach ─
+find "$HOME/Library/Application Support/Google" -maxdepth 1 -name "Chrome-Debug-mcp-*" -type d 2>/dev/null | while read -r stale_dir; do
+  echo "🧹 Removing old clone: $(basename "$stale_dir")" >&2
+  rm -rf "$stale_dir" 2>/dev/null || true
 done
 
-if [ -z "$CDP_PORT" ]; then
-  echo "❌ Failed to get CDP port from Chrome (PID $CHROME_PID)" >&2
-  exit 1
+# ─── Acquire lock & check singleton Chrome ────────────────────────────
+acquire_lock
+
+CDP_PORT=""
+CHROME_ALIVE=false
+
+if [ -f "$PID_FILE" ] && [ -f "$PORT_FILE" ]; then
+  STORED_PID=$(cat "$PID_FILE" 2>/dev/null) || true
+  STORED_PORT=$(cat "$PORT_FILE" 2>/dev/null) || true
+  if [ -n "$STORED_PID" ] && kill -0 "$STORED_PID" 2>/dev/null; then
+    CDP_PORT="$STORED_PORT"
+    CHROME_ALIVE=true
+  fi
 fi
 
-echo "🌐 Chrome launched (PID $CHROME_PID, CDP port $CDP_PORT, Profile 3 / rsinghtomar3011@gmail.com)" >&2
+if [ "$CHROME_ALIVE" = true ]; then
+  echo "🔗 Reusing Chrome singleton (PID $STORED_PID, CDP port $CDP_PORT)" >&2
+else
+  # ─── Selective copy of Chrome profile (~26MB, <1s) ──────────────────
+  echo "📋 Cloning Chrome session data (~26MB selective copy)..." >&2
+  rm -rf "$PROFILE_DIR"
+  mkdir -p "$PROFILE_DIR/$PROFILE"
 
-# --- Generate Playwright MCP config with CDP endpoint ---
-# Since we launched Chrome ourselves, tell Playwright MCP to CONNECT to it
-# via CDP instead of launching its own browser. This avoids mock keychain.
+  cp "$BASE_USER_DATA_DIR/Local State" "$PROFILE_DIR/" 2>/dev/null || true
+  cp "$BASE_USER_DATA_DIR/First Run" "$PROFILE_DIR/" 2>/dev/null || true
+
+  rsync -a \
+    --exclude='Service Worker' \
+    --exclude='IndexedDB' \
+    --exclude='GPUCache' \
+    --exclude='DawnWebGPUCache' \
+    --exclude='DawnGraphiteCache' \
+    --exclude='DawnWebGPUBlobCache' \
+    --exclude='Code Cache' \
+    --exclude='Cache' \
+    --exclude='ScriptCache' \
+    --exclude='blob_storage' \
+    "$BASE_USER_DATA_DIR/$PROFILE/" "$PROFILE_DIR/$PROFILE/"
+
+  rm -f "$PROFILE_DIR/SingletonLock" \
+        "$PROFILE_DIR/SingletonSocket" \
+        "$PROFILE_DIR/SingletonCookie" 2>/dev/null || true
+
+  # Mark clean exit — suppresses "Restore pages?" bubble
+  PREFS="$PROFILE_DIR/$PROFILE/Preferences"
+  if [ -f "$PREFS" ] && command -v python3 &>/dev/null; then
+    python3 -c "
+import json
+p = json.load(open('$PREFS'))
+p.setdefault('profile', {})['exit_type'] = 'Normal'
+p.setdefault('profile', {})['exited_cleanly'] = True
+json.dump(p, open('$PREFS', 'w'))
+" 2>/dev/null || true
+  fi
+
+  # ─── Launch Chrome manually (avoids --use-mock-keychain) ────────────
+  CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  CDP_STDERR="/tmp/shofferai-chrome-singleton-stderr-$$"
+
+  "$CHROME_BIN" \
+    --remote-debugging-port=0 \
+    --remote-debugging-address=127.0.0.1 \
+    --user-data-dir="$PROFILE_DIR" \
+    --profile-directory="$PROFILE" \
+    --no-first-run \
+    --no-default-browser-check \
+    --disable-sync \
+    --disable-default-apps \
+    --disable-blink-features=AutomationControlled \
+    --disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching \
+    --disable-infobars \
+    --disable-ipc-flooding-protection \
+    --disable-popup-blocking \
+    --disable-background-timer-throttling \
+    --disable-backgrounding-occluded-windows \
+    --disable-renderer-backgrounding \
+    --noerrdialogs \
+    --disable-gaia-services \
+    --hide-crash-restore-bubble \
+    --disable-session-crashed-bubble \
+    about:blank 2>"$CDP_STDERR" &
+
+  CHROME_PID=$!
+
+  CDP_PORT=""
+  for i in $(seq 1 30); do
+    if [ -f "$CDP_STDERR" ]; then
+      CDP_PORT=$(grep -oE 'ws://127\.0\.0\.1:[0-9]+' "$CDP_STDERR" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true)
+      [ -n "$CDP_PORT" ] && break
+    fi
+    sleep 0.3
+  done
+
+  rm -f "$CDP_STDERR"
+
+  if [ -z "$CDP_PORT" ]; then
+    echo "❌ Failed to get CDP port from Chrome (PID $CHROME_PID)" >&2
+    release_lock
+    exit 1
+  fi
+
+  echo "$CHROME_PID" > "$PID_FILE"
+  echo "$CDP_PORT" > "$PORT_FILE"
+  I_LAUNCHED_CHROME=true
+
+  echo "🌐 Chrome singleton launched (PID $CHROME_PID, CDP port $CDP_PORT, Profile 3)" >&2
+fi
+
+register_client
+release_lock
+
+# ─── Playwright MCP config (connect to shared Chrome via CDP) ────────
 cat > "$CONFIG_FILE" <<JSONEOF
 {
   "browser": {
@@ -164,13 +236,9 @@ cat > "$CONFIG_FILE" <<JSONEOF
 }
 JSONEOF
 
-echo "⏳ Playwright MCP connecting to Chrome via CDP (port $CDP_PORT)..." >&2
+echo "⏳ Playwright MCP → Chrome CDP port $CDP_PORT (client $$)" >&2
 
-# Run Playwright MCP as a foreground process (not exec) so the EXIT trap fires on exit.
-# Uses globally-installed binary — no npm registry lookup, instant startup.
-# --cdp-endpoint not needed as it's in the config.
-# --init-script: stealth anti-bot-detection patches (evaluated before any page JS)
-# --output-dir: where screenshots/traces go
+# ─── Start Playwright MCP (foreground so EXIT trap fires on exit) ─────
 "$PLAYWRIGHT_MCP" \
   --config "$CONFIG_FILE" \
   --init-script "$SCRIPT_DIR/stealth-init.js" \
