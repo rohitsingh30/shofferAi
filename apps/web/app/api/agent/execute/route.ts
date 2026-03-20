@@ -92,6 +92,12 @@ export async function POST(request: Request) {
             name: authUser.name || undefined,
             email: authUser.email || undefined,
             userId,
+            savedAddresses: profile?.addresses
+              ? (JSON.parse(profile.addresses) as Array<{ label: string; flatNo?: string; line1?: string; line2?: string; city?: string; state?: string; pincode?: string; contactNumber?: string; address?: string }>).map((a) => ({
+                  label: a.label,
+                  address: [a.flatNo, a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(', ') || a.address || '',
+                }))
+              : [],
             addressLabels: profile?.addresses
               ? (JSON.parse(profile.addresses) as Array<{ label: string }>).map((a) => a.label)
               : [],

@@ -81,12 +81,14 @@ export class CredentialVault {
       upi_id: (d) => 'upiId' in d ? d.upiId : undefined,
       username: (d) => 'username' in d ? d.username : undefined,
       password: (d) => 'password' in d ? d.password : undefined,
+      address_flat_no: (d) => 'flatNo' in d ? d.flatNo : undefined,
       address_line1: (d) => 'line1' in d ? d.line1 : undefined,
       address_line2: (d) => 'line2' in d ? d.line2 : undefined,
       city: (d) => 'city' in d ? d.city : undefined,
       state: (d) => 'state' in d ? d.state : undefined,
       pincode: (d) => 'pincode' in d ? d.pincode : undefined,
-      phone: (d) => 'phone' in d ? d.phone : undefined,
+      phone: (d) => 'phone' in d ? (d as any).contactNumber || d.phone : undefined,
+      contact_number: (d) => 'contactNumber' in d ? d.contactNumber : ('phone' in d ? d.phone : undefined),
       email: (d) => 'username' in d ? d.username : undefined,
     };
 

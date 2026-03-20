@@ -76,6 +76,7 @@ export function buildSystemPrompt(
   userContext: {
     name?: string;
     addressLabels?: string[];
+    savedAddresses?: Array<{ label: string; address: string }>;
     credentialLabels?: { id: string; label: string; type: string }[];
     preferences?: Record<string, unknown>;
   },
@@ -92,7 +93,10 @@ export function buildSystemPrompt(
     parts.push(`User's name: ${userContext.name}`);
   }
 
-  if (userContext.addressLabels?.length) {
+  if (userContext.savedAddresses?.length) {
+    parts.push(`Saved addresses:\n${userContext.savedAddresses.map(a => `- ${a.label}: ${a.address}`).join('\n')}`);
+    parts.push('When using ask_user with input_type "address" or "layout" with an address section, ALWAYS pass the saved addresses in the "saved" parameter so the user can quickly pick one.');
+  } else if (userContext.addressLabels?.length) {
     parts.push(`Saved addresses: ${userContext.addressLabels.join(', ')}`);
   }
 

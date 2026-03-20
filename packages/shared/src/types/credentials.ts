@@ -12,12 +12,14 @@ export const CredentialFieldType = z.enum([
   'upi_id',
   'username',
   'password',
+  'address_flat_no',
   'address_line1',
   'address_line2',
   'city',
   'state',
   'pincode',
   'phone',
+  'contact_number',
   'email',
 ]);
 export type CredentialFieldType = z.infer<typeof CredentialFieldType>;
@@ -57,12 +59,14 @@ export interface SiteLoginData {
 }
 
 export interface AddressData {
+  flatNo?: string;
   line1: string;
   line2?: string;
   city: string;
   state: string;
   pincode: string;
-  phone?: string;
+  contactNumber?: string;
+  phone?: string; // legacy alias for contactNumber
 }
 
 export type CredentialData = CardData | UPIData | SiteLoginData | AddressData;

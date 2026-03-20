@@ -59,6 +59,7 @@ export interface AgentConfig {
     email?: string;
     userId?: string;
     addressLabels?: string[];
+    savedAddresses?: Array<{ label: string; address: string }>;
     credentialLabels?: { id: string; label: string; type: string }[];
     preferences?: Record<string, unknown>;
   };
