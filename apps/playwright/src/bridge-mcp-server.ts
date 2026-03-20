@@ -164,7 +164,8 @@ mcpServer.registerTool(
     description:
       'Ask the user a question and wait for their response. Use this when you need user input ' +
       'to proceed (e.g., choosing a hotel, confirming details, providing an OTP). ' +
-      'The question is shown in the ShofferAI chat UI and the user types their response.',
+      'The question is shown in the ShofferAI chat UI and the user types their response. ' +
+      'For product selection, use input_type="card_grid" with cards array containing product details and images.',
     inputSchema: {
       question: z.string().describe('The question to ask the user'),
       options: z
@@ -172,12 +173,33 @@ mcpServer.registerTool(
         .optional()
         .describe('Optional list of choices for a multiple-choice question'),
       input_type: z
-        .enum(['text', 'choice', 'otp', 'confirmation', 'freetext', 'card_grid', 'chip_bar'])
+        .enum(['text', 'choice', 'otp', 'confirmation', 'freetext', 'card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'layout'])
         .optional()
-        .describe('Type of input widget to show. Defaults to "text" for freeform or "choice" if options provided'),
+        .describe('Type of input widget to show. Use "card_grid" for product selection with images, "carousel" for visual choices, "chip_bar" for toggleable filters'),
+      cards: z
+        .array(z.object({
+          id: z.string().describe('Unique card identifier'),
+          label: z.string().describe('Product name or title'),
+          image: z.string().optional().describe('Product image URL'),
+          subtitle: z.string().optional().describe('Price and weight, e.g. "₹29 · 500 ml"'),
+          badge: z.string().optional().describe('Badge text, e.g. "8% OFF" or "Bestseller"'),
+          emoji: z.string().optional().describe('Emoji icon for the card'),
+        }))
+        .optional()
+        .describe('Visual cards for card_grid or carousel input types'),
+      show_quantity: z.boolean().optional().describe('Show quantity stepper on each card (card_grid)'),
+      allow_custom: z.boolean().optional().describe('Allow user to add custom items (card_grid, carousel)'),
+      multi_select: z.boolean().optional().describe('Allow multiple selections (card_grid, carousel, chip_bar)'),
+      shortcuts: z.array(z.string()).optional().describe('Quick-pick shortcut buttons'),
+      min: z.number().optional().describe('Minimum value for stepper/slider'),
+      max: z.number().optional().describe('Maximum value for stepper/slider'),
+      step: z.number().optional().describe('Step increment for stepper/slider'),
+      presets: z.array(z.number()).optional().describe('Preset values for stepper/slider'),
+      placeholder: z.string().optional().describe('Placeholder text for text input'),
+      format_hint: z.string().optional().describe('Format hint for text input'),
     },
   },
-  async ({ question, options, input_type }) => {
+  async ({ question, options, input_type, cards, show_quantity, allow_custom, multi_select, shortcuts, min, max, step, presets, placeholder, format_hint }) => {
     const stepId = randomUUID();
     const inputType = input_type || (options?.length ? 'choice' : 'text');
 
@@ -188,6 +210,17 @@ mcpServer.registerTool(
       question,
       inputType: inputType as BridgeAskUserMessage['inputType'],
       options,
+      cards: cards as BridgeAskUserMessage['cards'],
+      show_quantity,
+      allow_custom,
+      multi_select,
+      shortcuts,
+      min,
+      max,
+      step,
+      presets,
+      placeholder,
+      format_hint,
     };
 
     sendToTaskManager(msg);
