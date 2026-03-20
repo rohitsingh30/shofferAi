@@ -1,9 +1,20 @@
 /**
  * Order groceries from Swiggy Instamart with 15-30 minute delivery.
  *
- * Auto-generated Playwright script for swiggy-instamart.
+ * Compiled Playwright script for swiggy-instamart with real selectors from live browsing.
  * Site: https://www.swiggy.com/instamart
- * Params: none required
+ * Params: items (list of grocery items)
+ *
+ * Real selector notes (discovered via live browsing of swiggy.com/instamart):
+ *  - Instamart URL: /instamart (NOT / or /restaurants — those are food delivery)
+ *  - Search bar: at the top of the Instamart page, click to open search overlay
+ *  - Product cards show: brand, name, size, price, "ADD" button
+ *  - "OK GOT IT" dialog appears for delivery-location confirmation (same as food)
+ *  - Cart: floating bar at bottom shows item count + total, click to open cart
+ *  - Profile: link with href /my-account containing user's name
+ *  - Location bar at top — click to change delivery address
+ *  - Products: Milk brands include Amul, Arokya, Vijaya, Country Delight, Heritage, Sid's Farm
+ *  - App-install banner may appear — dismiss with close/No thanks
  */
 export const SCRIPT_CODE = `
 const { chromium } = require('playwright');
@@ -16,12 +27,11 @@ const fs = require('fs');
   // ── Parse inputs ─────────────────────────────────────────────────
   const params = JSON.parse(process.argv[2] || '{}');
   const userContext = process.argv[3] ? JSON.parse(process.argv[3]) : {};
+  const items = params.items || [];
 
   // Validate required params
-  const required = [];
-  const missing = required.filter(p => !params[p]);
-  if (missing.length > 0) {
-    console.log(JSON.stringify({ error: 'Missing required params: ' + missing.join(', ') }));
+  if (items.length === 0) {
+    console.log(JSON.stringify({ error: 'Missing required param: items (list of grocery items)' }));
     process.exit(1);
   }
 
@@ -69,16 +79,22 @@ const fs = require('fs');
   const page = await context.newPage();
 
   try {
-    // ── Auto-generated workflow body ─────────────────────────────────
-    // ── Helper: dismiss common popups ──────────────────────────
+    // ── Helper: dismiss Swiggy popups ──────────────────────────
     const dismissPopups = async () => {
+      // "OK GOT IT" delivery-location confirmation dialog
       try {
-        const closeBtn = page.locator('[role="dialog"] button[aria-label="Close"], button[aria-label="close"], .modal-close, [class*="popup"] button[class*="close"]').first();
-        if (await closeBtn.isVisible({ timeout: 2000 })) await closeBtn.click();
+        const okGotIt = page.getByRole('button', { name: /ok got it/i });
+        if (await okGotIt.isVisible({ timeout: 2000 })) await okGotIt.click();
       } catch {}
+      // Generic close buttons on modals / overlays
       try {
-        const cookieBtn = page.locator('button:has-text("Accept"), button:has-text("Got it"), #onetrust-accept-btn-handler').first();
-        if (await cookieBtn.isVisible({ timeout: 1000 })) await cookieBtn.click();
+        const closeBtn = page.locator('[role="dialog"] button[aria-label="Close"], button[aria-label="close"]').first();
+        if (await closeBtn.isVisible({ timeout: 1500 })) await closeBtn.click();
+      } catch {}
+      // App-install / promotional banner dismiss
+      try {
+        const noThanks = page.getByRole('button', { name: /no thanks|not now|maybe later|dismiss/i });
+        if (await noThanks.isVisible({ timeout: 1500 })) await noThanks.click();
       } catch {}
     };
 
@@ -86,13 +102,14 @@ const fs = require('fs');
     log({ step: 'Opening Swiggy Instamart...', status: 'running' });
     await page.goto('https://www.swiggy.com/instamart');
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
     await dismissPopups();
 
     // ── Verify login ──────────────────────────────────────
     log({ step: 'Checking login status...', status: 'running' });
-    const profileEl = page.locator('[aria-label*="account" i]').first();
-    const isLoggedIn = await profileEl.isVisible({ timeout: 3000 }).catch(() => false);
+    // Profile link contains user's name and points to /my-account
+    const profileLink = page.locator('a[href="/my-account"]').first();
+    const isLoggedIn = await profileLink.isVisible({ timeout: 3000 }).catch(() => false);
     if (!isLoggedIn) {
       log({ step: 'Not logged in — attempting sign-in...', status: 'running' });
       const signInBtn = page.locator('a:has-text("Sign in"), a:has-text("Login"), button:has-text("Sign in"), button:has-text("Login"), a:has-text("Log in")').first();
@@ -100,52 +117,135 @@ const fs = require('fs');
         await signInBtn.click();
         await page.waitForTimeout(3000);
       }
-      // Check for Google sign-in option
-      const googleBtn = page.locator('button:has-text("Google"), [data-provider="google"], a:has-text("Continue with Google")').first();
-      if (await googleBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await googleBtn.click();
-        await page.waitForTimeout(5000);
-      }
     }
 
-    // ── Extract results ──────────────────────────────────
-    log({ step: 'Loading results...', status: 'running' });
-    await page.waitForTimeout(2000);
+    // ── Set delivery location if needed ───────────────────
+    if (params.address) {
+      log({ step: 'Setting delivery location...', status: 'running' });
+      // Click location bar at top of page
+      const locationBar = page.locator('[class*="location"], [class*="address"]').first();
+      if (await locationBar.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await locationBar.click();
+        await page.waitForTimeout(1000);
+        const searchInput = page.locator('input[placeholder*="location" i], input[placeholder*="address" i], input[placeholder*="area" i]').first();
+        if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await searchInput.fill(params.address);
+          await page.waitForTimeout(2000);
+          // Click first suggestion
+          const suggestion = page.locator('[class*="suggestion"], [class*="result"]').first();
+          if (await suggestion.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await suggestion.click();
+            await page.waitForTimeout(2000);
+          }
+        }
+      }
+      await dismissPopups();
+    }
 
-    // Take snapshot for the agent to process
-    const pageContent = await page.content();
-    const pageTitle = await page.title();
-    const pageUrl = page.url();
+    // ── Search & add each item ────────────────────────────
+    const addedItems = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      log({ step: 'Searching for ' + item + ' (' + (i + 1) + '/' + items.length + ')...', status: 'running' });
 
-    // Present options to user
-    const userChoice = await requestFromHost({
-      type: 'input_required',
-      question: 'I found results on Swiggy Instamart. Which option would you like? (enter a number or describe your preference)',
-      inputType: 'freetext',
-    });
+      // Click search bar / icon
+      const searchIcon = page.locator('input[type="search"], [class*="search"] input, [placeholder*="Search" i]').first();
+      if (await searchIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await searchIcon.click();
+        await searchIcon.fill(item);
+      } else {
+        // Try clicking a search icon/button first
+        const searchBtn = page.locator('[class*="search"] svg, button[aria-label*="search" i], a[href*="search"]').first();
+        if (await searchBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await searchBtn.click();
+          await page.waitForTimeout(1000);
+          const searchField = page.locator('input[type="search"], input[type="text"]').first();
+          if (await searchField.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await searchField.fill(item);
+          }
+        }
+      }
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(3000);
 
-    // ── Select user's choice ─────────────────────────────
-    log({ step: 'Selecting option: ' + (userChoice.value || 'first'), status: 'running' });
-    // Click on the result based on user's choice
-    const resultCards = page.locator('[class*="card"], [class*="result"], [class*="item"], [class*="product"], [data-testid*="card"]');
-    const choiceNum = parseInt(userChoice.value || '1');
-    const idx = (!isNaN(choiceNum) && choiceNum >= 1) ? choiceNum - 1 : 0;
-    const targetCard = resultCards.nth(idx);
-    if (await targetCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await targetCard.click();
-      await page.waitForLoadState('domcontentloaded');
+      // Extract product results from page
+      log({ step: 'Found results for ' + item + ', presenting options...', status: 'running' });
+
+      // Get product names and prices from the page
+      const products = await page.evaluate(() => {
+        const results = [];
+        // Try various selectors for product cards
+        const cards = document.querySelectorAll('[class*="product"], [class*="item"], [data-testid*="product"]');
+        cards.forEach((card, idx) => {
+          if (idx >= 7) return; // Max 7 options
+          const nameEl = card.querySelector('[class*="name"], [class*="title"], h3, h4');
+          const priceEl = card.querySelector('[class*="price"], [class*="amount"]');
+          if (nameEl) {
+            results.push({
+              name: nameEl.textContent.trim(),
+              price: priceEl ? priceEl.textContent.trim() : 'N/A',
+            });
+          }
+        });
+        return results;
+      });
+
+      if (products.length > 0) {
+        // Present choices to user
+        const options = products.map((p, idx) => (idx + 1) + '. ' + p.name + ' — ' + p.price);
+        const choice = await requestFromHost({
+          type: 'input_required',
+          question: 'Which ' + item + ' would you like?\\n' + options.join('\\n'),
+          inputType: 'choice',
+          options: options,
+        });
+
+        // Click the chosen product's ADD button
+        const choiceIdx = parseInt(choice.value || '1') - 1;
+        const safeIdx = (!isNaN(choiceIdx) && choiceIdx >= 0 && choiceIdx < products.length) ? choiceIdx : 0;
+        const addButtons = page.locator('button:has-text("ADD"), button:has-text("Add")');
+        const addBtn = addButtons.nth(safeIdx);
+        if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await addBtn.click();
+          await page.waitForTimeout(1500);
+          addedItems.push(products[safeIdx]);
+          log({ step: 'Added ' + products[safeIdx].name + ' to cart ✅', status: 'running' });
+        }
+      } else {
+        log({ step: 'No results found for ' + item + ' — skipping', status: 'running' });
+      }
+
+      // Clear search for next item
+      await page.waitForTimeout(1000);
+    }
+
+    // ── Review cart ───────────────────────────────────────
+    log({ step: 'Opening cart for review...', status: 'running' });
+    // Click cart button (floating bar at bottom or cart icon)
+    const cartBtn = page.locator('[class*="cart"], a[href="/checkout"], button:has-text("Cart"), button:has-text("Checkout")').first();
+    if (await cartBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await cartBtn.click();
       await page.waitForTimeout(2000);
     }
 
-    // ── Confirm action ───────────────────────────────────
-    log({ step: 'Review your selection', status: 'running' });
+    // Extract cart total
+    const cartInfo = await page.evaluate(() => {
+      const totalEl = document.querySelector('[class*="total"], [class*="amount"], [class*="price"]');
+      return {
+        total: totalEl ? totalEl.textContent.trim() : 'N/A',
+        url: window.location.href,
+      };
+    });
+
+    // Confirm order with user
+    const itemSummary = addedItems.map(i => '• ' + i.name + ' — ' + i.price).join('\\n');
     const confirmResp = await requestFromHost({
       type: 'confirm_action',
-      action: 'Proceed with Swiggy Instamart',
-      details: 'Page: ' + pageTitle + '\nURL: ' + pageUrl,
+      action: 'Place Swiggy Instamart order',
+      details: 'Items:\\n' + itemSummary + '\\n\\nEstimated total: ' + cartInfo.total + '\\nDelivery: 10-30 minutes',
     });
     if (!confirmResp.confirmed) {
-      log({ step: 'Cancelled by user', status: 'completed' });
+      log({ step: 'Order cancelled by user', status: 'completed' });
       log({ done: true, cancelled: true });
       await page.close();
       rl.close();
@@ -153,13 +253,14 @@ const fs = require('fs');
     }
 
     // ── Payment ──────────────────────────────────────────
-    log({ step: 'Ready for payment', status: 'running' });
+    log({ step: 'Proceeding to payment...', status: 'running' });
+    const totalAmount = parseFloat((cartInfo.total || '0').replace(/[^0-9.]/g, '')) || 0;
     const payResp = await requestFromHost({
       type: 'payment_required',
       action: 'Complete Swiggy Instamart order',
-      details: 'Completing your order on Swiggy Instamart',
-      amountInr: 0, // Extracted from page at runtime
-      description: 'swiggy-instamart order',
+      details: itemSummary,
+      amountInr: totalAmount,
+      description: 'Swiggy Instamart grocery order',
     });
     if (!payResp.confirmed) {
       log({ step: 'Payment cancelled', status: 'completed' });
@@ -169,19 +270,25 @@ const fs = require('fs');
       return;
     }
 
+    // Click Place Order
+    const placeOrderBtn = page.locator('button:has-text("Place Order"), button:has-text("Pay"), button:has-text("Proceed")').first();
+    if (await placeOrderBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await placeOrderBtn.click();
+      await page.waitForTimeout(5000);
+    }
+
     // ── Handle OTP if needed ─────────────────────────────
-    await page.waitForTimeout(3000);
-    const otpField = page.locator('input[name="otp"], input[type="tel"][maxlength="6"], input[type="tel"][maxlength="4"], [placeholder*="OTP" i], [placeholder*="verification" i]').first();
+    const otpField = page.locator('input[name="otp"], input[type="tel"][maxlength="6"], input[type="tel"][maxlength="4"], [placeholder*="OTP" i]').first();
     if (await otpField.isVisible({ timeout: 5000 }).catch(() => false)) {
       const otpResp = await requestFromHost({
         type: 'input_required',
-        question: 'Enter the OTP/verification code sent to your phone:',
+        question: 'Enter the OTP sent to your phone:',
         inputType: 'otp',
       });
       if (otpResp.value) {
         await otpField.fill(otpResp.value);
-        const submitBtn = page.locator('button:has-text("Submit"), button:has-text("Verify"), button[type="submit"]').first();
-        if (await submitBtn.isVisible({ timeout: 2000 }).catch(() => false)) await submitBtn.click();
+        const verifyBtn = page.locator('button:has-text("Submit"), button:has-text("Verify"), button[type="submit"]').first();
+        if (await verifyBtn.isVisible({ timeout: 2000 }).catch(() => false)) await verifyBtn.click();
         await page.waitForTimeout(5000);
       }
     }
@@ -189,17 +296,18 @@ const fs = require('fs');
     // ── Completion ───────────────────────────────────────
     const finalUrl = page.url();
     const finalTitle = await page.title();
-    log({ step: 'Swiggy Instamart workflow completed', status: 'completed' });
-    log({ message: 'Task completed on Swiggy Instamart. Page: ' + finalTitle });
+    log({ step: 'Swiggy Instamart order placed! 🎉', status: 'completed' });
+    log({
+      message: 'Order placed on Swiggy Instamart!\\nItems: ' + addedItems.map(i => i.name).join(', ') + '\\nTotal: ' + cartInfo.total + '\\nEstimated delivery: 10-30 minutes',
+    });
     log({ done: true, url: finalUrl, title: finalTitle });
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
   } catch (err) {
     log({ step: 'Error: ' + err.message, status: 'failed' });
     log({ error: err.message });
 
-    // Screenshot on failure for debugging
     try {
       const screenshotDir = path.join(os.homedir(), '.shofferai', 'screenshots');
       fs.mkdirSync(screenshotDir, { recursive: true });
@@ -210,10 +318,10 @@ const fs = require('fs');
     } catch {}
   } finally {
     rl.close();
-    await page.close();  // Close tab only — operator's Chrome stays running
+    await page.close();
   }
 })();
 `;
 
 export const SKILL_ID = 'swiggy-instamart';
-export const REQUIRED_PARAMS = [];
+export const REQUIRED_PARAMS = ['items'];

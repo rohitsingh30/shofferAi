@@ -593,7 +593,7 @@ export class AgentExecutor {
               { type: 'tool_use', id: syntheticId, name: 'ask_user', input: { question: fullText, input_type: inputType, options } } as ContentBlock,
             ]);
 
-            callbacks.onStepUpdate({ action: fullText, status: 'paused_for_input' });
+            // No onStepUpdate — InputPrompt handles the UI for ask_user
             const userResponse = await callbacks.onInputRequired({
               taskId: '',
               stepId: syntheticId,
@@ -787,7 +787,8 @@ export class AgentExecutor {
         };
       }
 
-      callbacks.onStepUpdate({ action: args.question as string, status: 'paused_for_input' });
+      // Do NOT send onStepUpdate here — it renders a TaskProgress card that
+      // hides the interactive InputPrompt. Only onInputRequired is needed.
       const inputStart = Date.now();
       const response = await callbacks.onInputRequired({
         taskId: '',

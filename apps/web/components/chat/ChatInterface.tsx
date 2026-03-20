@@ -164,6 +164,7 @@ function ChatInterfaceInner() {
         break;
       }
       case 'input_required': {
+        setCurrentSteps([]); // Clear progress card so InputPrompt is visible
         const p = event.payload;
         setPendingInput({
           taskId: p.taskId as string,
