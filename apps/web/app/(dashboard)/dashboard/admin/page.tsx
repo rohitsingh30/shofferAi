@@ -295,6 +295,7 @@ function TaskDetailPanel({ taskId, onClose }: { taskId: string; onClose: () => v
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                  <code className="cursor-pointer rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]" title="Click to copy" onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(taskId); }}>{taskId}</code>
                   <span>{data.task.user.email || data.task.user.name || data.task.user.id.slice(0, 12)}</span>
                   {data.task.workflowType && (
                     <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">{data.task.workflowType}</span>
@@ -990,6 +991,7 @@ export default function AdminDashboard() {
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-card">
                           <tr className="border-b border-border">
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">ID</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">User</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Task</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Skill</th>
@@ -1008,6 +1010,9 @@ export default function AdminDashboard() {
                             };
                             return (
                               <tr key={t.taskId} className="cursor-pointer border-b border-border/50 hover:bg-muted/30" onClick={() => setSelectedTaskId(t.taskId)}>
+                                <td className="px-4 py-2">
+                                  <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">{t.taskId.slice(0, 8)}</code>
+                                </td>
                                 <td className="px-4 py-2">
                                   <div className="flex flex-col">
                                     <span className="text-xs font-medium">{t.userName || 'Unknown'}</span>
