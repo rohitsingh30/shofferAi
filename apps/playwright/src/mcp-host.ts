@@ -20,7 +20,7 @@ export class MCPHost implements MCPHostLike {
   async connect(): Promise<void> {
     this.transport = new StdioClientTransport({
       command: 'playwright-mcp',
-      args: ['--cdp-endpoint', this.cdpEndpoint],
+      args: ['--cdp-endpoint', this.cdpEndpoint, '--output-dir', '/tmp/playwright-mcp-output'],
     });
 
     this.client = new Client({

@@ -133,6 +133,7 @@ export class ClaudeAgentSpawner {
             args: [
               '--cdp-endpoint', `http://127.0.0.1:${cdpPort}`,
               '--cdp-timeout', '60000',
+              '--output-dir', '/tmp/playwright-mcp-output',
             ],
           },
         },

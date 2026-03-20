@@ -323,4 +323,24 @@ After making changes:
 
 ---
 
+## 21. Playwright MCP Screenshots Saving to CWD / Opening on Desktop
+
+**What happens:** `browser_take_screenshot` saves `.png` files to the current working directory (repo root or operator's machine) because Playwright MCP wasn't launched with `--output-dir`. The file then opens on the operator's desktop — disrupting their workflow with random images like `bb_header.png`, `page-*.png`, etc.
+
+**Root cause:** Playwright MCP defaults to saving screenshots in CWD when no `--output-dir` is specified. Three of four launch paths were missing the flag:
+- `mcp-host.ts` (ChromePool relay) — **was missing `--output-dir`**
+- `claude-agent-spawner.ts` (Copilot CLI spawner) — **was missing `--output-dir`**
+- `shofferai-agent.sh` (standalone agent) — **was missing `--output-dir`**
+- `playwright-mcp-with-chrome.sh` (local Copilot/Claude Desktop) — already had it ✅
+
+**The fix (2026-03-20):** Added `--output-dir /tmp/playwright-mcp-output` to ALL Playwright MCP launch points:
+- `apps/playwright/src/mcp-host.ts` — added `'--output-dir', '/tmp/playwright-mcp-output'` to args
+- `apps/web/lib/claude-agent-spawner.ts` — added `'--output-dir', '/tmp/playwright-mcp-output'` to args
+- `apps/playwright/scripts/shofferai-agent.sh` — added `--output-dir /tmp/playwright-mcp-output` to MCP config
+- `apps/playwright/scripts/playwright-mcp-with-chrome.sh` — already had `--output-dir /tmp/playwright-mcp-output`
+
+**Rule:** EVERY Playwright MCP launch MUST include `--output-dir /tmp/playwright-mcp-output`. Never let screenshots default to CWD. When adding a new MCP launch point, always include `--output-dir`.
+
+---
+
 *Last updated: 2026-03-20*
