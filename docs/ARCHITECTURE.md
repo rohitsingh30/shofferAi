@@ -605,7 +605,7 @@ shofferai/
 ├── Dockerfile
 ├── docker-compose.yml                     ← PostgreSQL for local dev
 ├── turbo.json                             ← Turborepo config
-└── CLAUDE.md                              ← AI assistant context
+└── .github/copilot-instructions.md                              ← AI assistant context
 ```
 
 ---
@@ -652,7 +652,7 @@ Chrome launched by the script uses real macOS Keychain (not Playwright's mock ke
 ```
 .mcp.json invokes playwright-mcp-with-chrome.sh:
   1. Selective copy of Chrome-Debug/Profile 3 session data (~26MB)
-  2. Remove singleton lock files from clone
+  2. Remove Chrome's internal lock files (SingletonLock, SingletonSocket, SingletonCookie) from clone
   3. Launch Chrome ourselves with --remote-debugging-port=0 (NO Playwright launch)
   4. Parse CDP port from Chrome stderr (DevTools listening on ws://127.0.0.1:PORT)
   5. Generate config with cdpEndpoint → Playwright MCP CONNECTS to our Chrome
