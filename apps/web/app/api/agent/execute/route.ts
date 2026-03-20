@@ -113,6 +113,34 @@ export async function POST(request: Request) {
             })),
             preferences: profile?.preferences ? JSON.parse(profile.preferences) : {},
           },
+          onSaveAddress: async (targetUserId: string, address: Record<string, unknown>) => {
+            try {
+              const existingProfile = await prisma.profile.findUnique({ where: { userId: targetUserId } });
+              let addresses: Array<Record<string, unknown>> = [];
+              if (existingProfile?.addresses) {
+                addresses = JSON.parse(existingProfile.addresses);
+              }
+              // Upsert by label: replace existing address with same label, or append
+              const label = (address.label as string) || 'Home';
+              const idx = addresses.findIndex((a) => a.label === label);
+              if (idx >= 0) {
+                addresses[idx] = address;
+              } else {
+                addresses.push(address);
+              }
+              await prisma.profile.upsert({
+                where: { userId: targetUserId },
+                update: { addresses: JSON.stringify(addresses) },
+                create: { userId: targetUserId, addresses: JSON.stringify(addresses), phone: '', preferences: '{}' },
+              });
+              console.log('[execute] Address saved for user=%s label=%s count=%d', targetUserId, label, addresses.length);
+              return { saved: true, addressCount: addresses.length };
+            } catch (error) {
+              const errMsg = error instanceof Error ? error.message : 'Unknown DB error';
+              console.error('[execute] Failed to save address for user=%s:', targetUserId, errMsg);
+              return { saved: false, error: errMsg };
+            }
+          },
         });
 
         // ─── Handle task events from laptop ──────────────────────────

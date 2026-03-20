@@ -64,6 +64,8 @@ export interface AgentConfig {
     preferences?: Record<string, unknown>;
   };
   vault?: { list(userId: string): Promise<Array<{ id: string; label: string; type: string }>>; getFieldValue(credentialId: string, userId: string, fieldType: string): Promise<string> };
+  /** Called by ScriptPlayer when a script requests to save an address to the user's profile */
+  onSaveAddress?: (userId: string, address: Record<string, unknown>) => Promise<{ saved: boolean; addressCount?: number; error?: string }>;
   maxIterations?: number;
 }
 
@@ -410,6 +412,9 @@ export class AgentExecutor {
               this.config.vault,
               this.config.userContext.userId
             );
+            if (this.config.onSaveAddress) {
+              player.onSaveAddress = this.config.onSaveAddress;
+            }
             const result = await player.play();
 
             if (result.completed) {

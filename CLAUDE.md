@@ -250,8 +250,12 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 
 ## Testing Workflow
 
-**E2E / Agent Testing**: Always test through the **ShofferAI chat interface**, NEVER by opening target sites directly:
+**⚠️ ALWAYS test on PRODUCTION. NEVER test on localhost.** Deploy first, then test on prod.
+
+**E2E / Agent Testing**: Always test through the **ShofferAI chat interface** on production:
 - **Prod URL**: `https://shofferai-27188185100.asia-south1.run.app`
+- **NEVER curl localhost, NEVER open localhost:3000 for testing, NEVER health-check local ports**
+- Deploy changes first (`/deploy`), then test on the prod URL
 - Log in with real credentials (not test accounts)
 - Mimic actual user flow: landing page → login → chat → send request → watch agent execute
 - **E2E means END TO END**: Complete every action until the conversation is fully done
@@ -264,7 +268,7 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 # The operator starts this manually — do NOT attempt to start or health-check it programmatically.
 ```
 
-**UI Development**: Use `localhost:3000` only for frontend iteration. After UI changes, deploy and verify on prod.
+**localhost is NOT for testing.** Only use localhost for rapid CSS/layout iteration. All functional testing (messages, agent flow, scripts) must go through prod.
 
 ## Environment
 - `.env` at root — see `.env.example` for all variables
