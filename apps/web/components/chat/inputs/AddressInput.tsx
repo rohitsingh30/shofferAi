@@ -19,71 +19,45 @@ interface AddressInputProps {
   onSubmit: (value: string) => void;
 }
 
-const ICON_MAP: Record<string, string> = { Home: '🏠', Office: '🏢', Other: '📍' };
-const LABEL_PRESETS = ['Home', 'Office', 'Other'];
+const ICONS: Record<string, string> = { Home: '🏠', Office: '🏢', Other: '📍' };
+const LABELS = ['Home', 'Office', 'Other'] as const;
 
-async function lookupPincode(pincode: string): Promise<{ city: string; state: string } | null> {
+async function lookupPincode(pin: string): Promise<{ city: string; state: string } | null> {
   try {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = await res.json();
-    if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length) {
-      const po = data[0].PostOffice[0];
+    const r = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+    const d = await r.json();
+    if (d?.[0]?.Status === 'Success' && d[0].PostOffice?.length) {
+      const po = d[0].PostOffice[0];
       return { city: po.District || po.Division, state: po.State };
     }
-  } catch {
-    // Silently fail — user can still type manually
-  }
+  } catch { /* user can type manually */ }
   return null;
 }
 
 async function saveAddressToProfile(address: {
-  label: string;
-  flatNo?: string;
-  line1: string;
-  line2?: string;
-  city: string;
-  state: string;
-  pincode: string;
-  contactNumber?: string;
+  label: string; flatNo?: string; line1: string;
+  city: string; state: string; pincode: string; contactNumber?: string;
 }) {
   try {
-    // Fetch current profile
-    const profileRes = await fetch('/api/profile');
+    const res = await fetch('/api/profile');
     let addresses: SavedAddress[] = [];
-    if (profileRes.ok) {
-      const profile = await profileRes.json();
-      addresses = Array.isArray(profile.addresses) ? profile.addresses : [];
+    if (res.ok) {
+      const p = await res.json();
+      addresses = Array.isArray(p.addresses) ? p.addresses : [];
     }
-
-    // Check for duplicate label — update if exists, append if not
-    const existingIdx = addresses.findIndex(a => a.label === address.label);
-    const fullAddress = [address.flatNo, address.line1, address.line2, address.city, address.state, address.pincode]
-      .filter(Boolean)
-      .join(', ');
-    const newEntry: SavedAddress = { ...address, address: fullAddress };
-
-    if (existingIdx >= 0) {
-      addresses[existingIdx] = newEntry;
-    } else {
-      addresses.push(newEntry);
-    }
-
-    await fetch('/api/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ addresses }),
-    });
-  } catch {
-    // Non-blocking — address still gets used even if save fails
-  }
+    const fullAddress = [address.flatNo, address.line1, address.city, address.state, address.pincode].filter(Boolean).join(', ');
+    const entry: SavedAddress = { ...address, address: fullAddress };
+    const idx = addresses.findIndex(a => a.label === address.label);
+    if (idx >= 0) addresses[idx] = entry; else addresses.push(entry);
+    await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ addresses }) });
+  } catch { /* non-blocking */ }
 }
 
 export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(saved.length ? 0 : null);
   const [mode, setMode] = useState<'saved' | 'new'>(saved.length ? 'saved' : 'new');
-  const [showNewForm, setShowNewForm] = useState(!saved.length);
+  const [showNew, setShowNew] = useState(!saved.length);
 
-  // Structured form fields
   const [label, setLabel] = useState('');
   const [flatNo, setFlatNo] = useState('');
   const [line1, setLine1] = useState('');
@@ -91,93 +65,71 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
   const [contactNumber, setContactNumber] = useState('');
-  const [pincodeLoading, setPincodeLoading] = useState(false);
-  const [pincodeError, setPincodeError] = useState('');
-  const pincodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinError, setPinError] = useState('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Autofill city/state from pincode
   useEffect(() => {
-    if (pincodeTimerRef.current) clearTimeout(pincodeTimerRef.current);
-    setPincodeError('');
-
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setPinError('');
     if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-      setPincodeLoading(true);
-      pincodeTimerRef.current = setTimeout(async () => {
-        const result = await lookupPincode(pincode);
-        if (result) {
-          setCity(result.city);
-          setState(result.state);
-        } else {
-          setPincodeError('Could not find pincode — please enter city & state manually');
-        }
-        setPincodeLoading(false);
+      setPinLoading(true);
+      timerRef.current = setTimeout(async () => {
+        const r = await lookupPincode(pincode);
+        if (r) { setCity(r.city); setState(r.state); }
+        else setPinError('Not found — enter city manually');
+        setPinLoading(false);
       }, 300);
-    }
-
-    return () => { if (pincodeTimerRef.current) clearTimeout(pincodeTimerRef.current); };
+    } else { setCity(''); setState(''); }
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [pincode]);
 
   const handleSubmit = useCallback(() => {
     if (mode === 'saved' && selectedIdx !== null && saved[selectedIdx]) {
       onSubmit(JSON.stringify(saved[selectedIdx]));
     } else if (mode === 'new' && line1.trim() && pincode.trim()) {
-      const addressObj = {
+      const obj = {
         label: label.trim() || 'Custom',
         flatNo: flatNo.trim() || undefined,
         line1: line1.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        pincode: pincode.trim(),
+        city: city.trim(), state: state.trim(), pincode: pincode.trim(),
         contactNumber: contactNumber.trim() || undefined,
-        address: [flatNo.trim(), line1.trim(), city.trim(), state.trim(), pincode.trim()]
-          .filter(Boolean)
-          .join(', '),
+        address: [flatNo.trim(), line1.trim(), city.trim(), state.trim(), pincode.trim()].filter(Boolean).join(', '),
       };
-      onSubmit(JSON.stringify(addressObj));
-      // Auto-save in background
-      saveAddressToProfile(addressObj);
+      onSubmit(JSON.stringify(obj));
+      saveAddressToProfile(obj);
     }
   }, [mode, selectedIdx, saved, label, flatNo, line1, city, state, pincode, contactNumber, onSubmit]);
 
-  const canSubmit =
-    (mode === 'saved' && selectedIdx !== null) ||
-    (mode === 'new' && line1.trim() && pincode.trim());
+  const canSubmit = (mode === 'saved' && selectedIdx !== null) || (mode === 'new' && line1.trim() && pincode.trim());
 
-  const inputClass =
-    'w-full rounded-lg border border-border bg-input px-3 py-2.5 text-sm text-white placeholder:text-white/30 outline-none focus:border-primary/60 transition-colors';
+  const inp = 'w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-primary/50 focus:bg-white/[0.06] transition-all';
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       {/* Saved addresses */}
       {saved.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {saved.map((entry, i) => {
-            const selected = mode === 'saved' && selectedIdx === i;
+            const on = mode === 'saved' && selectedIdx === i;
             return (
               <button
                 key={i}
                 type="button"
-                onClick={() => { setSelectedIdx(i); setMode('saved'); setShowNewForm(false); }}
-                className={`rounded-lg border p-3 cursor-pointer transition-all flex items-start gap-3 text-left ${
-                  selected
-                    ? 'border-primary/60 bg-primary/10'
-                    : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15]'
+                onClick={() => { setSelectedIdx(i); setMode('saved'); setShowNew(false); }}
+                className={`group flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all ${
+                  on ? 'bg-primary/12 ring-1 ring-primary/40' : 'bg-white/[0.03] hover:bg-white/[0.06]'
                 }`}
               >
-                {/* Radio dot */}
-                <span
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                    selected ? 'border-primary' : 'border-white/30'
-                  }`}
-                >
-                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors ${
+                  on ? 'border-primary bg-primary' : 'border-white/25'
+                }`}>
+                  {on && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                 </span>
-
-                <span className="text-2xl leading-none">{ICON_MAP[entry.label] ?? '🏠'}</span>
-
-                <span className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-sm font-semibold text-white">{entry.label}</span>
-                  <span className="text-xs text-white/50 line-clamp-2">{entry.address}</span>
+                <span className="text-base leading-none">{ICONS[entry.label] ?? '🏠'}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="text-[13px] font-medium text-white">{entry.label}</span>
+                  <span className="ml-2 text-xs text-white/40 line-clamp-1">{entry.address}</span>
                 </span>
               </button>
             );
@@ -185,133 +137,72 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
         </div>
       )}
 
-      {/* Add new address toggle */}
+      {/* New address toggle */}
       <button
         type="button"
-        onClick={() => {
-          const willShow = !showNewForm;
-          setShowNewForm(willShow);
-          if (willShow) setMode('new');
-          else if (saved.length) setMode('saved');
-        }}
-        className={`rounded-lg border border-dashed p-3 text-sm text-left transition-all ${
-          showNewForm
-            ? 'border-primary/60 bg-primary/10 text-white'
-            : 'border-white/[0.15] bg-white/[0.02] text-white/60 hover:text-white/80'
+        onClick={() => { setShowNew(v => !v); if (!showNew) setMode('new'); else if (saved.length) setMode('saved'); }}
+        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+          showNew ? 'text-primary' : 'text-white/40 hover:text-white/60'
         }`}
       >
-        {showNewForm ? '− Cancel new address' : '+ Add new address'}
+        <span className={`transition-transform ${showNew ? 'rotate-45' : ''}`}>+</span>
+        <span>{showNew ? 'Cancel' : 'New address'}</span>
       </button>
 
-      {/* Structured address form */}
-      {showNewForm && (
-        <div className="flex flex-col gap-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-4">
-          {/* Label presets */}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/60">Save as</label>
-            <div className="flex gap-2">
-              {LABEL_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setLabel(preset)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
-                    label === preset
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-white/[0.06] text-white/60 hover:bg-white/[0.1] hover:text-white/80'
-                  }`}
-                >
-                  {ICON_MAP[preset] ?? '📍'} {preset}
-                </button>
-              ))}
-            </div>
+      {/* Compact form */}
+      {showNew && (
+        <div className="flex flex-col gap-2 rounded-lg bg-white/[0.02] p-3">
+          {/* Label chips */}
+          <div className="flex gap-1.5">
+            {LABELS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLabel(l)}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-all ${
+                  label === l
+                    ? 'bg-primary/20 text-primary ring-1 ring-primary/30'
+                    : 'bg-white/[0.05] text-white/40 hover:text-white/60'
+                }`}
+              >
+                {ICONS[l]} {l}
+              </button>
+            ))}
           </div>
 
-          {/* Flat / House No */}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/60">Flat / House No.</label>
-            <input
-              type="text"
-              placeholder="e.g. A-302, Flat 12B"
-              value={flatNo}
-              onChange={(e) => { setFlatNo(e.target.value); setMode('new'); }}
-              className={inputClass}
-            />
+          {/* Flat + Address on same conceptual group */}
+          <div className="grid grid-cols-[1fr_2fr] gap-2">
+            <input type="text" placeholder="Flat / House #" value={flatNo}
+              onChange={e => { setFlatNo(e.target.value); setMode('new'); }} className={inp} />
+            <input type="text" placeholder="Street, building, area *" value={line1}
+              onChange={e => { setLine1(e.target.value); setMode('new'); }} className={inp} />
           </div>
 
-          {/* Address Line 1 */}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/60">
-              Address <span className="text-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Street, building, society, area, landmark"
-              value={line1}
-              onChange={(e) => { setLine1(e.target.value); setMode('new'); }}
-              className={inputClass}
-            />
-          </div>
-
-          {/* Pincode */}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/60">
-              Pincode <span className="text-destructive">*</span>
-            </label>
+          {/* Pincode + Contact row */}
+          <div className="grid grid-cols-2 gap-2">
             <div className="relative">
-              <input
-                type="text"
-                placeholder="6-digit pincode"
-                value={pincode}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                  setPincode(val);
-                  setMode('new');
-                }}
-                inputMode="numeric"
-                maxLength={6}
-                className={inputClass}
-              />
-              {pincodeLoading && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">
-                  ⏳
-                </span>
-              )}
+              <input type="text" placeholder="Pincode *" value={pincode} inputMode="numeric" maxLength={6}
+                onChange={e => { setPincode(e.target.value.replace(/\D/g, '').slice(0, 6)); setMode('new'); }} className={inp} />
+              {pinLoading && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/30 animate-pulse">···</span>}
             </div>
-            {pincodeError && (
-              <p className="mt-1 text-xs text-amber-400">{pincodeError}</p>
-            )}
-            {city && !pincodeLoading && (
-              <p className="mt-1 text-xs text-white/40">{[city, state].filter(Boolean).join(', ')}</p>
-            )}
+            <input type="tel" placeholder="Phone (optional)" value={contactNumber} inputMode="tel" maxLength={10}
+              onChange={e => { setContactNumber(e.target.value.replace(/\D/g, '').slice(0, 10)); setMode('new'); }} className={inp} />
           </div>
 
-          {/* Contact Number */}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-white/60">Contact Number</label>
-            <input
-              type="tel"
-              placeholder="10-digit mobile number"
-              value={contactNumber}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                setContactNumber(val);
-                setMode('new');
-              }}
-              inputMode="tel"
-              maxLength={10}
-              className={inputClass}
-            />
-          </div>
+          {/* Pincode result or error — single line */}
+          {pinError && <p className="text-[11px] text-amber-400/80 -mt-1">{pinError}</p>}
+          {city && !pinLoading && (
+            <p className="text-[11px] text-white/30 -mt-1">📍 {[city, state].filter(Boolean).join(', ')}</p>
+          )}
         </div>
       )}
 
-      {/* Submit */}
+      {/* Submit — inline right */}
       <button
         type="button"
         disabled={!canSubmit}
         onClick={handleSubmit}
-        className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-40 self-end"
+        className="self-end rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground transition-all hover:brightness-110 disabled:opacity-30"
       >
         Continue →
       </button>
