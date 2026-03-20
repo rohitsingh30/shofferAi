@@ -300,7 +300,7 @@ function ChatInterfaceInner() {
   const handleInputResponse = async (value: string) => {
     if (!pendingInput) return;
     try {
-      await fetch('/api/agent/input', {
+      const res = await fetch('/api/agent/input', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,6 +309,26 @@ function ChatInterfaceInner() {
           value,
         }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error('Input delivery failed:', res.status, body);
+        // Retry once after a short delay (pending entry may not be registered yet)
+        if (res.status === 404) {
+          await new Promise((r) => setTimeout(r, 1000));
+          const retry = await fetch('/api/agent/input', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId: pendingInput.taskId,
+              stepId: pendingInput.stepId,
+              value,
+            }),
+          });
+          if (!retry.ok) {
+            console.error('Input delivery retry failed:', retry.status);
+          }
+        }
+      }
     } catch (error) {
       console.error('Failed to send input:', error);
     }
