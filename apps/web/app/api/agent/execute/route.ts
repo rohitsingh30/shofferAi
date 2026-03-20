@@ -65,6 +65,10 @@ export async function POST(request: Request) {
 
       // Cleanup function to remove task event listener
       let taskEventCleanup: (() => void) | null = null;
+      // Track whether the agent handed off to the laptop browser agent.
+      // When true, the stream must stay open for laptop events (task_progress,
+      // task_complete, task_error) — the finally block must NOT close it.
+      let handoffSent = false;
 
       try {
         // Don't eagerly connect relay — chat LLM can ask clarifying questions without it.
@@ -208,6 +212,7 @@ export async function POST(request: Request) {
               send('complete', { summary: msg.summary });
               workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: true, metadata: { skillName: matchedSkill?.name } });
+              if (taskEventCleanup) taskEventCleanup();
               controller.close();
               break;
 
@@ -216,6 +221,7 @@ export async function POST(request: Request) {
               send('error', { error: msg.error });
               workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: false, metadata: { error: msg.error } });
+              if (taskEventCleanup) taskEventCleanup();
               controller.close();
               break;
           }
@@ -303,6 +309,12 @@ export async function POST(request: Request) {
             return response.value === 'confirmed';
           },
           onComplete(summary) {
+            if (handoffSent) {
+              // Handoff is active — the laptop will send task_complete.
+              // Don't mark completed here (the LLM's "I've handed this off" is just a text message).
+              console.log('[execute] taskId=%s onComplete suppressed (handoff active)', taskId);
+              return;
+            }
             console.log('[execute] taskId=%s COMPLETE: %s', taskId, summary?.slice(0, 120));
             send('complete', { summary });
             workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB updateStatus failed:', e));
@@ -349,6 +361,7 @@ export async function POST(request: Request) {
             };
 
             remoteMcpHost.sendTaskMessage(handoffMsg);
+            handoffSent = true;
             // Don't close the stream — keep it open for task events from the laptop
           },
         };
@@ -366,10 +379,16 @@ export async function POST(request: Request) {
         await workflowEngine.updateTaskStatus(taskId, 'failed');
         taskTimer.end({ success: false, metadata: { error: errorMsg } });
       } finally {
-        if (taskEventCleanup) taskEventCleanup();
-        console.log('[execute] taskId=%s stream closing', taskId);
-        // Note: controller.close() may have already been called by task_complete/task_error
-        try { controller.close(); } catch { /* already closed */ }
+        if (handoffSent) {
+          // Handoff was sent to laptop — keep the stream and event listener alive.
+          // task_complete or task_error from the laptop will close the stream (lines 211/219).
+          console.log('[execute] taskId=%s agent.execute() finished, handoff active — stream stays open', taskId);
+        } else {
+          if (taskEventCleanup) taskEventCleanup();
+          console.log('[execute] taskId=%s stream closing', taskId);
+          // Note: controller.close() may have already been called by task_complete/task_error
+          try { controller.close(); } catch { /* already closed */ }
+        }
       }
     },
   });
