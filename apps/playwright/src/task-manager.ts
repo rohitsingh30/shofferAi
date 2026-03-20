@@ -27,6 +27,8 @@ import {
 interface RunningTask {
   taskId: string;
   userId: string;
+  description: string;
+  skill?: string;
   agentProcess: ChildProcess;
   bridgeWs: WebSocket | null;
   startedAt: number;
@@ -160,6 +162,8 @@ export class TaskManager {
       const task: RunningTask = {
         taskId,
         userId,
+        description,
+        skill: skill?.name,
         agentProcess,
         bridgeWs: null,
         startedAt: Date.now(),
@@ -252,6 +256,38 @@ export class TaskManager {
       maxConcurrent: this.options.maxConcurrent,
       bridgePort: this.bridgePort,
     };
+  }
+
+  /** Get detailed status for relay_status messages */
+  getDetailedStatus(): {
+    tasks: Array<{
+      taskId: string;
+      userId: string;
+      status: 'starting' | 'running' | 'complete' | 'error';
+      startedAt: number;
+      skill?: string;
+      description?: string;
+    }>;
+  } {
+    const tasks: Array<{
+      taskId: string;
+      userId: string;
+      status: 'starting' | 'running' | 'complete' | 'error';
+      startedAt: number;
+      skill?: string;
+      description?: string;
+    }> = [];
+    for (const [, task] of this.tasks) {
+      tasks.push({
+        taskId: task.taskId,
+        userId: task.userId,
+        status: task.status,
+        startedAt: task.startedAt,
+        skill: task.skill,
+        description: task.description.slice(0, 200),
+      });
+    }
+    return { tasks };
   }
 
   async shutdown(): Promise<void> {

@@ -175,6 +175,30 @@ export interface HeartbeatPong {
   timestamp: number;
 }
 
+// ─── Relay Status ─────────────────────────────────────────────────────────
+
+/** Laptop → Cloud: periodic status snapshot of all running tasks + Chrome pool */
+export interface RelayStatusMessage {
+  type: 'relay_status';
+  timestamp: string;
+  tasks: Array<{
+    taskId: string;
+    userId: string;
+    status: 'starting' | 'running' | 'complete' | 'error';
+    startedAt: number;
+    skill?: string;
+    description?: string;
+  }>;
+  chromePool: {
+    maxSlots: number;
+    active: number;
+    ready: number;
+    busy: number;
+    error: number;
+    queueLength: number;
+  };
+}
+
 // ─── Union Types ──────────────────────────────────────────────────────────
 
 export type TaskRelayMessage =
@@ -186,7 +210,8 @@ export type TaskRelayMessage =
   | TaskPaymentResponseMessage
   | TaskCompleteMessage
   | TaskErrorMessage
-  | TaskCancelMessage;
+  | TaskCancelMessage
+  | RelayStatusMessage;
 
 export type RelayMessage =
   | ToolCallRequest
@@ -196,6 +221,7 @@ export type RelayMessage =
   | SessionEndRequest
   | SessionEndResponse
   | TaskRelayMessage
+  | RelayStatusMessage
   | HeartbeatPing
   | HeartbeatPong;
 
@@ -267,7 +293,11 @@ export function isTaskCancel(msg: RelayMessage): msg is TaskCancelMessage {
   return msg.type === 'task_cancel';
 }
 
+export function isRelayStatus(msg: RelayMessage): msg is RelayStatusMessage {
+  return msg.type === 'relay_status';
+}
+
 /** Check if a message is any task-level message */
 export function isTaskMessage(msg: RelayMessage): msg is TaskRelayMessage {
-  return msg.type.startsWith('task_');
+  return msg.type.startsWith('task_') || msg.type === 'relay_status';
 }

@@ -3,6 +3,7 @@ import {
   logger,
   type RelayMessage,
   type TaskRelayMessage,
+  type RelayStatusMessage,
   type ToolCallResponse,
   type ToolListResponse,
   type SessionEndResponse,
@@ -41,6 +42,7 @@ export class RelayOutbound {
   private reconnectDelay = 1000;
   private maxReconnectDelay: number;
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private statusInterval: ReturnType<typeof setInterval> | null = null;
   private lastDataAt = Date.now();
 
   /** Ping every 20s to keep connection alive and detect dead sockets */
@@ -86,6 +88,7 @@ export class RelayOutbound {
         this.lastDataAt = Date.now();
         logger.info('Connected to Cloud Run relay', { url: this.cloudUrl });
         this.startHealthCheck();
+        this.startStatusBroadcast();
         resolved = true;
         resolve();
       });
@@ -109,6 +112,7 @@ export class RelayOutbound {
       this.ws.on('close', () => {
         logger.info('Disconnected from Cloud Run relay');
         this.stopHealthCheck();
+        this.stopStatusBroadcast();
         if (this.shouldReconnect) {
           this.scheduleReconnect();
         }
@@ -241,6 +245,7 @@ export class RelayOutbound {
   async disconnect(): Promise<void> {
     this.shouldReconnect = false;
     this.stopHealthCheck();
+    this.stopStatusBroadcast();
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -285,5 +290,32 @@ export class RelayOutbound {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
     }
+  }
+
+  /** Broadcast relay status every 10s so Cloud Run knows what's running */
+  private startStatusBroadcast(): void {
+    this.stopStatusBroadcast();
+    this.sendStatus();
+    this.statusInterval = setInterval(() => this.sendStatus(), 10_000);
+  }
+
+  private stopStatusBroadcast(): void {
+    if (this.statusInterval) {
+      clearInterval(this.statusInterval);
+      this.statusInterval = null;
+    }
+  }
+
+  private sendStatus(): void {
+    if (!this.taskManager) return;
+    const { tasks } = this.taskManager.getDetailedStatus();
+    const chromePool = this.chromePool.getStatus();
+    const msg: RelayStatusMessage = {
+      type: 'relay_status',
+      timestamp: new Date().toISOString(),
+      tasks,
+      chromePool,
+    };
+    this.send(msg);
   }
 }

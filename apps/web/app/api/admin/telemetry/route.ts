@@ -225,5 +225,59 @@ export async function GET(request: Request) {
     });
   }
 
+  if (view === 'chrome') {
+    // Live status from relay (lazy import to avoid breaking other views)
+    let liveStatus = null;
+    try {
+      const { remoteMcpHost } = await import('@/lib/singletons');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      liveStatus = (remoteMcpHost as any)?.getRelayStatus?.() || null;
+    } catch {
+      // Relay bridge may not be available (dev mode uses RemoteMCPHost)
+    }
+
+    // Historical: recent task executions with user info
+    const recentTasks = await prisma.task.findMany({
+      where: { createdAt: { gte: since } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        description: true,
+        status: true,
+        workflowType: true,
+        createdAt: true,
+        completedAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Task durations
+    const taskDurations = recentTasks.map((t) => ({
+      taskId: t.id,
+      userEmail: t.user.email,
+      userName: t.user.name,
+      description: t.description?.slice(0, 200),
+      status: t.status,
+      skill: t.workflowType,
+      createdAt: t.createdAt,
+      completedAt: t.completedAt,
+      durationMs: t.completedAt ? t.completedAt.getTime() - t.createdAt.getTime() : null,
+    }));
+
+    return NextResponse.json({
+      live: liveStatus,
+      recentTasks: taskDurations,
+      totalTasks: recentTasks.length,
+      activeTasks: liveStatus?.tasks?.length || 0,
+    });
+  }
+
   return NextResponse.json({ error: 'Unknown view' }, { status: 400 });
 }

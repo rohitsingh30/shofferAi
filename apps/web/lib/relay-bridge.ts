@@ -9,10 +9,12 @@ import {
   type MCPToolInfo,
   type RelayMessage,
   type TaskRelayMessage,
+  type RelayStatusMessage,
   isToolCallResponse,
   isToolListResponse,
   isHeartbeatPong,
   isTaskMessage,
+  isRelayStatus,
 } from '@shofferai/shared';
 
 interface PendingRequest {
@@ -36,6 +38,7 @@ export class RelayBridge implements MCPHostLike {
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private lastPongAt = Date.now();
   private taskEventHandler: ((msg: TaskRelayMessage) => void) | null = null;
+  private latestStatus: RelayStatusMessage | null = null;
 
   /**
    * Called by the custom server when a laptop WebSocket connects.
@@ -61,11 +64,21 @@ export class RelayBridge implements MCPHostLike {
     });
 
     ws.on('close', () => {
-      logger.info('RelayBridge: laptop disconnected');
+      logger.info('RelayBridge: laptop disconnected — waiting 30s grace period before rejecting pending requests');
       this.laptopSocket = null;
       this.connected = false;
       this.stopHeartbeat();
-      this.rejectAllPending('Laptop disconnected');
+
+      // Grace period: give the laptop 30s to reconnect before rejecting pending requests.
+      // RelayOutbound on the laptop auto-reconnects with exponential backoff.
+      setTimeout(() => {
+        if (!this.connected) {
+          logger.warn('RelayBridge: laptop did not reconnect within 30s grace period, rejecting %d pending requests', this.pending.size);
+          this.rejectAllPending('Laptop disconnected (grace period expired)');
+        } else {
+          logger.info('RelayBridge: laptop reconnected within grace period, %d pending requests preserved', this.pending.size);
+        }
+      }, 30_000);
     });
 
     ws.on('error', (error) => {
@@ -95,6 +108,11 @@ export class RelayBridge implements MCPHostLike {
   private handleMessage(msg: RelayMessage): void {
     if (isHeartbeatPong(msg)) {
       this.lastPongAt = Date.now();
+      return;
+    }
+
+    if (isRelayStatus(msg)) {
+      this.latestStatus = msg;
       return;
     }
 
@@ -233,6 +251,11 @@ export class RelayBridge implements MCPHostLike {
   /** Register a handler for incoming task events from the laptop */
   onTaskEvent(handler: (msg: TaskRelayMessage) => void): void {
     this.taskEventHandler = handler;
+  }
+
+  /** Get the latest relay status snapshot (tasks + Chrome pool) */
+  getRelayStatus(): RelayStatusMessage | null {
+    return this.latestStatus;
   }
 
   async disconnect(): Promise<void> {

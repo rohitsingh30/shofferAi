@@ -143,11 +143,11 @@ httpServer.on('upgrade', (request, socket, head) => {
 // ─── Start ──────────────────────────────────────────────────────
 nextApp.prepare().then(() => {
   httpServer.listen(port, hostname, () => {
-    // Keep connections alive longer to survive Cloud Run's idle reaper.
-    // Cloud Run default request timeout is 300s; these keep the TCP socket
-    // alive between WebSocket frames so the LB doesn't drop it.
-    httpServer.keepAliveTimeout = 120000; // 120s
-    httpServer.headersTimeout = 125000;   // must be > keepAliveTimeout
+    // Keep connections alive for long-running SSE streams (agent tasks can run 30+ minutes).
+    // The SSE heartbeat (every 15s) keeps data flowing, but these timeouts
+    // must be high enough to survive any gap. Cloud Run timeout is set separately.
+    httpServer.keepAliveTimeout = 620000; // 620s (~10 min)
+    httpServer.headersTimeout = 625000;   // must be > keepAliveTimeout
 
     console.log(`> ShofferAI ready on http://${hostname}:${port}`);
     console.log(`> Relay WebSocket endpoint: ws://${hostname}:${port}/api/relay/ws`);

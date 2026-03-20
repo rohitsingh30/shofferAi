@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 type TimeRange = '1' | '6' | '24' | '72' | '168';
-type Tab = 'overview' | 'errors' | 'llm' | 'tools' | 'relay' | 'users';
+type Tab = 'overview' | 'errors' | 'llm' | 'tools' | 'relay' | 'users' | 'chrome';
 
 interface OverviewData {
   totalEvents: number;
@@ -80,6 +80,48 @@ interface RelayData {
 interface UserData {
   summary: Array<{ event: string; count: number }>;
   recentLogins: Array<{ timestamp: string; userId: string | null; metadata: string | null }>;
+}
+
+interface ChromeLiveTask {
+  taskId: string;
+  userId: string;
+  status: 'starting' | 'running' | 'complete' | 'error';
+  startedAt: number;
+  skill?: string;
+  description?: string;
+}
+
+interface ChromePoolStatus {
+  maxSlots: number;
+  active: number;
+  ready: number;
+  busy: number;
+  error: number;
+  queueLength: number;
+}
+
+interface ChromeHistoricalTask {
+  taskId: string;
+  userEmail: string | null;
+  userName: string | null;
+  description: string | null;
+  status: string;
+  skill: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+}
+
+interface ChromeData {
+  live: {
+    type: string;
+    timestamp: string;
+    tasks: ChromeLiveTask[];
+    chromePool: ChromePoolStatus;
+  } | null;
+  recentTasks: ChromeHistoricalTask[];
+  totalTasks: number;
+  activeTasks: number;
 }
 
 function formatDuration(ms: number): string {
@@ -161,6 +203,7 @@ export default function AdminDashboard() {
   const [tools, setTools] = useState<ToolData[]>([]);
   const [relay, setRelay] = useState<RelayData | null>(null);
   const [users, setUsers] = useState<UserData | null>(null);
+  const [chrome, setChrome] = useState<ChromeData | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -192,6 +235,8 @@ export default function AdminDashboard() {
         setRelay(await fetchView('relay'));
       } else if (tab === 'users') {
         setUsers(await fetchView('users'));
+      } else if (tab === 'chrome') {
+        setChrome(await fetchView('chrome'));
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch telemetry';
@@ -209,6 +254,7 @@ export default function AdminDashboard() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
+    { key: 'chrome', label: 'Chrome Sessions' },
     { key: 'llm', label: 'LLM Usage' },
     { key: 'tools', label: 'Tool Calls' },
     { key: 'relay', label: 'Relay' },
@@ -287,7 +333,7 @@ export default function AdminDashboard() {
             <p className="text-sm text-red-400">{apiError}</p>
             <button onClick={fetchData} className="mt-2 rounded-lg bg-primary px-4 py-1.5 text-xs text-primary-foreground hover:bg-primary/90">Retry</button>
           </div>
-        ) : loading && !overview && !errors.length && !llm && !tools.length && !relay && !users ? (
+        ) : loading && !overview && !errors.length && !llm && !tools.length && !relay && !users && !chrome ? (
           <div className="flex h-40 items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
@@ -533,6 +579,171 @@ export default function AdminDashboard() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* CHROME SESSIONS TAB */}
+            {tab === 'chrome' && chrome && (
+              <div className="space-y-6">
+                {/* Live status header */}
+                {chrome.live ? (
+                  <>
+                    {/* Chrome Pool capacity */}
+                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+                      <StatCard label="Max Slots" value={chrome.live.chromePool.maxSlots} />
+                      <StatCard label="Active" value={chrome.live.chromePool.active} />
+                      <StatCard label="Ready" value={chrome.live.chromePool.ready} color="text-green-400" />
+                      <StatCard label="Busy" value={chrome.live.chromePool.busy} color={chrome.live.chromePool.busy > 0 ? 'text-amber-400' : 'text-foreground'} />
+                      <StatCard label="Errors" value={chrome.live.chromePool.error} color={chrome.live.chromePool.error > 0 ? 'text-red-400' : 'text-green-400'} />
+                      <StatCard label="Queued" value={chrome.live.chromePool.queueLength} color={chrome.live.chromePool.queueLength > 0 ? 'text-red-400' : 'text-foreground'} />
+                    </div>
+
+                    {/* Live running tasks */}
+                    <div className="rounded-xl border border-border bg-card">
+                      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                        <h3 className="text-sm font-semibold">
+                          Live Tasks ({chrome.live.tasks.length})
+                        </h3>
+                        <span className="text-xs text-muted-foreground">
+                          Updated {new Date(chrome.live.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      {chrome.live.tasks.length === 0 ? (
+                        <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                          No active tasks — Chrome pool idle
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-border/50">
+                          {chrome.live.tasks.map((t) => {
+                            const elapsed = Date.now() - t.startedAt;
+                            const statusColor: Record<string, string> = {
+                              starting: 'bg-blue-500/20 text-blue-400',
+                              running: 'bg-green-500/20 text-green-400',
+                              complete: 'bg-emerald-500/20 text-emerald-400',
+                              error: 'bg-red-500/20 text-red-400',
+                            };
+                            return (
+                              <div key={t.taskId} className="flex items-center gap-4 px-4 py-3">
+                                {/* Status dot */}
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${statusColor[t.status] || 'bg-muted'}`}>
+                                  {t.status === 'running' ? (
+                                    <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
+                                  ) : t.status === 'starting' ? (
+                                    <div className="h-3 w-3 animate-spin rounded-full border border-blue-400 border-t-transparent" />
+                                  ) : (
+                                    <div className="h-2 w-2 rounded-full bg-current" />
+                                  )}
+                                </div>
+
+                                {/* Task info */}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="truncate text-sm font-medium">
+                                      {t.description || 'Task ' + t.taskId.slice(0, 8)}
+                                    </span>
+                                    {t.skill && (
+                                      <span className="shrink-0 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                        {t.skill}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                    <span className="font-mono">{t.userId.slice(0, 12)}…</span>
+                                    <span>•</span>
+                                    <span>{formatDuration(elapsed)}</span>
+                                    <span>•</span>
+                                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${statusColor[t.status] || ''}`}>
+                                      {t.status}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Task ID */}
+                                <span className="hidden shrink-0 font-mono text-[10px] text-muted-foreground md:block">
+                                  {t.taskId.slice(0, 12)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
+                    <svg className="mx-auto h-10 w-10 text-muted-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+                    </svg>
+                    <p className="mt-3 text-sm font-medium text-muted-foreground">Laptop relay not connected</p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">Live Chrome data requires the laptop relay to be running</p>
+                  </div>
+                )}
+
+                {/* Historical tasks */}
+                <div className="rounded-xl border border-border">
+                  <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">
+                    Recent Tasks ({chrome.totalTasks})
+                  </h3>
+                  {chrome.recentTasks.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">No tasks in this period</div>
+                  ) : (
+                    <div className="max-h-[420px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-card">
+                          <tr className="border-b border-border">
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">User</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Task</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Skill</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Duration</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {chrome.recentTasks.map((t) => {
+                            const taskStatusColor: Record<string, string> = {
+                              completed: 'bg-green-500/20 text-green-400',
+                              running: 'bg-blue-500/20 text-blue-400',
+                              failed: 'bg-red-500/20 text-red-400',
+                              pending: 'bg-muted text-muted-foreground',
+                            };
+                            return (
+                              <tr key={t.taskId} className="border-b border-border/50 hover:bg-muted/20">
+                                <td className="px-4 py-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-medium">{t.userName || 'Unknown'}</span>
+                                    <span className="text-[10px] text-muted-foreground">{t.userEmail || '-'}</span>
+                                  </div>
+                                </td>
+                                <td className="max-w-[200px] truncate px-4 py-2 text-xs" title={t.description || ''}>
+                                  {t.description || '-'}
+                                </td>
+                                <td className="px-4 py-2">
+                                  {t.skill ? (
+                                    <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">{t.skill}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2">
+                                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${taskStatusColor[t.status] || 'bg-muted text-muted-foreground'}`}>
+                                    {t.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-xs text-muted-foreground">
+                                  {t.durationMs ? formatDuration(t.durationMs) : t.status === 'running' ? '⏳' : '-'}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2 text-xs text-muted-foreground">
+                                  {new Date(t.createdAt).toLocaleString()}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

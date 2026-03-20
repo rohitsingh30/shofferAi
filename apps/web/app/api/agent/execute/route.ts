@@ -58,11 +58,32 @@ export async function POST(request: Request) {
     async start(controller) {
       const encoder = new TextEncoder();
 
+      let streamClosed = false;
+
       function send(type: string, payload: Record<string, unknown>) {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type, payload })}\n\n`)
-        );
+        if (streamClosed) return;
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type, payload })}\n\n`)
+          );
+        } catch {
+          // Stream already closed (browser disconnected, timeout, etc.)
+          streamClosed = true;
+        }
       }
+
+      function sendKeepAlive() {
+        if (streamClosed) return;
+        try {
+          controller.enqueue(encoder.encode(`: keepalive\n\n`));
+        } catch {
+          streamClosed = true;
+        }
+      }
+
+      // SSE heartbeat — prevents keepAliveTimeout from killing the connection
+      // while the laptop is executing the task (Chrome launching, page loading, etc.)
+      const heartbeatTimer = setInterval(sendKeepAlive, 15_000);
 
       // Cleanup function to remove task event listener
       let taskEventCleanup: (() => void) | null = null;
@@ -247,8 +268,9 @@ export async function POST(request: Request) {
               send('complete', { summary: msg.summary });
               workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: true, metadata: { skillName: matchedSkill?.name } });
+              clearInterval(heartbeatTimer);
               if (taskEventCleanup) taskEventCleanup();
-              controller.close();
+              try { controller.close(); } catch { /* already closed */ }
               break;
 
             case 'task_error':
@@ -256,8 +278,9 @@ export async function POST(request: Request) {
               send('error', { error: msg.error });
               workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: false, metadata: { error: msg.error } });
+              clearInterval(heartbeatTimer);
               if (taskEventCleanup) taskEventCleanup();
-              controller.close();
+              try { controller.close(); } catch { /* already closed */ }
               break;
           }
         };
@@ -415,13 +438,13 @@ export async function POST(request: Request) {
         taskTimer.end({ success: false, metadata: { error: errorMsg } });
       } finally {
         if (handoffSent) {
-          // Handoff was sent to laptop — keep the stream and event listener alive.
-          // task_complete or task_error from the laptop will close the stream (lines 211/219).
-          console.log('[execute] taskId=%s agent.execute() finished, handoff active — stream stays open', taskId);
+          // Handoff was sent to laptop — keep the stream, heartbeat, and event listener alive.
+          // task_complete or task_error from the laptop will close the stream.
+          console.log('[execute] taskId=%s agent.execute() finished, handoff active — stream stays open (heartbeat running)', taskId);
         } else {
+          clearInterval(heartbeatTimer);
           if (taskEventCleanup) taskEventCleanup();
           console.log('[execute] taskId=%s stream closing', taskId);
-          // Note: controller.close() may have already been called by task_complete/task_error
           try { controller.close(); } catch { /* already closed */ }
         }
       }
