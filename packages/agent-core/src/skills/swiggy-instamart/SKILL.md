@@ -15,6 +15,10 @@ triggers:
   - quick grocery delivery
   - swiggy instant delivery
   - order vegetables from swiggy
+  - order milk and bread from swiggy
+  - swiggy instamart milk
+  - buy from swiggy instamart
+  - swiggy grocery delivery
 siteUrl: https://www.swiggy.com/instamart
 requiresAuth: true
 params:
@@ -48,15 +52,21 @@ Only call `ask_user` for information NOT already in the user's message.
 
 ### 1. Open Swiggy Instamart & Set Location
 - Open a NEW tab and navigate to `https://www.swiggy.com/instamart`.
-- Take snapshot. Verify logged in — look for profile name or account icon in header (link with href `/my-account`).
+- Take snapshot. Verify logged in — look for profile name (e.g., "Rohit") or account icon in header (link with href `/my-account`).
 - If NOT logged in, login transparently using operator credentials. Do NOT ask user for credentials.
 - **If session expired, STOP and tell user: "Session expired, please re-login in Chrome Debug."**
 - If "OK GOT IT" dialog appears for delivery-location confirmation, click it.
-- If location is wrong, click the location/address bar at the top, type the user's delivery address, wait for autocomplete suggestions, click the best match.
+- **Check current delivery location** shown at the top of the page. If it doesn't match the user's address:
+  - Click the location/address bar at the top.
+  - Look for **saved addresses** — e.g., "new home" at C-502, Honer Aquantis, Tellapur. If one matches, click it directly.
+  - If no saved address matches, type the user's delivery address, wait for autocomplete suggestions, click the best match.
 - Take snapshot again. Confirm location is set and Instamart product categories are visible.
+- **⚠️ STORE HOURS CHECK**: If the page shows "We'll reopen at 6 am" or similar, the store is closed. Inform the user with the reopening time and ask if they want to proceed (items can still be added to cart for when the store opens).
 - Dismiss any app-install banners or notification prompts (click "No thanks" / "Not now" / close button).
 
 ### 2. Search & Add Each Item (loop)
+**FIRST**: Check if there are pre-existing items in the cart from a previous session. If the cart badge shows items, go to the cart and remove ALL items before starting. This ensures the user only gets what they asked for.
+
 For EACH item in the shopping list:
 
 **a) Search for the item:**
@@ -71,13 +81,16 @@ For EACH item in the shopping list:
 
 **c) Add selected item to cart:**
 - Click the "Add" or "ADD" button on the chosen product card.
-- If a quantity stepper appears (+/- buttons), adjust quantity if user requested more than 1.
+- If a quantity stepper appears (+/- buttons), verify the quantity shows "1". If user requested more than 1, use the "+" button to increase.
+- If the product already shows a quantity (e.g., from a previous session), that's fine — note it and move on.
 - If an "Add to cart" confirmation modal appears, click "Add item" or confirm.
 - Take snapshot to verify item was added (cart count should increase).
 
 **d) Go back to search for next item:**
-- Click the search bar again or navigate back to search.
+- Clear the search bar (click the X/clear button or select all text and type the next item).
+- If navigated away from search results, click the search bar at the top of the page.
 - Repeat for all items.
+- **TIP**: After adding an item, you may land on the product detail page. Use the back button or click the search bar to return to search.
 
 ### 3. Review Cart
 - Click the cart button/link (usually shows item count and total at bottom of page, or "N items" floating bar).
@@ -109,15 +122,17 @@ For EACH item in the shopping list:
 - **Swiggy Instamart URL**: `https://www.swiggy.com/instamart` — do NOT use `/` or `/restaurants` (those are for food delivery).
 - **Delivery speed**: 10-30 minutes depending on items and location.
 - **"OK GOT IT" dialog**: Swiggy shows this on first visit for delivery-location confirmation. Always dismiss it.
-- **Location bar**: Located at the top of the page. If location is wrong, click it, type address, pick from autocomplete.
-- **Search**: The search bar is at the top of the Instamart page. Type item name and press Enter.
-- **Product cards**: Each card shows product image, brand name, size, price, and an "ADD" button.
-- **Cart**: A floating bar at the bottom shows cart count and total. Click it to open the cart.
+- **Location bar**: Located at the top of the page showing current delivery area (e.g., "Ujjain", "Tellapur"). Click it to change. **Saved addresses** appear as clickable cards (e.g., "new home" with full address). Prefer selecting a saved address over typing.
+- **Store hours**: Instamart stores may close late at night. If closed, page shows "We'll reopen at 6 am, today" or similar. Items can still be browsed but cart modifications may be disabled.
+- **Search**: The search bar is at the top of the Instamart page. Type item name and press Enter. After searching, clicking a product may navigate to its detail page — use back/search to return.
+- **Product cards**: Each card shows product image, brand name, size/weight (e.g., "1 Ltr", "400g"), price (with MRP strikethrough if discounted), and an "ADD" button. Common milk brands: Amul Taaza, Arokya, Heritage, Sid's Farm, Country Delight. Common bread brands: Britannia, Modern, English Oven, NOICE.
+- **Cart**: A floating bar at the bottom shows cart count and total. Click it to open the cart. **Pre-existing items from previous sessions may remain in the cart** — always check and clean up before proceeding.
 - **Out of stock**: Some products may show "Out of stock" or have no "ADD" button — suggest alternatives.
 - **Swiggy One**: Members get free delivery and extra discounts. Profile 3 may have Swiggy One.
 - **Minimum order**: Free delivery may require a minimum order value (typically ₹149-₹199).
-- **Operator Chrome Profile 3** should be logged in as rsinghtomar3011@gmail.com. Do NOT ask user for credentials.
+- **Operator Chrome Profile 3** should be logged in as rsinghtomar3011@gmail.com (shows as "Rohit" in the header). Do NOT ask user for credentials.
 - **If session expired**, login transparently. Phone OTP goes to operator.
 - **Swiggy uses React** — always use Playwright fill/type methods for form inputs.
 - When using `confirm_action` or `collect_payment`, WAIT for user response. Do NOT auto-proceed.
 - **App-install banners**: Swiggy may show "Download the app" prompts. Dismiss with close button or "No thanks".
+- **Iteration budget**: The search → select → add loop can be iteration-heavy. Keep searches efficient — search for the exact product name, present top 5-7 choices, add quickly. Avoid unnecessary navigation back-and-forth.
