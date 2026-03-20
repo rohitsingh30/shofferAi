@@ -303,6 +303,8 @@ export async function POST(request: Request) {
           },
           async onInputRequired(request) {
             console.log('[execute] taskId=%s INPUT_REQUIRED stepId=%s type=%s q=%s', taskId, request.stepId, request.inputType, request.question?.slice(0, 80));
+            // Save the ask_user prompt as an assistant message
+            workflowEngine.addMessage(taskId, 'assistant', request.question || '[input requested]', { inputType: request.inputType, stepId: request.stepId, options: request.options }).catch(e => console.error('[execute] DB addMessage(ask) failed:', e));
             send('input_required', {
               taskId,
               stepId: request.stepId,
@@ -327,14 +329,18 @@ export async function POST(request: Request) {
             });
             const response = await pauseManager.waitForInput({ ...request, taskId });
             console.log('[execute] taskId=%s input received for stepId=%s', taskId, request.stepId);
+            // Save user's response
+            workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', { stepId: request.stepId, inputType: request.inputType }).catch(e => console.error('[execute] DB addMessage(input) failed:', e));
             return response;
           },
           async onConfirmRequired(details) {
             console.log('[execute] taskId=%s CONFIRM_REQUIRED: %s', taskId, details.action?.slice(0, 80));
+            const confirmQuestion = `${details.action}\n\n${details.description}`;
+            workflowEngine.addMessage(taskId, 'assistant', confirmQuestion, { type: 'confirmation' }).catch(e => console.error('[execute] DB addMessage(confirm-ask) failed:', e));
             send('input_required', {
               taskId,
               stepId: 'confirm',
-              question: `${details.action}\n\n${details.description}`,
+              question: confirmQuestion,
               inputType: 'confirmation',
             });
             const response = await pauseManager.waitForInput({
@@ -344,10 +350,12 @@ export async function POST(request: Request) {
               inputType: 'confirmation',
             });
             console.log('[execute] taskId=%s confirm response=%s', taskId, response.value);
+            workflowEngine.addMessage(taskId, 'user', response.value === 'yes' ? 'Yes, confirmed' : 'No, cancelled', { type: 'confirmation' }).catch(e => console.error('[execute] DB addMessage(confirm-resp) failed:', e));
             return response.value === 'yes';
           },
           async onPaymentRequired(details: { bookingSummary: string; amountInr: number; description: string }) {
             console.log('[execute] taskId=%s PAYMENT_REQUIRED amount=₹%d', taskId, details.amountInr);
+            workflowEngine.addMessage(taskId, 'assistant', `Payment required: ₹${details.amountInr}\n${details.bookingSummary}`, { type: 'payment', amountInr: details.amountInr }).catch(e => console.error('[execute] DB addMessage(payment-ask) failed:', e));
             send('payment_required', {
               taskId,
               bookingSummary: details.bookingSummary,
@@ -363,6 +371,7 @@ export async function POST(request: Request) {
               timeout: 600000,
             });
             console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
+            workflowEngine.addMessage(taskId, 'user', response.value === 'confirmed' ? 'Payment confirmed' : 'Payment declined', { type: 'payment' }).catch(e => console.error('[execute] DB addMessage(payment-resp) failed:', e));
             return response.value === 'confirmed';
           },
           onComplete(summary) {

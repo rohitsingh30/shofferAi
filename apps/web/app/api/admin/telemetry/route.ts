@@ -323,6 +323,7 @@ export async function GET(request: Request) {
           id: true,
           role: true,
           content: true,
+          metadata: true,
           createdAt: true,
         },
       }),

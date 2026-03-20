@@ -152,6 +152,7 @@ interface TaskDetailData {
     id: string;
     role: string;
     content: string;
+    metadata: string | null;
     createdAt: string;
   }>;
   telemetry: Array<{
@@ -349,17 +350,28 @@ function TaskDetailPanel({ taskId, onClose }: { taskId: string; onClose: () => v
                 <div className="space-y-3">
                   {data.messages.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No messages</p>
-                  ) : data.messages.map((m) => (
+                  ) : data.messages.map((m) => {
+                    const meta = m.metadata ? (typeof m.metadata === 'string' ? JSON.parse(m.metadata) : m.metadata) : null;
+                    const isInput = meta?.inputType;
+                    const isConfirm = meta?.type === 'confirmation';
+                    const isPayment = meta?.type === 'payment';
+                    return (
                     <div key={m.id} className={`rounded-lg border p-3 ${m.role === 'user' ? 'border-primary/30 bg-primary/5' : m.role === 'assistant' ? 'border-border bg-card' : 'border-border/50 bg-muted/30'}`}>
                       <div className="mb-1 flex items-center justify-between">
-                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${m.role === 'user' ? 'text-primary' : m.role === 'assistant' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {m.role}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider ${m.role === 'user' ? 'text-primary' : m.role === 'assistant' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {m.role}
+                          </span>
+                          {isInput && <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-medium text-amber-400">ask_user</span>}
+                          {isConfirm && <span className="rounded bg-orange-500/20 px-1.5 py-0.5 text-[9px] font-medium text-orange-400">confirm</span>}
+                          {isPayment && <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400">payment</span>}
+                        </div>
                         <span className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleTimeString()}</span>
                       </div>
                       <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">{m.content}</p>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
