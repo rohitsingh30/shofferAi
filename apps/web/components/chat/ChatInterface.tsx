@@ -64,7 +64,43 @@ function ChatInterfaceInner() {
   const [cartStore, setCartStore] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const { openL2 } = useL2Payment();
+
+  const resetChat = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setMessages([]);
+    setInput('');
+    setIsLoading(false);
+    setCurrentSteps([]);
+    setPendingInput(null);
+    setCartItems([]);
+    setCartTotal('');
+    setCartStore('');
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+  }, []);
+
+  // Listen for "newchat" event from Sidebar
+  useEffect(() => {
+    const handler = () => resetChat();
+    window.addEventListener('newchat', handler);
+    return () => window.removeEventListener('newchat', handler);
+  }, [resetChat]);
+
+  // Abort stream on unmount
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -182,6 +218,13 @@ function ChatInterfaceInner() {
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
 
+    // Abort any previous in-flight request
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -201,6 +244,7 @@ function ChatInterfaceInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage.content }),
+        signal: controller.signal,
       });
 
       if (!res.ok) throw new Error('Failed to execute');
@@ -210,27 +254,35 @@ function ChatInterfaceInner() {
 
       if (reader) {
         let buffer = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const event = JSON.parse(line.slice(6));
-                handleSSEEvent(event);
-              } catch {
-                // skip
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const event = JSON.parse(line.slice(6));
+                  handleSSEEvent(event);
+                } catch {
+                  // skip
+                }
               }
             }
           }
+        } finally {
+          reader.releaseLock();
         }
       }
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        // Request was cancelled (new chat or navigation) — don't show error
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -241,6 +293,9 @@ function ChatInterfaceInner() {
       ]);
     } finally {
       setIsLoading(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
     }
   }, [isLoading, handleSSEEvent]);
 

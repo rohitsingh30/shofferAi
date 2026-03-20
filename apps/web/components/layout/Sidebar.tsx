@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 
@@ -11,7 +11,16 @@ interface SidebarProps {
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleNewChat = () => {
+    // Dispatch event so ChatInterface resets state & aborts active stream
+    window.dispatchEvent(new Event('newchat'));
+    if (pathname !== '/dashboard') {
+      router.push('/dashboard');
+    }
+  };
 
   const navItems = [
     {
@@ -87,6 +96,25 @@ export function Sidebar({ user }: SidebarProps) {
           const isActive = item.exact
             ? pathname === item.href
             : pathname.startsWith(item.href);
+
+          // "New Chat" uses a button to dispatch reset event instead of plain navigation
+          if (item.exact && item.href === '/dashboard') {
+            return (
+              <button
+                key={item.href}
+                onClick={handleNewChat}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                } ${collapsed ? 'justify-center' : ''}`}
+                title={collapsed ? item.label : undefined}
+              >
+                {item.icon}
+                {!collapsed && <span>{item.label}</span>}
+              </button>
+            );
+          }
 
           return (
             <Link

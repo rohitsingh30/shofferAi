@@ -134,7 +134,7 @@ export async function executeAgent(
     if (signal) {
       signal.addEventListener('abort', () => {
         cleanup();
-        reject(new Error('Aborted'));
+        reject(new DOMException('The operation was aborted.', 'AbortError'));
       });
     }
 
