@@ -219,4 +219,19 @@ After making changes:
 
 ---
 
+---
+
+## 15. Testing UI on localhost Instead of Production
+
+**What happens:** Agent makes UI changes and tests them on `localhost:3000` instead of the production URL. Localhost requires the relay running, has different auth state, and doesn't prove the change works in production. The agent wastes time trying to send messages through localhost when the relay isn't connected.
+
+**Examples:**
+- Agent redesigned the chat UI, tested locally, relay wasn't running → got "couldn't reach browser agent" error
+- Agent tested message flow on localhost instead of just deploying and testing on prod
+- Multiple sessions wasted time starting `npx next dev` for visual testing when prod was already deployed
+
+**Rule:** For UI/visual testing, ALWAYS use production: `https://shofferai-27188185100.asia-south1.run.app`. Deploy first, then test on prod. Only use localhost for rapid iteration on CSS/layout (no need to send actual messages). For testing the full agent flow (sending messages, seeing steps, input prompts), ALWAYS use prod where the relay is connected.
+
+---
+
 *Last updated: 2026-03-20*

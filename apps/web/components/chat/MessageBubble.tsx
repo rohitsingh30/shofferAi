@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -6,7 +8,7 @@ export interface Message {
 
 /** Render basic markdown: **bold**, *italic*, `code`, and line breaks */
 function renderMarkdown(text: string) {
-  const parts: (string | JSX.Element)[] = [];
+  const parts: React.ReactNode[] = [];
   // Split into lines first, then process inline formatting
   const lines = text.split('\n');
 
