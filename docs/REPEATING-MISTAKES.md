@@ -357,4 +357,52 @@ After making changes:
 
 ---
 
+## 23. Skills Not Loading in Docker (0 Skills on Cloud Run)
+
+**What happens:** Cloud Run logs show `[singletons] Loaded 0 skills` on EVERY request. Skill matching always returns null. The Copilot CLI gets no site-specific instructions, tries to login to pre-authenticated sites, and doesn't know how to navigate target websites.
+
+**Root cause:** `loadSkills()` in `loader.ts` uses `__dirname` to find SKILL.md files. In the Next.js standalone Docker build, `__dirname` resolves to the bundled chunk directory — SKILL.md files (plain markdown) are NOT bundled by webpack/Next.js, so they don't exist in the container.
+
+**The fix (2026-03-20):**
+1. Added `COPY --from=builder /app/packages/agent-core/src/skills ./skills` to Dockerfile
+2. Added `ENV SKILLS_DIR=/app/skills` to Dockerfile
+3. Updated `singletons.ts` to pass explicit `skillsDir` path: `process.env.SKILLS_DIR || join(process.cwd(), 'packages/agent-core/src/skills')`
+
+**Rule:** Plain markdown files (SKILL.md) are NOT included in Next.js standalone builds. Any non-code assets needed at runtime must be explicitly COPY'd in the Dockerfile. Always verify with `gcloud logging read` that skills load after deployment.
+
+---
+
+## 24. Event Handler Singleton Breaks Concurrent Tasks
+
+**What happens:** When two tasks run simultaneously, the second task's events are delivered correctly but the first task's events silently vanish. The first task appears to stall — `UserInputTimeoutError` after 5 minutes.
+
+**Root cause:** `RelayBridge.onTaskEvent(handler)` was `this.taskEventHandler = handler` — a single slot. Starting a new task replaced the previous task's handler. Events from task A dispatched to task B's handler, which filtered them out (wrong taskId).
+
+**The fix (2026-03-20):**
+1. Changed `taskEventHandler` singleton → `taskEventHandlers: Map<string, handler>` in RelayBridge, RelayClient, and RemoteMCPHost
+2. `onTaskEvent(handler, taskId?)` registers handlers by taskId
+3. `removeTaskEventHandler(taskId?)` cleans up after task completion
+4. `handleMessage()` dispatches to ALL registered handlers (each filters by its own taskId)
+
+**Rule:** Never use singleton patterns for per-task state. Any handler, callback, or state that is task-specific MUST be keyed by taskId.
+
+---
+
+## 25. Re-Asking for Information Already in User's Message
+
+**What happens:** User says "Order milk and bread from Swiggy Instamart" and the agent shows an input form asking "What do you want to buy?" — even though items are clearly stated. Terrible UX.
+
+**Root cause:** Two issues:
+1. `system.ts` injected skill instructions but NOT skill `params` definitions. LLM never saw which params could be extracted from the message.
+2. Every SKILL.md's Step 0 explicitly said "call ask_user with layout and TWO sections: address AND items" — the LLM followed the instruction literally.
+
+**The fix (2026-03-20):**
+1. System prompt now injects params with OVERRIDE directive: "Extract parameter values from the user's ORIGINAL message. Do NOT ask for values already provided."
+2. Includes explicit examples: "If the user said 'order milk and bread' → items are ALREADY KNOWN"
+3. Updated 17 grocery SKILL.md files with extract-first Step 0 logic
+
+**Rule:** ALWAYS extract parameters from the user's message first. Only call `ask_user` for values that are genuinely missing. The system prompt OVERRIDE directive applies to all 500 skills.
+
+---
+
 *Last updated: 2026-03-20*

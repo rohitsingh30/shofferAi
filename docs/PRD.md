@@ -313,10 +313,45 @@ The operator's Chrome profile must have:
 
 ## 11. Implementation Priority
 
-**Phase 0**: Documentation (this document + ARCHITECTURE.md + CLAUDE.md update)
-**Phase 1**: Relay infrastructure (cloud ↔ laptop tunnel)
-**Phase 2**: L2 payment window (Razorpay + split-view UI)
-**Phase 3**: GCP deployment (Cloud Run + Cloud SQL)
-**Phase 4**: End-to-end testing and launch
+**Phase 0**: Documentation (this document + ARCHITECTURE.md + CLAUDE.md update) ✅
+**Phase 1**: Relay infrastructure (cloud ↔ laptop tunnel) ✅
+**Phase 2**: L2 payment window (Razorpay + split-view UI) ✅
+**Phase 3**: GCP deployment (Cloud Run + Cloud SQL) ✅
+**Phase 4**: End-to-end testing and launch 🔄
 
 **Target**: Ship MVP within this sprint. We've wasted enough time.
+
+---
+
+## 12. Known Bugs & Status (as of 2026-03-20)
+
+### Fixed (deployed to prod)
+
+| Bug | Impact | Fix |
+|-----|--------|-----|
+| **SSE stream dies after 120s silence** | Task appears to stall | keepAliveTimeout 120→620s, SSE heartbeat every 15s |
+| **Cloud Run timeout = 5 min** | Complex tasks killed | Bumped to 3600s (1 hour) |
+| **Relay no grace period** | All pending rejected on disconnect | 30s grace window before rejection |
+| **Skills never load in Docker** | 0 skills on EVERY Cloud Run request | Copy skills/ to Docker, explicit SKILLS_DIR env var |
+| **Event handler singleton** | Concurrent tasks break (events lost) | Map<taskId, handler> in RelayBridge/RelayClient |
+| **Re-asking items already in message** | "What do you want to buy?" when user said "milk and bread" | System prompt OVERRIDE + extract-first Step 0 |
+| **ask_user renders as progress card** | User can't respond to input prompts | Removed onStepUpdate before onInputRequired |
+
+### Open
+
+| Bug | Severity | Description |
+|-----|----------|-------------|
+| **Frontend swallows input POST failures** | P0 | POST to `/api/agent/input` fails silently — user sees infinite stall, no error |
+| **Swiggy session expired** | P1 | Chrome Profile 3 session needs re-login (not a code bug) |
+| **TelemetryEvent table missing** | P2 | Needs Prisma migration — all telemetry endpoints return 500 |
+| **maxIterations = 25** | P1 | May be too low for complex multi-item orders (bumped in ARCHITECTURE but not in code?) |
+
+### Architecture Verified (2026-03-20 E2E test)
+
+Full pipeline tested and working:
+```
+User → Chat LLM → handoff_to_browser_agent → relay → laptop Copilot CLI
+  → Playwright MCP → Chrome → Swiggy Instamart
+  → Set location ✅ → Detected login wall ✅ → ask_user for phone ✅
+  → SSE streaming back to user ✅
+```
