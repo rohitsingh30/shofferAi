@@ -22,7 +22,7 @@ async function main() {
   await taskManager.initialize();
 
   const poolStatus = chromePool.getStatus();
-  const tools = chromePool.getTools();
+  const toolCount = poolStatus.active > 0 ? '(discovering...)' : '(cached or lazy)';
   const taskStatus = taskManager.getStatus();
 
   let shutdownFn: () => Promise<void>;
@@ -40,8 +40,8 @@ async function main() {
     logger.info('');
     logger.info('=== ShofferAI Laptop Relay ===');
     logger.info(`Cloud:   ${RELAY_CLOUD_URL}`);
-    logger.info(`Chrome:  ${poolStatus.active} warm slot (up to ${poolStatus.maxSlots} on demand)`);
-    logger.info(`Tools:   ${tools.length} Playwright MCP tools`);
+    logger.info(`Chrome:  0 running (up to ${poolStatus.maxSlots} on demand)`);
+    logger.info(`Tools:   ${toolCount}`);
     logger.info(`Tasks:   Bridge WS on port ${taskStatus.bridgePort} (max ${taskStatus.maxConcurrent} concurrent)`);
     logger.info('Press Ctrl+C to stop.');
     logger.info('');
@@ -61,8 +61,8 @@ async function main() {
     logger.info('');
     logger.info('=== ShofferAI Laptop Relay (Dev) ===');
     logger.info(`Relay:   ws://localhost:${RELAY_PORT}`);
-    logger.info(`Chrome:  ${poolStatus.active} warm slot (up to ${poolStatus.maxSlots} on demand)`);
-    logger.info(`Tools:   ${tools.length} Playwright MCP tools`);
+    logger.info(`Chrome:  0 running (up to ${poolStatus.maxSlots} on demand)`);
+    logger.info(`Tools:   ${toolCount}`);
     logger.info(`Tasks:   Bridge WS on port ${taskStatus.bridgePort} (max ${taskStatus.maxConcurrent} concurrent)`);
     logger.info('Press Ctrl+C to stop.');
     logger.info('');

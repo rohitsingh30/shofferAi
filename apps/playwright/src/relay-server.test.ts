@@ -12,7 +12,7 @@ vi.mock('@shofferai/shared', async () => {
 
 function createMockChromePool() {
   return {
-    getTools: vi.fn(() => [
+    getTools: vi.fn(async () => [
       { name: 'browser_click', description: 'Click element', inputSchema: { type: 'object' } },
       { name: 'browser_type', description: 'Type text', inputSchema: { type: 'object' } },
     ]),

@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process';
-import { cpSync, mkdirSync, existsSync, rmSync } from 'fs';
+import { cpSync, mkdirSync, existsSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { EventEmitter } from 'events';
@@ -97,6 +97,8 @@ export class ChromePool {
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   private options: ChromePoolOptions;
   private tools: ReturnType<MCPHost['getTools']> = [];
+  private toolsDiscovered = false;
+  private toolDiscoveryPromise: Promise<void> | null = null;
   private nextSlotIndex = 0;
 
   constructor(options: Partial<ChromePoolOptions> = {}) {
@@ -104,40 +106,93 @@ export class ChromePool {
   }
 
   /**
-   * Initialize the pool — just creates the data dir and starts cleanup timer.
-   * No Chrome instances are launched until a task arrives.
-   * One temporary Chrome is launched to discover available Playwright MCP tools,
-   * then immediately shut down.
+   * Initialize the pool — creates data dir and starts cleanup timers.
+   * No Chrome instances are launched until actually needed.
+   * Tool discovery happens lazily on first getTools() call.
    */
   async initialize(): Promise<void> {
-    logger.info('Initializing Chrome Pool (lazy mode)', {
+    logger.info('Initializing Chrome Pool (lazy mode — zero Chrome until needed)', {
       maxSlots: this.options.maxSlots,
       poolDataDir: this.options.poolDataDir,
     });
 
     mkdirSync(this.options.poolDataDir, { recursive: true });
 
-    // Bootstrap: launch one temporary Chrome to discover tool list
-    const bootstrapSlot = this.createSlot();
-    try {
-      await this.initSlot(bootstrapSlot);
-      this.tools = bootstrapSlot.mcpHost!.getTools();
-      logger.info(`Discovered ${this.tools.length} Playwright MCP tools`);
-      // Keep this slot warm — it's ready for the first task
-      this.slots.push(bootstrapSlot);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown';
-      throw new Error(`Chrome Pool bootstrap failed (cannot discover tools): ${msg}`);
+    // Try to load cached tools from previous run
+    const cached = this.loadCachedTools();
+    if (cached) {
+      this.tools = cached;
+      this.toolsDiscovered = true;
+      logger.info(`Loaded ${this.tools.length} cached Playwright MCP tools (no Chrome needed)`);
     }
 
-    logger.info('Chrome Pool ready (lazy mode — Chrome launches on demand)', {
-      tools: this.tools.length,
-      warmSlots: 1,
+    logger.info('Chrome Pool ready (zero Chrome running — launches on first request)', {
+      toolsCached: this.toolsDiscovered,
     });
 
     this.cleanupInterval = setInterval(() => this.cleanupIdleSlots(), 60_000);
-    // Periodic CDP health check — catches frozen Chrome before tool calls fail
     this.healthCheckInterval = setInterval(() => this.healthCheckSlots(), 15_000);
+  }
+
+  /** Cache file for Playwright MCP tool definitions */
+  private get toolsCachePath(): string {
+    return join(this.options.poolDataDir, 'tools-cache.json');
+  }
+
+  private loadCachedTools(): ReturnType<MCPHost['getTools']> | null {
+    try {
+      if (!existsSync(this.toolsCachePath)) return null;
+      const data = JSON.parse(readFileSync(this.toolsCachePath, 'utf-8'));
+      if (Array.isArray(data) && data.length > 0 && data[0].name) {
+        return data;
+      }
+    } catch {
+      // Corrupted cache — will rediscover
+    }
+    return null;
+  }
+
+  private saveCachedTools(): void {
+    try {
+      writeFileSync(this.toolsCachePath, JSON.stringify(this.tools, null, 2));
+      logger.debug('Saved tools cache for next startup');
+    } catch (err) {
+      logger.warn('Failed to save tools cache', { error: String(err) });
+    }
+  }
+
+  /**
+   * Discover Playwright MCP tools by launching a temporary Chrome.
+   * Tears Chrome down immediately after discovery.
+   * Deduplicates concurrent calls via a shared promise.
+   */
+  async discoverTools(): Promise<void> {
+    if (this.toolsDiscovered) return;
+
+    if (this.toolDiscoveryPromise) {
+      return this.toolDiscoveryPromise;
+    }
+
+    this.toolDiscoveryPromise = (async () => {
+      logger.info('Discovering Playwright MCP tools (launching temporary Chrome)...');
+      const tempSlot = this.createSlot();
+      try {
+        await this.initSlot(tempSlot);
+        this.tools = tempSlot.mcpHost!.getTools();
+        this.toolsDiscovered = true;
+        this.saveCachedTools();
+        logger.info(`Discovered ${this.tools.length} Playwright MCP tools`);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown';
+        throw new Error(`Tool discovery failed: ${msg}`);
+      } finally {
+        // Tear down the temporary Chrome — don't keep idle windows
+        await this.teardownSlot(tempSlot);
+        this.toolDiscoveryPromise = null;
+      }
+    })();
+
+    return this.toolDiscoveryPromise;
   }
 
   private createSlot(): ChromeSlot {
@@ -592,7 +647,10 @@ export class ChromePool {
     logger.debug(`Slot ${slot.index} torn down`);
   }
 
-  getTools(): ReturnType<MCPHost['getTools']> {
+  async getTools(): Promise<ReturnType<MCPHost['getTools']>> {
+    if (!this.toolsDiscovered) {
+      await this.discoverTools();
+    }
     return this.tools;
   }
 

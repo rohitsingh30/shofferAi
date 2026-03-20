@@ -136,7 +136,7 @@ export class RelayOutbound {
     // ─── Legacy MCP tool relay → ChromePool ─────────────────────
 
     if (isToolListRequest(msg)) {
-      const tools = this.chromePool.getTools();
+      const tools = await this.chromePool.getTools();
       const response: ToolListResponse = {
         id: msg.id,
         type: 'tool_list_result',
