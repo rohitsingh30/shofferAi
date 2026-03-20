@@ -90,7 +90,7 @@ export class TaskManager {
     this.options = {
       bridgePortRange: options.bridgePortRange || [9400, 9499],
       copilotBin: options.copilotBin || process.env.COPILOT_BIN || 'gh',
-      model: options.model || process.env.COPILOT_MODEL || 'claude-sonnet-4.6',
+      model: options.model || process.env.COPILOT_MODEL || 'claude-opus-4.6',
       chromeDebugPort: options.chromeDebugPort || Number(process.env.CHROME_DEBUG_PORT) || 9222,
       taskTimeoutMs: options.taskTimeoutMs || 10 * 60_000,
       maxConcurrent: options.maxConcurrent || 5,

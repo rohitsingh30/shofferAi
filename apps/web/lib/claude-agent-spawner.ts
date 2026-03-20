@@ -68,7 +68,7 @@ export class ClaudeAgentSpawner {
       chromeSourceProfile: options.chromeSourceProfile ||
         join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome-Debug'),
       profileDirectory: options.profileDirectory || 'Profile 3',
-      model: options.model || process.env.COPILOT_MODEL || 'claude-sonnet-4.6',
+      model: options.model || process.env.COPILOT_MODEL || 'claude-opus-4.6',
       chromePath: options.chromePath ||
         '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       cdpPortRange: options.cdpPortRange || [9300, 9399],
