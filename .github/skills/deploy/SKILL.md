@@ -40,20 +40,21 @@ Pre-flight checks:
 
 If GCP auth fails, STOP and help the user fix it. Everything else is a warning.
 
-### Step 2: Submit to Cloud Build
+### Step 2: Push and Submit to Cloud Build
 
-Run the deploy command:
+Push changes and start the build:
 ```bash
-gcloud builds submit --config cloudbuild.yaml 2>&1
+cd /Users/rohit/shofferAi && git push origin main 2>&1 | tail -3 && gcloud builds submit --config cloudbuild.yaml 2>&1
 ```
 
 This will:
+- Push latest commits to GitHub
 - Upload source tarball to Cloud Storage (~12 MB)
-- Build the Docker image remotely (multi-stage: builder → runner)
-- Push to Artifact Registry (`asia-south1-docker.pkg.dev`)
+- Build with **Kaniko** (automatic layer caching in Artifact Registry) on an **8-vCPU** machine
+- Push image to Artifact Registry (`asia-south1-docker.pkg.dev`)
 - Deploy to Cloud Run (`shofferai` service, `asia-south1`)
 
-**The build takes 3-5 minutes.** Use `initial_wait: 120` (2 min) when running this command so you can monitor progress. If it exceeds the wait, you'll be notified on completion.
+**The build takes ~2-3 minutes** (npm ci and prisma layers are cached between builds). Use `initial_wait: 120` (2 min) when running this command so you can monitor progress. If it exceeds the wait, you'll be notified on completion.
 
 ### Step 3: Monitor Build
 
@@ -61,7 +62,7 @@ Watch the build output. Common failure points:
 - **npm ci fails** — dependency issues, check package-lock.json is committed
 - **Prisma generate fails** — schema issue or missing prisma/ directory in Docker context
 - **turbo build fails** — TypeScript errors (most common failure — read the error carefully)
-- **Push fails** — Artifact Registry permissions
+- **Kaniko cache miss** — first build after Dockerfile changes rebuilds all layers; subsequent builds use cache
 - **Deploy fails** — Cloud Run quota, env vars missing
 
 If the build fails, analyze the error and suggest a fix.

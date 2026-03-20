@@ -561,8 +561,13 @@ shofferai/
 │       │   ├── task-manager.ts           ← TaskManager (bridge WS on dynamic port 9400-9499, isInternalToolLabel filter)
 │       │   └── chrome-pool.ts            ← ChromePool + mcpToolEvents (tool log stream on dynamic port)
 │       └── scripts/
-│           ├── start-debug-chrome.sh      ← Launch Chrome Debug with Profile 3
-│           └── setup-chrome-profile.sh    ← Sync Chrome profile sessions
+│           ├── playwright-mcp-with-chrome.sh ← Lazy MCP launcher (.mcp.json entry)
+│           ├── stealth-init.js              ← Anti-bot init script for --init-script
+│           ├── start-laptop.sh              ← Primary relay launcher
+│           ├── start-relay-daemon.sh        ← LaunchAgent daemon entry
+│           ├── shofferai-agent.sh           ← CLI agent runner (dev/testing)
+│           ├── shofferai-parallel.sh        ← Parallel task runner
+│           └── update-playwright-mcp.sh     ← Maintenance utility
 │
 ├── packages/
 │   ├── agent-core/                        ← LLM Agent Logic (cloud only)
@@ -639,22 +644,31 @@ shofferai/
 └───────────────────────────────────────────────────────────┘
 ```
 
-### Chrome CDP Setup
+### Chrome Launch (Lazy)
 
-Playwright MCP connects to a persistent Chrome Debug instance via CDP on port 9222:
+Chrome is launched **lazily** — only when the first Playwright tool call arrives. No eager Chrome on startup.
 
+**Copilot CLI / Claude Desktop path** (`.mcp.json` → `playwright-mcp-with-chrome.sh`):
 ```
-LaunchAgent (com.shofferai.chrome-debug) starts on login:
-  → scripts/start-debug-chrome.sh
-    → Chrome --remote-debugging-port=9222
-              --user-data-dir=~/Library/Application Support/Google/Chrome-Debug
-              --profile-directory="Profile 3"    ← rsinghtomar3011@gmail.com
-  → Playwright MCP connects via --cdp-endpoint http://localhost:9222
+.mcp.json invokes playwright-mcp-with-chrome.sh:
+  1. APFS-clone Chrome-Debug profile dir (instant, preserves sessions)
+  2. Remove singleton lock files from clone
+  3. Generate Playwright MCP config JSON (channel: chrome, Profile 3, stealth args)
+  4. Start Playwright MCP with --config + --init-script stealth-init.js
+  5. Chrome launches lazily on first tool call (not on startup)
+  6. Cleanup cloned dir on exit
 ```
 
-**Profile 3** = `rsinghtomar3011@gmail.com` (Booking.com Genius Level 1). Chrome encrypts cookies per OS keychain — copying a profile does NOT copy sessions. Sign in once manually, then sessions persist forever.
+**Relay path** (`start-laptop.sh` → ChromePool):
+```
+ChromePool launches Chrome lazily per task:
+  1. Clone session files from Chrome-Debug/Profile 3
+  2. Launch Chrome with --remote-debugging-port=0 (OS-assigned port)
+  3. Connect MCPHost via CDP
+  4. Auto-release after 15 min idle
+```
 
-**Verify CDP:** `curl -s http://localhost:9222/json/version`
+**Profile 3** = `rsinghtomar3011@gmail.com` (Booking.com Genius Level 1). Chrome encrypts cookies per macOS Keychain (per-user, not per-dir) — APFS clones preserve all signed-in sessions.
 
 ---
 
