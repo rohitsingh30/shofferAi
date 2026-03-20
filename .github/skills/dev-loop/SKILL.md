@@ -228,8 +228,8 @@ For each skill (sequential):
 ### Step 0: Verify prerequisites
 
 ```bash
-curl -s http://localhost:8765 | python3 -m json.tool  # Pool running
-curl -s http://localhost:9222/json/version             # Chrome available
+# TaskManager bridge (always running in both outbound and server modes)
+curl -s http://localhost:9400 2>/dev/null && echo "✅ Relay running" || echo "❌ Relay not running — run /start-laptop"
 ```
 
 If not running, use `/start-laptop` first.
@@ -302,15 +302,25 @@ npx turbo build --filter=@shofferai/agent-core
 
 ## Mode D: Continue Skill
 
-Pick ONE existing skill and deeply improve it — browse the real site, update SKILL.md with real observations, compile real Playwright selectors, fix broken steps.
+Pick ONE existing skill and improve it by testing E2E through the **real ShofferAI production app**.
 
-### Step 1: Suggest a Skill
+**CRITICAL: NEVER navigate directly to the target site (e.g. swiggy.com, booking.com). ALWAYS start from the ShofferAI chat interface on prod.** The whole point is to test the full pipeline: User → ShofferAI Chat → Agent → Relay → Chrome → Target Site. Skipping to the target site tests nothing real.
+
+### Step 0: Prerequisites
+
+**Laptop relay MUST be running.** If not, use `/start-laptop` first.
+
+```bash
+# Verify relay is up (TaskManager bridge on port 9400, always active in both modes)
+curl -s http://localhost:9400 2>/dev/null && echo "✅ Relay running" || echo "❌ Relay not running — run /start-laptop"
+```
+
+### Step 1: Pick a Skill
 
 If the user didn't specify a skill, **suggest one** using this priority system.
 
 **Check current state:**
 ```bash
-# How many skills have real selectors vs auto-generated templates?
 echo "Live-compiled:"
 grep -l "real selectors from live browsing" packages/agent-core/src/scripts/compiled/*.ts | wc -l
 echo "Auto-generated (need work):"
@@ -328,49 +338,56 @@ grep -l "Auto-generated Playwright script" packages/agent-core/src/scripts/compi
 | 🔵 5 | Services | urbancompany-service, practo-doctor, apollo-doctor, bookmyshow-movie, cult-fitness | Lifestyle services |
 | ⚪ 6 | Everything else | All remaining skills | Long tail |
 
-**Selection logic:**
-1. Find skills in the highest tier that still have "Auto-generated" compiled scripts
-2. Within a tier, prefer popular Indian sites (more likely to be accessible)
-3. Present the suggestion with: skill name, site URL, what needs improvement
-4. Let user confirm or pick a different one
-
 ### Step 2: Audit the Current Skill
 
-Read the skill's SKILL.md and compiled .ts script. Assess quality:
-
-```bash
-cat packages/agent-core/src/skills/{skill-name}/SKILL.md
-head -20 packages/agent-core/src/scripts/compiled/{skill-name}.ts
-```
-
-**Score the skill (out of 5):**
+Read the skill's SKILL.md and compiled .ts script. Score it (out of 5):
 
 | Check | ✅ Good | ❌ Needs work |
 |-------|---------|-------------|
 | Triggers | 8-15 specific, natural phrases | Generic or fewer than 8 |
 | Steps | Exact URLs, selectors, error handling | Vague "click the button" |
-| Site Notes | Real quirks from browsing (popups, login walls, dynamic loading) | Generic template notes |
-| Compiled script | "real selectors from live browsing" in header | "Auto-generated Playwright script" |
-| Selectors | Real `data-testid`, `aria-label`, or stable class names | Generic/guessed selectors |
+| Site Notes | Real quirks from browsing | Generic template notes |
+| Compiled script | "real selectors from live browsing" header | "Auto-generated Playwright script" |
+| Selectors | Real `data-testid`, `aria-label`, stable classes | Generic/guessed selectors |
 
-Report: "This skill scores X/5. Needs: [what's missing]"
+### Step 3: Open ShofferAI Prod & Trigger the Skill
 
-### Step 3: Browse the Real Site
+**This is the core of Mode D. You test by USING the app as a real user would.**
 
-Navigate to the site and walk through the full user journey:
+1. **Navigate to prod**: `https://shofferai-27188185100.asia-south1.run.app`
+2. **Log in** if needed (Google OAuth or credentials)
+3. **Go to dashboard** → the chat interface
+4. **Type a realistic user message** that should trigger the skill:
+   - Use one of the skill's trigger phrases with real params
+   - e.g., "Order milk and bread from Swiggy Instamart"
+   - e.g., "Book a hotel in Goa on Booking.com for this weekend"
+5. **Send it and watch the agent execute end-to-end**
 
-1. **Open site** → snapshot → check login status
-2. **Dismiss popups** (cookie banners, app-install, location — note selectors!)
-3. **Walk the flow** step by step:
-   - Search/browse → results → detail → cart → checkout
-   - Take snapshot at EVERY page
-   - Record real selectors: `data-testid`, `aria-label`, unique class names, text content
-4. **Verify login** — is Profile 3 (rsinghtomar3011@gmail.com) logged in?
-5. **Note all quirks**: redirects, lazy loading, modal interruptions, required fields
+### Step 4: Observe & Record the Full Agent Execution
 
-### Step 4: Update SKILL.md
+While the agent runs, monitor and record everything:
 
-Improve the skill definition with real observations:
+**What to watch:**
+- ✅ **Skill matching** — did the agent pick the right skill?
+- ✅ **SSE streaming** — do progress updates appear in real-time?
+- ✅ **Tool calls** — watch `browser_navigate`, `browser_snapshot`, `browser_click` in the UI
+- ✅ **Target site behavior** — agent opens site in a new tab via relay
+- ✅ **Login handling** — agent verifies Chrome Profile 3 is logged in
+- ✅ **Popup handling** — agent dismisses cookie banners, app-install prompts
+- ✅ **User interactions** — `ask_user` and `confirm_action` render correctly in chat
+- ✅ **Selectors** — record every real `data-testid`, `aria-label` selector from agent snapshots
+
+**What to document when the agent finishes (or gets stuck):**
+- Which step it got stuck on (and why)
+- Real selectors it discovered (from snapshot tool calls)
+- Missing steps in SKILL.md that the agent needed
+- Popups/modals that weren't anticipated
+- Incorrect selectors or stale page assumptions
+- Any quirks: redirects, lazy loading, login walls, dynamic content
+
+### Step 5: Update SKILL.md with Real Observations
+
+Based on what you observed in Steps 3–4, improve the skill:
 
 - **Fix step instructions** — use exact URLs, real button text, real selectors discovered
 - **Add missing steps** — popup dismissal, location setting, login verification
@@ -378,16 +395,19 @@ Improve the skill definition with real observations:
 - **Improve triggers** — add natural phrases users would actually say
 - **Add selector hints** in steps (e.g., "Click 'Add to Cart' `[data-testid='add-to-cart']`")
 
-### Step 5: Update Compiled Script
+### Step 6: Update Compiled Script
 
 Update `packages/agent-core/src/scripts/compiled/{skill-name}.ts`:
 
-- Replace generic selectors with real ones from live browsing
+- Replace generic selectors with real ones from the agent's execution
 - Update header: change "Auto-generated" → "Compiled with real selectors from live browsing"
-- Add discovered selector notes in the header comment
 - Fix the flow to match reality (handle popups, redirects, etc.)
 
-### Step 6: Report
+### Step 7: Re-test via Prod Chat
+
+**Go back to Step 3 and run the skill again through ShofferAI prod.** Verify the fixes actually work. Repeat the loop until the skill completes successfully or you've documented all remaining blockers.
+
+### Step 8: Report
 
 ```
 ✅ Skill improved: {skill-name}
@@ -396,7 +416,8 @@ Update `packages/agent-core/src/scripts/compiled/{skill-name}.ts`:
    - SKILL.md: {what changed}
    - Compiled script: {what changed}
    - Real selectors recorded: {count}
-   Suggested next skill: {next-skill-name} (Tier {N} — {reason})
+   E2E result: {passed / stuck at step N — reason}
+   Suggested next skill: {next-skill-name} (Tier {N})
 ```
 
 Always suggest the next skill to work on at the end!

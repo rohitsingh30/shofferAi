@@ -113,8 +113,9 @@ graph TB
 ```
 
 **Two Relay Modes:**
-- **Dev** (`RELAY_MODE=local`): `RemoteMCPHost` in Cloud Run connects OUT to `ws://localhost:8765`
-- **Prod** (`RELAY_MODE=cloud`): `RelayBridge` accepts incoming WS from laptop. Laptop runs `RelayOutbound` which connects directly to Cloud Run — **no tunnel needed**
+- **Dev** (no `RELAY_CLOUD_URL`): `RelayServer` listens on `ws://localhost:8765`, Cloud Run's `RemoteMCPHost` connects OUT to it
+- **Prod** (`RELAY_CLOUD_URL` set): `RelayOutbound` connects directly to Cloud Run via WSS — **no tunnel needed**, no port 8765
+- **Both modes**: `TaskManager` bridge WS always listens on port **9400** (range 9400-9499)
 
 **LLM's role**: Chat with user, reason about steps, call MCP tools via relay. The LLM NEVER touches the browser directly — it sends tool calls that get relayed to the laptop's Playwright MCP.
 
@@ -267,7 +268,7 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 - `AZURE_OPENAI_API_KEY` — Azure OpenAI API key
 - `LLM_MODEL` — Azure deployment name (default `gpt-5.1-chat`)
 - `RELAY_MODE=local` for dev, `RELAY_MODE=cloud` for production
-- Dev server on port 3000, relay server on port 8765
+- Dev server on port 3000, relay server on port 8765 (server mode) or outbound to Cloud Run (prod mode), TaskManager bridge always on port 9400
 
 ## Docs
 - `docs/PRD.md` — Product requirements document

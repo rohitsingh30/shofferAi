@@ -42,7 +42,8 @@ graph TB
 
     subgraph LAPTOP["💻 Operator Laptop"]
         direction TB
-        RS["📡 RelayServer<br/>Port 8765"]
+        RS["📡 RelayServer / RelayOutbound<br/>Port 8765 (dev) or outbound WSS (prod)"]
+        TM["📋 TaskManager<br/>Bridge WS Port 9400"]
         MCP["🎭 MCPHost<br/>Playwright MCP (stdio)"]
         POOL["🏊 ChromePool<br/>Tab Management"]
         CHROME["🌐 Chrome Debug<br/>CDP Port 9222<br/>Profile 3 (signed-in)"]
@@ -75,16 +76,21 @@ The relay supports two modes depending on `RELAY_MODE` environment variable:
 
 ```mermaid
 graph TB
-    subgraph DEV["🔧 Dev Mode (RELAY_MODE=local)"]
+    subgraph DEV["🔧 Dev Mode (no RELAY_CLOUD_URL)"]
         direction LR
         C1["Cloud Run<br/>RemoteMCPHost"] -->|"1. Connects OUT<br/>ws://localhost:8765"| L1["Laptop<br/>RelayServer"]
         L1 -->|"2. Accepts connection"| M1["MCPHost<br/>Playwright"]
     end
     
-    subgraph PROD["🚀 Prod Mode (RELAY_MODE=cloud)"]
+    subgraph PROD["🚀 Prod Mode (RELAY_CLOUD_URL set)"]
         direction LR
-        L2["Laptop<br/>RelayServer"] -->|"1. Connects IN<br/>wss://cloud-run-url"| C2["Cloud Run<br/>RelayBridge"]
+        L2["Laptop<br/>RelayOutbound"] -->|"1. Connects OUT<br/>wss://cloud-run-url"| C2["Cloud Run<br/>RelayBridge"]
         C2 -->|"2. setLaptopSocket()"| A2["AgentExecutor<br/>callToolWithSession()"]
+    end
+    
+    subgraph ALWAYS["📋 Always Running"]
+        direction TB
+        TM["TaskManager bridge<br/>WS on port 9400"]
     end
     
     subgraph PROTO["📋 Shared Relay Protocol"]
@@ -98,8 +104,9 @@ graph TB
 
 | Mode | Who Initiates | Class | Use Case |
 |------|--------------|-------|----------|
-| **Dev** (`RELAY_MODE=local`) | Cloud connects OUT | `RemoteMCPHost` (`apps/web/lib/relay-client.ts`) | Local development, ws://localhost:8765 |
-| **Prod** (`RELAY_MODE=cloud`) | Laptop connects IN | `RelayBridge` (`apps/web/lib/relay-bridge.ts`) | Production, no Cloudflare Tunnel needed |
+| **Dev** (no `RELAY_CLOUD_URL`) | Cloud connects OUT | `RemoteMCPHost` (`apps/web/lib/relay-client.ts`) | Local development, ws://localhost:8765 |
+| **Prod** (`RELAY_CLOUD_URL` set) | Laptop connects OUT | `RelayOutbound` (`apps/playwright/src/relay-outbound.ts`) | Production, no Cloudflare Tunnel needed |
+| **Both modes** | TaskManager bridge | `TaskManager` (`apps/playwright/src/task-manager.ts`) | Always on port 9400 (range 9400-9499) |
 
 **Shared Protocol** (defined in `packages/shared/src/relay.ts`):
 - `ToolCallRequest` / `ToolCallResponse` — UUID-correlated tool execution
@@ -548,7 +555,9 @@ shofferai/
 │       ├── src/
 │       │   ├── index.ts                   ← Entry: MCPHost + RelayServer + ChromePool
 │       │   ├── mcp-host.ts                ← Local MCPHost (Playwright MCP stdio)
-│       │   └── relay-server.ts            ← RelayServer (WS server on port 8765)
+│       │   ├── relay-server.ts            ← RelayServer (WS server on port 8765, dev mode only)
+│       │   ├── relay-outbound.ts         ← RelayOutbound (connects to Cloud Run, prod mode)
+│       │   └── task-manager.ts           ← TaskManager (bridge WS on port 9400, always active)
 │       └── scripts/
 │           ├── start-debug-chrome.sh      ← Launch Chrome Debug with Profile 3
 │           └── setup-chrome-profile.sh    ← Sync Chrome profile sessions
@@ -617,8 +626,10 @@ shofferai/
 ┌────────┴──────────────────────────────────────────────────┐
 │              OPERATOR LAPTOP (Mac)                         │
 │                                                           │
-│  RelayServer on :8765 ← Cloud Run connects via WSS       │
-│  Chrome Debug on :9222 ← Profile 3 (rsinghtomar3011)     │
+│  Outbound mode: RelayOutbound → wss://Cloud Run (prod)     │
+│  Server mode:   RelayServer on :8765 (dev only)            │
+│  TaskManager:   Bridge WS on :9400 (always active)         │
+│  Chrome:        OS-assigned ephemeral port via ChromePool   │
 │  ChromePool ← Per-task tab isolation                      │
 │                                                           │
 │  LaunchAgent (com.shofferai.chrome-debug) starts on login │
@@ -696,8 +707,10 @@ LaunchAgent (com.shofferai.chrome-debug) starts on login:
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Chrome Debug** | ✅ Running | CDP port 9222, Profile 3 (signed-in accounts) |
-| **RelayServer** | ✅ Running | Port 8765, accepts tool calls from cloud |
+| **Chrome Debug** | ✅ Running | OS-assigned ephemeral CDP port, Profile 3 (signed-in accounts) |
+| **RelayServer** | Conditional | Port 8765, only in dev/server mode (no `RELAY_CLOUD_URL`) |
+| **RelayOutbound** | Conditional | Connects to Cloud Run WSS, only in prod/outbound mode (`RELAY_CLOUD_URL` set) |
+| **TaskManager** | ✅ Running | Bridge WS on port 9400 (always active in both modes) |
 | **MCPHost** | ✅ Running | Playwright MCP via stdio, connects to Chrome CDP |
 | **ChromePool** | ✅ Running | Per-task tab isolation |
 | **Cloudflare Tunnel** | Manual | Must be started manually for prod connectivity |

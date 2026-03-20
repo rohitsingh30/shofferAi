@@ -18,7 +18,11 @@ tail -50 /private/tmp/claude-*/tasks/*.output 2>/dev/null | grep -E "Session|slo
 
 ### Pool status (live)
 ```bash
-curl -s http://localhost:8765 | python3 -m json.tool
+# TaskManager bridge (always active — works in both outbound and server modes)
+curl -s http://localhost:9400 2>/dev/null | python3 -m json.tool || echo "Relay not running"
+
+# Server mode only (dev without RELAY_CLOUD_URL): RelayServer on port 8765
+curl -s http://localhost:8765 2>/dev/null | python3 -m json.tool || true
 ```
 
 ### Next.js dev server logs

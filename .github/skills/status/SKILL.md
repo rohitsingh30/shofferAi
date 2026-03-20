@@ -11,9 +11,13 @@ See `docs/DEPLOYMENT.md` for what runs where (Cloud Run vs Laptop).
 
 Run ALL of these checks and report a single status table:
 
-### 1. Chrome Pool + Relay (server mode only)
+### 1. Laptop Relay
 ```bash
-curl -s http://localhost:8765 2>/dev/null | python3 -m json.tool || echo "RELAY: Not in server mode (may be in outbound mode, or down)"
+# TaskManager bridge (always active in both outbound and server modes)
+curl -s http://localhost:9400 2>/dev/null && echo "RELAY: ✅ Running (TaskManager bridge on :9400)" || echo "RELAY: ❌ Not running — run /start-laptop"
+
+# Server mode only (dev without RELAY_CLOUD_URL)
+curl -s http://localhost:8765 2>/dev/null | python3 -m json.tool && echo "(RelayServer — server mode)" || true
 ```
 
 ### 2. Individual Chrome CDP instances
