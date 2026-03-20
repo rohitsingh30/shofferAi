@@ -11,9 +11,9 @@ export default async function DashboardLayout({
   if (!session?.user) redirect('/login');
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#09090b]">
       <Sidebar user={{ name: session.user.name || 'User', email: session.user.email || '' }} />
-      <main className="flex flex-1 flex-col overflow-hidden bg-chat-bg">
+      <main className="flex flex-1 flex-col overflow-hidden">
         {children}
       </main>
     </div>

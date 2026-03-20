@@ -176,14 +176,14 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
   };
 
   return (
-    <div className="flex items-start gap-4">
+    <div className="flex items-start gap-3.5">
       {/* Icon */}
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-500">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 shadow-md shadow-amber-500/20">
         {icon}
       </div>
 
       {/* Content */}
-      <div className="flex-1 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+      <div className="flex-1 rounded-2xl rounded-tl-md border border-amber-500/15 bg-amber-500/[0.04] p-4">
         <p className="mb-3 whitespace-pre-wrap text-sm font-medium leading-relaxed">{cleanQuestion}</p>
 
         {/* Rich input types */}

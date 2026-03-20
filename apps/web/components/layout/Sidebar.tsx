@@ -15,7 +15,6 @@ export function Sidebar({ user }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
 
   const handleNewChat = () => {
-    // Dispatch event so ChatInterface resets state & aborts active stream
     window.dispatchEvent(new Event('newchat'));
     if (pathname !== '/dashboard') {
       router.push('/dashboard');
@@ -64,21 +63,25 @@ export function Sidebar({ user }: SidebarProps) {
 
   return (
     <aside
-      className={`flex flex-col border-r border-border bg-sidebar transition-all duration-200 ${
-        collapsed ? 'w-16' : 'w-64'
+      className={`flex flex-col border-r border-white/[0.06] bg-[#09090b] transition-all duration-200 ${
+        collapsed ? 'w-[60px]' : 'w-[260px]'
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3">
+      <div className="flex items-center justify-between px-3 py-4">
         {!collapsed && (
-          <Link href="/dashboard" className="text-lg font-bold tracking-tight">
-            <span className="text-primary">Shoffer</span>
-            <span className="text-accent">AI</span>
+          <Link href="/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-violet-500">
+              <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span className="text-white">Shoffer<span className="text-primary">AI</span></span>
           </Link>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             {collapsed ? (
@@ -91,22 +94,21 @@ export function Sidebar({ user }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 px-2 pt-2">
+      <nav className="flex-1 space-y-1 px-2 pt-2">
         {navItems.map((item) => {
           const isActive = item.exact
             ? pathname === item.href
             : pathname.startsWith(item.href);
 
-          // "New Chat" uses a button to dispatch reset event instead of plain navigation
           if (item.exact && item.href === '/dashboard') {
             return (
               <button
                 key={item.href}
                 onClick={handleNewChat}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150 ${
                   isActive
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                    ? 'bg-white/[0.08] text-white shadow-sm'
+                    : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300'
                 } ${collapsed ? 'justify-center' : ''}`}
                 title={collapsed ? item.label : undefined}
               >
@@ -120,10 +122,10 @@ export function Sidebar({ user }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150 ${
                 isActive
-                  ? 'bg-muted text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                  ? 'bg-white/[0.08] text-white shadow-sm'
+                  : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300'
               } ${collapsed ? 'justify-center' : ''}`}
               title={collapsed ? item.label : undefined}
             >
@@ -135,21 +137,21 @@ export function Sidebar({ user }: SidebarProps) {
       </nav>
 
       {/* User */}
-      <div className="border-t border-border p-2">
+      <div className="border-t border-white/[0.06] p-2">
         <div
-          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 ${
+          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
             collapsed ? 'justify-center' : ''
           }`}
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-sm font-semibold text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-violet-500 text-xs font-bold text-white shadow-md shadow-primary/20">
             {user.name[0]?.toUpperCase()}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="truncate text-sm font-medium">{user.name}</p>
+              <p className="truncate text-[13px] font-medium text-zinc-300">{user.name}</p>
               <button
                 onClick={() => signOut({ callbackUrl: '/' })}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors"
               >
                 Sign out
               </button>
