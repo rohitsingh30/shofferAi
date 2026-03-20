@@ -242,6 +242,251 @@ function TimelineChart({ data }: { data: TimelinePoint[] }) {
   );
 }
 
+type TaskDetailTab = 'messages' | 'steps' | 'telemetry' | 'payments';
+
+function TaskDetailPanel({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+  const [data, setData] = useState<TaskDetailData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<TaskDetailTab>('messages');
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetch(`/api/admin/telemetry?view=task-detail&taskId=${taskId}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json();
+      })
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [taskId]);
+
+  const detailTabs: { key: TaskDetailTab; label: string; count?: number }[] = [
+    { key: 'messages', label: 'Messages', count: data?.messages.length },
+    { key: 'steps', label: 'Steps', count: data?.steps.length },
+    { key: 'telemetry', label: 'Events', count: data?.telemetry.length },
+    { key: 'payments', label: 'Payments', count: data?.payments.length },
+  ];
+
+  const statusColor: Record<string, string> = {
+    completed: 'bg-green-500/20 text-green-400',
+    running: 'bg-blue-500/20 text-blue-400',
+    failed: 'bg-red-500/20 text-red-400',
+    pending: 'bg-muted text-muted-foreground',
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-40 bg-black/50" onClick={onClose} />
+      {/* Slide-over panel */}
+      <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l border-border bg-background shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="min-w-0 flex-1">
+            {data?.task ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <h2 className="truncate text-sm font-semibold">{data.task.description}</h2>
+                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${statusColor[data.task.status] || 'bg-muted text-muted-foreground'}`}>
+                    {data.task.status}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{data.task.user.email || data.task.user.name || data.task.user.id.slice(0, 12)}</span>
+                  {data.task.workflowType && (
+                    <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">{data.task.workflowType}</span>
+                  )}
+                  <span>{new Date(data.task.createdAt).toLocaleString()}</span>
+                  {data.task.completedAt && (
+                    <span>→ {formatDuration(new Date(data.task.completedAt).getTime() - new Date(data.task.createdAt).getTime())}</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <h2 className="text-sm font-semibold">Task {taskId.slice(0, 12)}…</h2>
+            )}
+          </div>
+          <button onClick={onClose} className="ml-4 rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Detail tabs */}
+        <div className="flex gap-0 border-b border-border px-6">
+          {detailTabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setDetailTab(t.key)}
+              className={`border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
+                detailTab === t.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t.label} {t.count !== undefined ? `(${t.count})` : ''}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex h-32 items-center justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : error ? (
+            <p className="text-sm text-red-400">Failed to load: {error}</p>
+          ) : !data ? (
+            <p className="text-sm text-muted-foreground">No data</p>
+          ) : (
+            <>
+              {/* Messages */}
+              {detailTab === 'messages' && (
+                <div className="space-y-3">
+                  {data.messages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No messages</p>
+                  ) : data.messages.map((m) => (
+                    <div key={m.id} className={`rounded-lg border p-3 ${m.role === 'user' ? 'border-primary/30 bg-primary/5' : m.role === 'assistant' ? 'border-border bg-card' : 'border-border/50 bg-muted/30'}`}>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${m.role === 'user' ? 'text-primary' : m.role === 'assistant' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {m.role}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleTimeString()}</span>
+                      </div>
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">{m.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Steps */}
+              {detailTab === 'steps' && (
+                <div className="space-y-2">
+                  {data.steps.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No steps recorded</p>
+                  ) : data.steps.map((s) => {
+                    const stepStatusColor: Record<string, string> = {
+                      completed: 'text-green-400',
+                      running: 'text-blue-400',
+                      failed: 'text-red-400',
+                      pending: 'text-muted-foreground',
+                    };
+                    const dur = s.startedAt && s.completedAt
+                      ? new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime()
+                      : null;
+                    return (
+                      <div key={s.id} className="rounded-lg border border-border bg-card p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[10px] font-bold">{s.stepNumber}</span>
+                            <span className="text-xs font-medium">{s.action}</span>
+                            <span className={`text-[10px] ${stepStatusColor[s.status] || 'text-muted-foreground'}`}>● {s.status}</span>
+                          </div>
+                          {dur !== null && <span className="text-[10px] text-muted-foreground">{formatDuration(dur)}</span>}
+                        </div>
+                        {s.toolCalls && (
+                          <pre className="mt-2 max-h-32 overflow-auto rounded bg-muted/50 p-2 text-[10px] leading-relaxed text-muted-foreground">{
+                            (() => { try { return JSON.stringify(JSON.parse(s.toolCalls), null, 2); } catch { return s.toolCalls; } })()
+                          }</pre>
+                        )}
+                        {s.result && (
+                          <p className="mt-1 truncate text-[10px] text-muted-foreground" title={s.result}>→ {s.result.slice(0, 200)}</p>
+                        )}
+                        {s.error && (
+                          <p className="mt-1 text-[10px] text-red-400">✗ {s.error}</p>
+                        )}
+                        {s.inputNeeded && (
+                          <div className="mt-1 text-[10px]">
+                            <span className="text-amber-400">? {s.inputNeeded}</span>
+                            {s.userInput && <span className="ml-2 text-green-400">→ {s.userInput}</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Telemetry */}
+              {detailTab === 'telemetry' && (
+                <div className="space-y-1">
+                  {data.telemetry.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No telemetry events</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-border">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/30">
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Time</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Event</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Cat</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Duration</th>
+                            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Details</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.telemetry.map((e) => {
+                            let meta: Record<string, unknown> = {};
+                            try { if (e.metadata) meta = JSON.parse(e.metadata); } catch {}
+                            const detail = meta.tool || meta.error || meta.skillName || meta.message || '';
+                            return (
+                              <tr key={e.id} className="border-b border-border/50 hover:bg-muted/20">
+                                <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground">{new Date(e.timestamp).toLocaleTimeString()}</td>
+                                <td className="px-3 py-1.5 font-medium">{e.event}</td>
+                                <td className="px-3 py-1.5 text-muted-foreground">{e.category}</td>
+                                <td className="px-3 py-1.5">
+                                  <span className={`rounded px-1 py-0.5 text-[10px] ${e.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    {e.success ? 'ok' : 'fail'}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-1.5 text-muted-foreground">{e.durationMs ? formatDuration(e.durationMs) : '-'}</td>
+                                <td className="max-w-[200px] truncate px-3 py-1.5 text-muted-foreground" title={String(detail)}>{String(detail).slice(0, 80) || '-'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Payments */}
+              {detailTab === 'payments' && (
+                <div className="space-y-3">
+                  {data.payments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No payments for this task</p>
+                  ) : data.payments.map((p) => (
+                    <div key={p.id} className="rounded-lg border border-border bg-card p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold">
+                          {p.currency === 'INR' ? '₹' : p.currency} {(p.totalCents / 100).toFixed(2)}
+                        </span>
+                        <span className={`rounded px-2 py-0.5 text-xs ${p.status === 'captured' ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                          {p.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{p.bookingSummary}</p>
+                      <div className="mt-2 flex gap-4 text-[10px] text-muted-foreground">
+                        <span>Created: {new Date(p.createdAt).toLocaleString()}</span>
+                        {p.paidAt && <span>Paid: {new Date(p.paidAt).toLocaleString()}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>('overview');
   const [hours, setHours] = useState<TimeRange>('24');
@@ -255,6 +500,7 @@ export default function AdminDashboard() {
   const [relay, setRelay] = useState<RelayData | null>(null);
   const [users, setUsers] = useState<UserData | null>(null);
   const [chrome, setChrome] = useState<ChromeData | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -322,6 +568,7 @@ export default function AdminDashboard() {
   ];
 
   return (
+    <>
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
@@ -675,7 +922,7 @@ export default function AdminDashboard() {
                               error: 'bg-red-500/20 text-red-400',
                             };
                             return (
-                              <div key={t.taskId} className="flex items-center gap-4 px-4 py-3">
+                              <div key={t.taskId} className="flex cursor-pointer items-center gap-4 px-4 py-3 hover:bg-muted/30" onClick={() => setSelectedTaskId(t.taskId)}>
                                 {/* Status dot */}
                                 <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${statusColor[t.status] || 'bg-muted'}`}>
                                   {t.status === 'running' ? (
@@ -760,7 +1007,7 @@ export default function AdminDashboard() {
                               pending: 'bg-muted text-muted-foreground',
                             };
                             return (
-                              <tr key={t.taskId} className="border-b border-border/50 hover:bg-muted/20">
+                              <tr key={t.taskId} className="cursor-pointer border-b border-border/50 hover:bg-muted/30" onClick={() => setSelectedTaskId(t.taskId)}>
                                 <td className="px-4 py-2">
                                   <div className="flex flex-col">
                                     <span className="text-xs font-medium">{t.userName || 'Unknown'}</span>
@@ -802,5 +1049,11 @@ export default function AdminDashboard() {
         )}
       </div>
     </div>
+
+    {/* Task detail slide-over */}
+    {selectedTaskId && (
+      <TaskDetailPanel taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
+    )}
+  </>
   );
 }
