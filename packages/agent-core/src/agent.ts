@@ -10,6 +10,7 @@ import {
   type UserInputRequest,
   type UserInputResponse,
   type FillCredentialRequest,
+  shouldSuppressMessage,
 } from '@shofferai/shared';
 import type { SkillMetadata, LessonStore, LessonEntry } from './skills/types';
 import { loadSkills, matchSkill } from './skills/loader';
@@ -645,7 +646,7 @@ export class AgentExecutor {
         // not just narration of browser actions ("Let me navigate to...", "I'll click on...")
         for (const block of textBlocks) {
           const text = block.text.trim();
-          if (text && !this.isNarrationText(text)) {
+          if (text && !shouldSuppressMessage(text)) {
             callbacks.onMessage(text);
           }
         }
@@ -1212,36 +1213,6 @@ export class AgentExecutor {
     return true;
   }
 
-  /** Detects LLM narration text that shouldn't be shown to the user (e.g. "Let me navigate to...", "I'll search for...") */
-  private isNarrationText(text: string): boolean {
-    const lower = text.toLowerCase().trim();
-    // Short texts that are just browser action narration
-    if (lower.length < 200) {
-      const narrationPatterns = [
-        /^(let me|i'll|i will|i'm going to|now i'll|now let me|i'm now|i need to|i'm about to|first,? i'll|next,? i'll)\s+(navigate|go to|open|click|search|type|browse|check|look|read|scroll|select|visit|head to|dismiss|refresh|fill|submit|wait|load|close|handle|verify|proceed)/,
-        /^(navigating|going|opening|clicking|searching|typing|browsing|checking|looking|reading|scrolling|loading|heading|dismissing|refreshing|filling|submitting|waiting|closing|handling|verifying|proceeding)\s+(to|for|at|on|the|through|a |an )/,
-        /^(sure|okay|alright|great|perfect)[,.!]?\s*(let me|i'll|i will|now)/,
-        /^(now |first |next )?(i('ll| will| need to| am going to|'m going to) )?(open|navigate|go|click|search|type|dismiss|scroll|refresh|read|check|look|fill|submit|wait|load|close|handle|verify|proceed)/,
-        /^(searching|looking) for (hotels|flights|products|items|rooms|options)/,
-        // Catch raw browser instructions the LLM outputs as text alongside tool calls
-        /^open a new tab/,
-        /^navigate to https?:\/\//,
-        /^scroll (down|up|to)/,
-        /^click (on |the )/,
-        /^type .+ in the/,
-        /^find the .+ (field|button|input|link|element)/,
-        /^(take|read) (a )?snapshot/,
-        /^read the (current |)page/,
-        /^refresh the page/,
-        /^dismiss (the |any )/,
-        /^wait for /,
-        /^(verify|check) (if |that |the |whether )/,
-        /^look for /,
-      ];
-      return narrationPatterns.some(p => p.test(lower));
-    }
-    return false;
-  }
 
   private getFriendlyActionName(toolName: string, args: Record<string, unknown>): string {
     switch (toolName) {
