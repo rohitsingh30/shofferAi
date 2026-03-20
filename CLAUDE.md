@@ -210,11 +210,11 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 1. Resolves the globally-installed `playwright-mcp` binary (no npx, no network)
 2. Cleans up any orphaned Chrome-Debug clones from previous crashes (>1hr old)
 3. Generates a unique instance ID (`mcp-$$-timestamp`)
-4. **APFS-clones** the entire `Chrome-Debug` user-data-dir (preserves signed-in sessions)
-5. Removes stale lock files from the clone
+4. **Selective copy** of Chrome-Debug session data (~26MB in <1s) — copies only Cookies, Local Storage, Preferences, Extensions. Skips 6.8GB of regeneratable caches (Service Worker, IndexedDB, GPUCache, etc.)
+5. Removes stale lock files from the copy
 6. Generates a config JSON with Chrome launch args (Profile 3 / rsinghtomar3011@gmail.com)
 7. Runs `playwright-mcp --config <config> --init-script stealth-init.js` (Chrome launches lazily on first tool call)
-8. Cleanup trap removes clone + config on exit
+8. Cleanup trap removes copy + config on exit
 
 **IMPORTANT**: `playwright-mcp` is installed globally (`npm install -g @playwright/mcp`) — not via `npx @latest`. This eliminates npm registry lookups and prevents slow/failed startups. Update with: `./apps/playwright/scripts/update-playwright-mcp.sh`
 

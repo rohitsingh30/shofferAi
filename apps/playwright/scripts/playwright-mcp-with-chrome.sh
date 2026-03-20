@@ -8,16 +8,18 @@
 # only the instance that receives tool calls opens Chrome.
 #
 # How it works:
-#   1. Clean up any orphaned Chrome-Debug clones from previous crashes
-#   2. APFS-clone the Chrome-Debug user-data-dir (instant, preserves signed-in sessions)
-#   3. Remove stale lock files from the clone
-#   4. Generate a Playwright MCP config JSON with Chrome launch options
-#   5. Start Playwright MCP with --config (no --cdp-endpoint → lazy browser launch)
-#   6. Playwright MCP launches Chrome only on first tool call
-#   7. On exit, clean up the cloned dir and temp config
+#   1. Resolve globally-installed playwright-mcp binary (no npx, no network)
+#   2. Clean up any orphaned Chrome-Debug clones from previous crashes
+#   3. Selective copy of Chrome-Debug session data (~26MB, <1s vs 13s full clone)
+#   4. Remove stale lock files from the copy
+#   5. Generate a Playwright MCP config JSON with Chrome launch options
+#   6. Start Playwright MCP with --config (no --cdp-endpoint → lazy browser launch)
+#   7. Playwright MCP launches Chrome only on first tool call
+#   8. On exit, clean up the copied dir and temp config
 #
-# APFS clone (`cp -c`) is near-instant and preserves all signed-in sessions
-# (cookies are encrypted via macOS Keychain per-user, not per-dir).
+# Selective copy preserves all signed-in sessions (Cookies, Local Storage,
+# Preferences, etc.) while skipping large caches Chrome regenerates on its own
+# (Service Worker, IndexedDB, GPUCache — saves ~6.8GB → 26MB).
 #
 # IMPORTANT: Uses globally-installed playwright-mcp binary (not npx @latest)
 # to eliminate npm registry lookups and avoid slow/failed startups.
@@ -43,8 +45,8 @@ if [ -z "$PLAYWRIGHT_MCP" ]; then
   exit 1
 fi
 
-PLAYWRIGHT_MCP_VERSION="$("$PLAYWRIGHT_MCP" --version 2>/dev/null || echo 'unknown')"
-echo "🎭 playwright-mcp $PLAYWRIGHT_MCP_VERSION ($PLAYWRIGHT_MCP)" >&2
+PLAYWRIGHT_MCP_VERSION="$("$PLAYWRIGHT_MCP" --version 2>&1 || echo 'unknown')"
+echo "🎭 playwright-mcp $PLAYWRIGHT_MCP_VERSION" >&2
 
 PROFILE="Profile 3"
 BASE_USER_DATA_DIR="$HOME/Library/Application Support/Google/Chrome-Debug"
@@ -57,7 +59,10 @@ find "$HOME/Library/Application Support/Google" -maxdepth 1 -name "Chrome-Debug-
   rm -rf "$stale_dir" 2>/dev/null || true
 done
 
-# --- APFS-clone the profile for this instance ---
+# --- Selective copy of Chrome profile (only session-critical files) ---
+# Full APFS clone of 6.8GB Chrome-Debug takes ~13s. Selective copy of only
+# the files needed for signed-in sessions takes <1s (~26MB).
+# Chrome regenerates caches (Service Worker, IndexedDB, GPUCache, etc.) on its own.
 USER_DATA_DIR="${BASE_USER_DATA_DIR}-${INSTANCE_ID}"
 CONFIG_FILE="/tmp/playwright-mcp-config-${INSTANCE_ID}.json"
 
@@ -67,8 +72,26 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "📋 Cloning Chrome-Debug → ${INSTANCE_ID} (APFS instant clone)..." >&2
-cp -cR "$BASE_USER_DATA_DIR" "$USER_DATA_DIR"
+echo "📋 Copying Chrome session data → ${INSTANCE_ID} (~26MB selective copy)..." >&2
+mkdir -p "$USER_DATA_DIR/$PROFILE"
+
+# Top-level: Local State has the encryption key reference for cookies
+cp "$BASE_USER_DATA_DIR/Local State" "$USER_DATA_DIR/" 2>/dev/null || true
+cp "$BASE_USER_DATA_DIR/First Run" "$USER_DATA_DIR/" 2>/dev/null || true
+
+# Profile 3: copy everything EXCEPT large regeneratable caches
+rsync -a \
+  --exclude='Service Worker' \
+  --exclude='IndexedDB' \
+  --exclude='GPUCache' \
+  --exclude='DawnWebGPUCache' \
+  --exclude='DawnGraphiteCache' \
+  --exclude='DawnWebGPUBlobCache' \
+  --exclude='Code Cache' \
+  --exclude='Cache' \
+  --exclude='ScriptCache' \
+  --exclude='blob_storage' \
+  "$BASE_USER_DATA_DIR/$PROFILE/" "$USER_DATA_DIR/$PROFILE/"
 
 # Remove lock files so Chrome doesn't think another instance owns the profile
 rm -f "$USER_DATA_DIR/SingletonLock" \
