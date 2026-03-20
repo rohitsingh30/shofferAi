@@ -394,9 +394,12 @@ export class AgentExecutor {
         });
 
         // Execution strategy for ALL skills:
-        // 1. Try compiled Playwright script (instant replay, no LLM)
+        // 1. Try compiled Playwright script (instant replay, no LLM) — laptop only
         // 2. Fall back to LLM + MCP with recording (captures for next time)
-        if (ScriptPlayer.hasScript(this.matchedSkill.name)) {
+        // Skip instant mode on Cloud Run — no playwright/chrome available there.
+        // Scripts require a local browser; they'll work when sent to laptop via relay (future).
+        const isCloudEnvironment = !!(process.env.K_SERVICE || process.env.CLOUD_RUN_JOB);
+        if (!isCloudEnvironment && ScriptPlayer.hasScript(this.matchedSkill.name)) {
           try {
             logger.info('Compiled script found, running instant replay', { skill: this.matchedSkill.name });
             callbacks.onStepUpdate({
