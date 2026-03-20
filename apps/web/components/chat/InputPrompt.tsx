@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { renderMarkdown } from './render-markdown';
 import { CardGridInput } from './inputs/CardGridInput';
 import { CarouselInput } from './inputs/CarouselInput';
 import { ChipBarInput } from './inputs/ChipBarInput';
@@ -191,7 +192,7 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
       {/* Content */}
       <div className="flex-1 rounded-2xl rounded-tl-md bg-white/[0.03] ring-1 ring-white/[0.06] overflow-hidden">
         <div className="p-4">
-          <p className="mb-3 whitespace-pre-wrap text-[14px] font-medium leading-relaxed text-zinc-200">{cleanQuestion}</p>
+          <p className="mb-3 whitespace-pre-wrap text-[14px] font-medium leading-relaxed text-zinc-200">{renderMarkdown(cleanQuestion)}</p>
 
           {/* Rich input types */}
           {isRichType(inputType) ? (

@@ -5,6 +5,7 @@ import { homedir } from 'os';
 import { EventEmitter } from 'events';
 import { logger } from '@shofferai/shared';
 import { MCPHost } from './mcp-host';
+import { STEALTH_CHROME_ARGS, injectStealthViaCDP } from './stealth';
 
 export interface McpToolEvent {
   type: 'tool_start' | 'tool_end' | 'tool_error';
@@ -165,7 +166,14 @@ export class ChromePool {
       // 3. Wait for CDP to be ready
       await this.waitForCDP(slot);
 
-      // 4. Connect MCP host
+      // 4. Inject stealth anti-bot-detection scripts via CDP
+      await injectStealthViaCDP(slot.port).catch((err) => {
+        logger.warn(`Slot ${slot.index} stealth injection failed (non-fatal)`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
+      // 5. Connect MCP host
       slot.mcpHost = new MCPHost({ cdpEndpoint: `http://127.0.0.1:${slot.port}` });
       await slot.mcpHost.connect();
 
@@ -231,9 +239,9 @@ export class ChromePool {
       '--profile-directory=Profile 3',
       '--no-first-run',
       '--no-default-browser-check',
-      '--disable-blink-features=AutomationControlled',
       '--disable-sync',
       '--disable-default-apps',
+      ...STEALTH_CHROME_ARGS,
     ];
 
     slot.chromeProcess = spawn(this.options.chromePath, args, {

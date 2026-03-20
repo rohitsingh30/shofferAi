@@ -65,6 +65,10 @@ echo "🚀 Launching Chrome-Debug (Profile 3 / rsinghtomar3011@gmail.com) — OS
   --no-first-run \
   --no-default-browser-check \
   --disable-blink-features=AutomationControlled \
+  --disable-features=AutomationControlled \
+  --disable-infobars \
+  --disable-ipc-flooding-protection \
+  --disable-popup-blocking \
   --disable-background-timer-throttling \
   --disable-backgrounding-occluded-windows \
   --disable-renderer-backgrounding \
@@ -98,6 +102,11 @@ ELAPSED=0
 while [ $ELAPSED -lt 5 ]; do
   if curl -sf "$CDP_URL/json/version" >/dev/null 2>&1; then
     echo "✅ Chrome-Debug ready on port $PORT — signed in as rsinghtomar3011@gmail.com (Profile 3)" >&2
+
+    # --- Inject stealth anti-bot-detection scripts via CDP ---
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    echo "🔧 Injecting stealth scripts via CDP..." >&2
+    node "$SCRIPT_DIR/inject-stealth.mjs" "$CDP_URL" 2>&1 | while IFS= read -r line; do echo "  $line" >&2; done || true
 
     # --- Watchdog: monitor Chrome health, kill MCP if Chrome dies ---
     # After exec, the shell PID becomes the MCP process. The watchdog runs
