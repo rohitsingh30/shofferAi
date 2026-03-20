@@ -264,4 +264,16 @@ After making changes:
 
 ---
 
+## 18. Opening Browsers via `open` Command
+
+**What happens:** Agent uses `open <url>` to open a URL, which launches the OS default browser (Edge on this machine) instead of Chrome. The agent has no business opening browsers — the operator tests UI manually. If browser automation is needed, use Playwright MCP (which always uses the Chrome-Debug profile).
+
+**Examples:**
+- Agent ran `open https://shofferai-....run.app/login` → opened in Edge instead of Chrome
+- Agent tried to "test on prod" by opening a browser → can't interact with it anyway
+
+**Rule:** NEVER use the `open` command to launch browsers. You cannot interact with a browser opened via `open`. For testing, tell the user the prod URL and let them test. For automated testing, use Playwright MCP tools (when connected). The operator handles all manual browser testing.
+
+---
+
 *Last updated: 2026-03-20*

@@ -112,15 +112,79 @@ For each item the user requested:
 
 ## Site Notes
 
-- **Delivery**: Zepto delivers in 10-15 minutes depending on area — time-sensitive, don't waste time.
+- **Site URL**: `zeptonow.com` redirects to `zepto.com`. Always navigate to `https://www.zeptonow.com`.
+- **Delivery**: Zepto delivers in 6-15 minutes depending on area — time-sensitive, don't waste time.
 - **Operator Chrome Profile 3** should be logged in. Do NOT ask user for phone or credentials.
 - If session expired, login with operator phone 8109137158. OTP goes to operator.
-- **Location**: First-time visitors see a location popup. If already set, header shows address + delivery time.
+
+### Verified Selectors (2026-03-20)
+
+**Header (homepage + search):**
+- Logo: `a[data-testid="zepto-logo"]`
+- Delivery time: `h2[data-testid="delivery-time"]` — shows "X minutes"
+- Address: `h3[data-testid="user-address"]` — shows address or "Select Location"
+- Search: `a[data-testid="search-bar-icon"]` → links to `/search`
+- Login (logged out): `span[data-testid="login-btn"]` with text "login"
+- Profile (logged in): `span[data-testid="my-account"]` with text "profile", links to `/account`
+- Cart: `button[data-testid="cart-btn"]` — shows count badge when items in cart
+
+**Login modal:**
+- Login button: `button[aria-label="login"]`
+- Phone input: `textbox "Enter Phone Number"` in dialog
+- Country code: "+91" (pre-set)
+- Continue: `button "Continue"` (disabled until phone entered)
+
+**Location modal:**
+- Trigger: `button[aria-label="Select Location"]`
+- Search: `textbox "Search a new address"`
+- Saved addresses: List of clickable divs with label (Home/Work/Other) + address text
+- Close: `button "Location modal close Icon"`
+
+**Search page (`/search?query={term}`):**
+- URL pattern: `https://www.zepto.com/search?query={term}` — use direct navigation
+- Search input: `combobox "Search"` (role=combobox)
+- Results heading: `h1` — "Showing results for "{term}""
+- Brand filter buttons: Top row (e.g., "Amul", "Nandini")
+- Price/Brand/Weight filters: Collapsible sections with checkboxes
+
+**Product cards (search results):**
+- Card: `a[href*="/pn/"]` — each product is a link
+- Product image: `img[src*="cdn.zeptonow.com"]`
+- ADD button: `button` with text "ADD" inside card
+- After adding: ADD becomes `button "Decrease quantity"` + qty + `button "Increase quantity"`
+- Price: `span` elements (current price, then MRP strikethrough)
+- Discount: `span` with "₹X OFF"
+- Name: `span`/`div` with product name text
+- Weight: `span` with e.g., "1 pack (1 L)", "1 pc (250 ml)"
+- Rating: star icon + `span` "4.7" + count "(69.6k)"
+- Delivery: `div` "X mins"
+
+**Cart (`[role="dialog"]`):**
+- Open via `button[data-testid="cart-btn"]` — URL gets `&cart=open`
+- Dialog: `[role="dialog"]` (div, not native `<dialog>`)
+- Cart items: image + name (`paragraph`) + size + quantity controls (`button "Remove"` / qty / `button "Add"`)
+- Quantity data-testids: `{id}-minus-btn`, `{id}-cart-qty`, `{id}-plus-btn`
+- Bill summary: `"Bill summary"` heading, then:
+  - `button "Item Total"` → ₹amount
+  - `button "Handling Fee"` → "FREE" or ₹amount
+  - `button "Delivery Fee"` → ₹amount + free delivery threshold text
+  - `button "To Pay"` → final ₹amount
+- Pay button: `button "Click to Pay ₹{amount}"` with class `bg-skin-primary`
+- Paper bag opt-out: checkbox
+- "Add More Items" link → `/search`
+
+**Image CDN pattern:**
+```
+https://cdn.zeptonow.com/production/ik-seo/tr:w-403,ar-{ratio},pr-true,f-auto,q-40,dpr-2/cms/product_variant/{uuid}/{slug}.jpeg
+```
+
+### Operational Notes
+- **Location**: First-time visitors or profile without location see "Select Location". If already set, header shows address + delivery time.
 - **Product availability** varies by area and time of day. Some items may be out of stock.
 - **Minimum order**: Below minimum may incur a small cart/delivery surcharge. Minimum varies by area.
 - Some areas don't have Zepto coverage — site shows "not serviceable" or similar message.
-- **Quantity controls**: After clicking Add, the button becomes `-`/count/`+`. Click `+` to increase, `-` to decrease.
+- **Quantity controls**: After clicking ADD, the button becomes Decrease/count/Increase. Click Increase to add more, Decrease to reduce.
 - Use `confirm_action` for cart review (no money), `collect_payment` for checkout (actual payment).
 - When using confirm_action or collect_payment, WAIT for user response. Do NOT auto-proceed.
 - **Cancellation**: Orders may not be cancellable once packed for delivery.
-- **Note**: Selectors in this skill have NOT been verified against the live site. The agent should use `browser_snapshot` to inspect actual page structure and adapt selectors dynamically.
+- **Coupons**: Cart dialog shows available coupons with "Apply" buttons and "View all coupons" link.
