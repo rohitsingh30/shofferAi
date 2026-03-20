@@ -8,24 +8,54 @@
 # only the instance that receives tool calls opens Chrome.
 #
 # How it works:
-#   1. APFS-clone the Chrome-Debug user-data-dir (instant, preserves signed-in sessions)
-#   2. Remove stale lock files from the clone
-#   3. Generate a Playwright MCP config JSON with Chrome launch options
-#   4. Start Playwright MCP with --config (no --cdp-endpoint → lazy browser launch)
-#   5. Playwright MCP launches Chrome only on first tool call
-#   6. On exit, clean up the cloned dir and temp config
+#   1. Clean up any orphaned Chrome-Debug clones from previous crashes
+#   2. APFS-clone the Chrome-Debug user-data-dir (instant, preserves signed-in sessions)
+#   3. Remove stale lock files from the clone
+#   4. Generate a Playwright MCP config JSON with Chrome launch options
+#   5. Start Playwright MCP with --config (no --cdp-endpoint → lazy browser launch)
+#   6. Playwright MCP launches Chrome only on first tool call
+#   7. On exit, clean up the cloned dir and temp config
 #
 # APFS clone (`cp -c`) is near-instant and preserves all signed-in sessions
 # (cookies are encrypted via macOS Keychain per-user, not per-dir).
+#
+# IMPORTANT: Uses globally-installed playwright-mcp binary (not npx @latest)
+# to eliminate npm registry lookups and avoid slow/failed startups.
+# Update with: npm install -g @playwright/mcp@<version>
 #
 # Called by .mcp.json — no manual Chrome launch needed.
 
 set -euo pipefail
 
+# --- Resolve playwright-mcp binary (global install, no npx) ---
+PLAYWRIGHT_MCP=""
+if command -v playwright-mcp >/dev/null 2>&1; then
+  PLAYWRIGHT_MCP="$(command -v playwright-mcp)"
+elif [ -x /opt/homebrew/bin/playwright-mcp ]; then
+  PLAYWRIGHT_MCP="/opt/homebrew/bin/playwright-mcp"
+elif [ -x /usr/local/bin/playwright-mcp ]; then
+  PLAYWRIGHT_MCP="/usr/local/bin/playwright-mcp"
+fi
+
+if [ -z "$PLAYWRIGHT_MCP" ]; then
+  echo "❌ playwright-mcp not found! Install with: npm install -g @playwright/mcp" >&2
+  echo "   Then restart the CLI session." >&2
+  exit 1
+fi
+
+PLAYWRIGHT_MCP_VERSION="$("$PLAYWRIGHT_MCP" --version 2>/dev/null || echo 'unknown')"
+echo "🎭 playwright-mcp $PLAYWRIGHT_MCP_VERSION ($PLAYWRIGHT_MCP)" >&2
+
 PROFILE="Profile 3"
 BASE_USER_DATA_DIR="$HOME/Library/Application Support/Google/Chrome-Debug"
 INSTANCE_ID="mcp-$$-$(date +%s)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# --- Clean up orphaned Chrome-Debug clones from previous crashes (>1 hour old) ---
+find "$HOME/Library/Application Support/Google" -maxdepth 1 -name "Chrome-Debug-mcp-*" -type d -mmin +60 2>/dev/null | while read -r stale_dir; do
+  echo "🧹 Removing stale clone: $(basename "$stale_dir")" >&2
+  rm -rf "$stale_dir" 2>/dev/null || true
+done
 
 # --- APFS-clone the profile for this instance ---
 USER_DATA_DIR="${BASE_USER_DATA_DIR}-${INSTANCE_ID}"
@@ -35,7 +65,7 @@ cleanup() {
   rm -rf "$USER_DATA_DIR" 2>/dev/null || true
   rm -f "$CONFIG_FILE" 2>/dev/null || true
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 
 echo "📋 Cloning Chrome-Debug → ${INSTANCE_ID} (APFS instant clone)..." >&2
 cp -cR "$BASE_USER_DATA_DIR" "$USER_DATA_DIR"
@@ -76,11 +106,12 @@ JSONEOF
 echo "⏳ Playwright MCP starting (Chrome launches lazily on first tool call)..." >&2
 
 # Run Playwright MCP as a foreground process (not exec) so the EXIT trap fires on exit.
-# --config: our Chrome profile + launch args
+# Uses globally-installed binary — no npm registry lookup, instant startup.
+# --config: our Chrome profile + launch args (Profile 3 / rsinghtomar3011@gmail.com)
 # --init-script: stealth anti-bot-detection patches (evaluated before any page JS)
 # --output-dir: where screenshots/traces go
 # No --cdp-endpoint → Playwright MCP launches Chrome lazily on first tool call.
-npx -y @playwright/mcp@latest \
+"$PLAYWRIGHT_MCP" \
   --config "$CONFIG_FILE" \
   --init-script "$SCRIPT_DIR/stealth-init.js" \
   --output-dir /tmp/playwright-mcp-output

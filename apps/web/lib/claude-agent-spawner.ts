@@ -124,13 +124,13 @@ export class ClaudeAgentSpawner {
       }
 
       // gh copilot with Playwright MCP pointed at Chrome
+      // Uses globally-installed playwright-mcp binary (not npx) for instant startup
       const mcpConfig = JSON.stringify({
         mcpServers: {
           playwright: {
             type: 'stdio',
-            command: 'npx',
+            command: 'playwright-mcp',
             args: [
-              '-y', '@playwright/mcp@latest',
               '--cdp-endpoint', `http://127.0.0.1:${cdpPort}`,
               '--cdp-timeout', '60000',
             ],

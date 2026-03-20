@@ -276,4 +276,17 @@ After making changes:
 
 ---
 
+## 16. Using `npx @playwright/mcp@latest` Instead of Global Binary
+
+**What happens:** Agent or scripts use `npx -y @playwright/mcp@latest` to start the Playwright MCP server. The `@latest` tag forces an npm registry check on EVERY startup, adding 5-20 seconds (or timing out entirely on slow/flaky network). This causes "MCP server taking longer than expected" warnings and mid-session disconnects.
+
+**Examples:**
+- `npx -y @playwright/mcp@latest` in `mcp-host.ts`, `claude-agent-spawner.ts`, `shofferai-agent.sh`
+- MCP server times out during Copilot CLI startup because npx is waiting on npm registry
+- Mid-session disconnects when the npx cache becomes stale
+
+**Rule:** ALWAYS use the globally-installed `playwright-mcp` binary. Never use `npx @playwright/mcp@latest`. The binary is installed via `npm install -g @playwright/mcp` and updated with `./apps/playwright/scripts/update-playwright-mcp.sh`. In code: `command: 'playwright-mcp'` (not `command: 'npx'`). In shell scripts: `playwright-mcp --cdp-endpoint ...` (not `npx -y @playwright/mcp@latest --cdp-endpoint ...`).
+
+---
+
 *Last updated: 2026-03-20*
