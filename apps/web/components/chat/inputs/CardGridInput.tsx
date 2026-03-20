@@ -103,25 +103,36 @@ export function CardGridInput({
     return showQuantity ? `${label} ×${qty}` : label;
   });
 
+  // Parse "₹44 · 450 ml" → { price, detail }
+  function parseCardSubtitle(sub?: string): { price?: string; detail?: string } {
+    if (!sub) return {};
+    const m = sub.match(/^(₹[\d,]+)\s*[·•\-–]\s*(.+)$/);
+    if (m) return { price: m[1], detail: m[2].trim() };
+    if (/^₹/.test(sub)) return { price: sub };
+    return { detail: sub };
+  }
+
   // Product mode: larger cards with images on top, price + weight below
   if (isProductMode) {
     return (
       <div className="space-y-3">
         {/* Product grid */}
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-          {allCards.map((card) => {
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {allCards.map((card, i) => {
             const qty = selections.get(card.id);
             const isSelected = qty !== undefined;
             const showImg = card.image && !imgErrors.has(card.id);
+            const parsed = parseCardSubtitle(card.subtitle);
 
             return (
               <div
                 key={card.id}
-                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition-all duration-150 ${
+                className={`carousel-card group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all duration-200 ${
                   isSelected
-                    ? 'border-primary/60 bg-primary/[0.08] ring-1 ring-primary/30'
-                    : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] hover:bg-white/[0.05]'
+                    ? 'border-primary/60 bg-primary/[0.06] ring-2 ring-primary/25 shadow-lg shadow-primary/10'
+                    : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20'
                 }`}
+                style={{ animationDelay: `${i * 50}ms` }}
                 onClick={() => {
                   if (showQuantity && isSelected) return;
                   toggleCard(card.id);
@@ -129,38 +140,58 @@ export function CardGridInput({
               >
                 {/* Badge */}
                 {card.badge && (
-                  <span className="absolute left-1.5 top-1.5 z-10 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                  <span className="absolute left-2 top-2 z-10 rounded-lg bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white shadow-sm">
                     {card.badge}
                   </span>
                 )}
 
+                {/* Selected check */}
+                {isSelected && !showQuantity && (
+                  <span className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/30">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
+
                 {/* Product image */}
-                <div className="relative flex aspect-square items-center justify-center bg-white/[0.04] p-2">
+                <div className="relative flex aspect-[4/3] items-center justify-center bg-white/[0.06] p-3">
                   {showImg ? (
                     <img
                       src={card.image!}
                       alt={card.label}
-                      className="h-full w-full rounded-lg object-contain"
+                      className="h-full w-full rounded-lg object-contain transition-transform duration-200 group-hover:scale-105"
                       loading="lazy"
                       onError={() => handleImgError(card.id)}
                     />
                   ) : (
-                    <span className="text-4xl leading-none">
+                    <span className="text-5xl leading-none transition-transform duration-200 group-hover:scale-110">
                       {card.emoji ?? '📦'}
                     </span>
                   )}
                 </div>
 
                 {/* Product info */}
-                <div className="flex flex-1 flex-col gap-1 px-2.5 pb-2.5 pt-2">
+                <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
                   {/* Name */}
-                  <span className="line-clamp-2 text-xs font-medium leading-tight text-white/90">
+                  <span className="line-clamp-2 text-[13px] font-semibold leading-tight text-white/90">
                     {card.label}
                   </span>
 
-                  {/* Price / weight (via subtitle like "₹32 · 500ml") */}
-                  {card.subtitle && (
-                    <span className="text-[11px] font-medium text-primary/80">
+                  {/* Weight / detail */}
+                  {parsed.detail && (
+                    <span className="text-[11px] text-white/40">
+                      {parsed.detail}
+                    </span>
+                  )}
+
+                  {/* Price */}
+                  {parsed.price ? (
+                    <span className="mt-1 text-[15px] font-bold text-primary">
+                      {parsed.price}
+                    </span>
+                  ) : card.subtitle && (
+                    <span className="mt-1 text-[11px] font-medium text-primary/70">
                       {card.subtitle}
                     </span>
                   )}
@@ -168,23 +199,23 @@ export function CardGridInput({
                   {/* Quantity stepper */}
                   {showQuantity && isSelected && (
                     <div
-                      className="mt-auto flex items-center justify-center gap-1 pt-1"
+                      className="mt-2 flex items-center justify-center gap-1.5"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
                         type="button"
                         onClick={() => setQty(card.id, -1)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20 text-xs font-bold text-primary transition-colors hover:bg-primary/30"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-sm font-bold text-primary transition-all hover:bg-primary/25 active:scale-95"
                       >
                         −
                       </button>
-                      <span className="min-w-[1.5rem] text-center text-sm font-semibold text-white">
+                      <span className="min-w-[2rem] text-center text-base font-bold text-white">
                         {qty}
                       </span>
                       <button
                         type="button"
                         onClick={() => setQty(card.id, 1)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20 text-xs font-bold text-primary transition-colors hover:bg-primary/30"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/15 text-sm font-bold text-primary transition-all hover:bg-primary/25 active:scale-95"
                       >
                         +
                       </button>
@@ -199,7 +230,7 @@ export function CardGridInput({
                         e.stopPropagation();
                         toggleCard(card.id);
                       }}
-                      className="mt-auto rounded-lg border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                      className="mt-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-1.5 text-xs font-bold text-primary tracking-wide transition-all hover:bg-primary/20 active:scale-95"
                     >
                       ADD
                     </button>
@@ -224,12 +255,12 @@ export function CardGridInput({
               value={customText}
               onChange={(e) => setCustomText(e.target.value)}
               placeholder="🔍 Search for something else..."
-              className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white/90 placeholder:text-white/30 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/30"
+              className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white/90 placeholder:text-white/30 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/30 transition-all"
             />
             <button
               type="submit"
               disabled={!customText.trim()}
-              className="rounded-xl bg-white/10 px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-xl bg-white/10 px-4 py-2 text-sm font-medium transition-all hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Add
             </button>
@@ -238,19 +269,19 @@ export function CardGridInput({
 
         {/* Cart summary + submit */}
         {selections.size > 0 && (
-          <div className="flex items-center gap-3 rounded-xl bg-primary/10 p-3 ring-1 ring-primary/20">
+          <div className="flex items-center gap-3 rounded-xl bg-primary/[0.08] p-3 ring-1 ring-primary/20 animate-fade-in">
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-primary">
+              <p className="text-xs font-semibold text-primary">
                 {selections.size} item{selections.size > 1 ? 's' : ''} selected
               </p>
-              <p className="truncate text-[11px] text-white/50">
+              <p className="truncate text-[11px] text-white/40">
                 {summaryParts.join(', ')}
               </p>
             </div>
             <button
               type="button"
               onClick={handleSubmit}
-              className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90"
+              className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 active:scale-[0.98]"
             >
               Continue →
             </button>

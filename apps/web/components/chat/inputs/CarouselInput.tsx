@@ -2,18 +2,34 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+interface CardData {
+  id: string;
+  label: string;
+  emoji?: string;
+  image?: string;
+  subtitle?: string;
+  badge?: string;
+}
+
 interface CarouselInputProps {
-  cards: Array<{
-    id: string;
-    label: string;
-    emoji?: string;
-    image?: string;
-    subtitle?: string;
-    badge?: string;
-  }>;
+  cards: CardData[];
   multiSelect?: boolean;
   allowCustom?: boolean;
   onSubmit: (value: string) => void;
+}
+
+/* Detect whether any card has a real product image */
+function hasImages(cards: CardData[]): boolean {
+  return cards.some((c) => c.image && c.image.startsWith('http'));
+}
+
+/* Parse "₹44 · 450 ml" → { price: "₹44", detail: "450 ml" } */
+function parseSubtitle(sub?: string): { price?: string; detail?: string } {
+  if (!sub) return {};
+  const m = sub.match(/^(₹[\d,]+)\s*[·•\-–]\s*(.+)$/);
+  if (m) return { price: m[1], detail: m[2].trim() };
+  if (/^₹/.test(sub)) return { price: sub };
+  return { detail: sub };
 }
 
 export function CarouselInput({
@@ -26,13 +42,15 @@ export function CarouselInput({
   const [customText, setCustomText] = useState('');
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
+  const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const productMode = hasImages(cards);
 
   const updateArrows = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    setShowLeftArrow(el.scrollLeft > 0);
-    setShowRightArrow(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    setShowLeftArrow(el.scrollLeft > 4);
+    setShowRightArrow(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
   }, []);
 
   useEffect(() => {
@@ -61,7 +79,8 @@ export function CarouselInput({
   function scroll(direction: 'left' | 'right') {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollBy({ left: direction === 'left' ? -200 : 200, behavior: 'smooth' });
+    const cardWidth = productMode ? 172 : 120;
+    el.scrollBy({ left: direction === 'left' ? -cardWidth * 2 : cardWidth * 2, behavior: 'smooth' });
   }
 
   function handleSubmit() {
@@ -78,62 +97,256 @@ export function CarouselInput({
     );
   }
 
+  const handleImgError = useCallback((id: string) => {
+    setImgErrors((prev) => new Set(prev).add(id));
+  }, []);
+
+  /* ─── Product Mode: large image cards ─── */
+  if (productMode) {
+    return (
+      <div className="flex flex-col gap-3">
+        {/* Carousel wrapper */}
+        <div className="carousel-wrapper relative -mx-1">
+          {/* Edge fade — left */}
+          {showLeftArrow && (
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[var(--color-background)] to-transparent" />
+          )}
+          {/* Edge fade — right */}
+          {showRightArrow && (
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[var(--color-background)] to-transparent" />
+          )}
+
+          {/* Left arrow */}
+          {showLeftArrow && (
+            <button
+              type="button"
+              onClick={() => scroll('left')}
+              className="absolute -left-1 top-1/2 z-20 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 text-white/70 shadow-xl backdrop-blur-sm transition-all hover:bg-zinc-800 hover:text-white hover:scale-105"
+              aria-label="Scroll left"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+
+          {/* Right arrow */}
+          {showRightArrow && (
+            <button
+              type="button"
+              onClick={() => scroll('right')}
+              className="absolute -right-1 top-1/2 z-20 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 text-white/70 shadow-xl backdrop-blur-sm transition-all hover:bg-zinc-800 hover:text-white hover:scale-105"
+              aria-label="Scroll right"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+
+          {/* Scrollable row */}
+          <div
+            ref={scrollRef}
+            className="flex gap-3 overflow-x-auto snap-x snap-mandatory px-1 pb-2"
+            style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+          >
+            {cards.map((card, i) => {
+              const isSelected = selected.includes(card.id);
+              const showImg = card.image && !imgErrors.has(card.id);
+              const { price, detail } = parseSubtitle(card.subtitle);
+
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => toggle(card.id)}
+                  className={`carousel-card snap-start shrink-0 w-[156px] flex flex-col overflow-hidden rounded-2xl border transition-all duration-200 cursor-pointer group ${
+                    isSelected
+                      ? 'border-primary/70 bg-primary/[0.06] ring-2 ring-primary/25 shadow-lg shadow-primary/10 scale-[1.02]'
+                      : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20'
+                  }`}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  {/* Image area */}
+                  <div className="relative flex aspect-[4/3] items-center justify-center bg-white/[0.06] p-3">
+                    {/* Badge */}
+                    {card.badge && (
+                      <span className="absolute left-2 top-2 z-10 rounded-lg bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white shadow-sm">
+                        {card.badge}
+                      </span>
+                    )}
+
+                    {/* Selected check */}
+                    {isSelected && (
+                      <span className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/30">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    )}
+
+                    {showImg ? (
+                      <img
+                        src={card.image!}
+                        alt={card.label}
+                        className="h-full w-full rounded-lg object-contain transition-transform duration-200 group-hover:scale-105"
+                        loading="lazy"
+                        onError={() => handleImgError(card.id)}
+                      />
+                    ) : (
+                      <span className="text-5xl leading-none transition-transform duration-200 group-hover:scale-110">
+                        {card.emoji ?? '📦'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-2.5">
+                    {/* Product name */}
+                    <span className="line-clamp-2 text-[13px] font-semibold leading-tight text-white/90">
+                      {card.label}
+                    </span>
+
+                    {/* Weight / detail */}
+                    {detail && (
+                      <span className="text-[11px] text-white/40">
+                        {detail}
+                      </span>
+                    )}
+
+                    {/* Price */}
+                    {price && (
+                      <span className="mt-auto pt-1 text-[15px] font-bold text-primary">
+                        {price}
+                      </span>
+                    )}
+
+                    {/* Subtitle fallback (no price parsed) */}
+                    {!price && card.subtitle && (
+                      <span className="mt-auto pt-1 text-[11px] font-medium text-primary/70">
+                        {card.subtitle}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Scroll indicator dots */}
+        {cards.length > 3 && (
+          <div className="flex justify-center gap-1">
+            {Array.from({ length: Math.min(cards.length, 7) }).map((_, i) => (
+              <span
+                key={i}
+                className="h-1 w-1 rounded-full bg-white/20"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Custom text input */}
+        {allowCustom && (
+          <input
+            type="text"
+            value={customText}
+            onChange={(e) => setCustomText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            placeholder="Or type something specific..."
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/30 transition-all"
+          />
+        )}
+
+        {/* Submit bar */}
+        {(selected.length > 0 || (allowCustom && customText.trim())) && (
+          <div className="flex items-center gap-3 rounded-xl bg-primary/[0.08] p-3 ring-1 ring-primary/20 animate-fade-in">
+            <div className="min-w-0 flex-1">
+              {selected.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-primary">
+                    {selected.length} selected
+                  </p>
+                  <p className="truncate text-[11px] text-white/40">
+                    {cards.filter(c => selected.includes(c.id)).map(c => c.label).join(', ')}
+                  </p>
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 active:scale-[0.98]"
+            >
+              Confirm →
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ─── Emoji Mode: compact cards (no product images) ─── */
   return (
     <div className="flex flex-col gap-3">
-      {/* Scroll area wrapper */}
-      <div className="relative">
-        {/* Left arrow */}
+      <div className="carousel-wrapper relative -mx-1">
+        {showLeftArrow && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-[var(--color-background)] to-transparent" />
+        )}
+        {showRightArrow && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-[var(--color-background)] to-transparent" />
+        )}
+
         {showLeftArrow && (
           <button
             type="button"
             onClick={() => scroll('left')}
-            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white/70 transition-colors hover:text-white"
+            className="absolute -left-1 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 text-white/60 shadow-lg backdrop-blur-sm transition-all hover:bg-zinc-800 hover:text-white"
             aria-label="Scroll left"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M15 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         )}
 
-        {/* Right arrow */}
         {showRightArrow && (
           <button
             type="button"
             onClick={() => scroll('right')}
-            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white/70 transition-colors hover:text-white"
+            className="absolute -right-1 top-1/2 z-20 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 text-white/60 shadow-lg backdrop-blur-sm transition-all hover:bg-zinc-800 hover:text-white"
             aria-label="Scroll right"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         )}
 
-        {/* Scrollable card row */}
         <div
           ref={scrollRef}
-          className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 px-1"
-          style={{ scrollbarWidth: 'none' }}
+          className="flex gap-2 overflow-x-auto snap-x snap-mandatory px-1 pb-2"
+          style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
         >
-          {cards.map((card) => {
+          {cards.map((card, i) => {
             const isSelected = selected.includes(card.id);
             return (
               <button
                 key={card.id}
                 type="button"
                 onClick={() => toggle(card.id)}
-                className={`snap-start shrink-0 w-24 flex flex-col items-center gap-1.5 rounded-xl border p-3 cursor-pointer transition-all ${
+                className={`carousel-card snap-start shrink-0 w-[108px] flex flex-col items-center gap-1.5 rounded-xl border p-3 cursor-pointer transition-all duration-200 ${
                   isSelected
-                    ? 'border-primary/60 bg-primary/10'
-                    : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] hover:bg-white/[0.06]'
+                    ? 'border-primary/60 bg-primary/10 ring-1 ring-primary/20 scale-[1.03]'
+                    : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5'
                 }`}
+                style={{ animationDelay: `${i * 50}ms` }}
               >
                 {card.image ? (
                   <img
                     src={card.image}
                     alt={card.label}
-                    className="h-12 w-12 rounded-lg object-cover"
+                    className="h-14 w-14 rounded-lg object-cover"
                     loading="lazy"
                   />
                 ) : card.emoji ? (
@@ -145,14 +358,22 @@ export function CarouselInput({
                 </span>
 
                 {card.subtitle && (
-                  <span className="text-[10px] text-white/50 text-center leading-tight line-clamp-1">
+                  <span className="text-[10px] text-white/45 text-center leading-tight line-clamp-1">
                     {card.subtitle}
                   </span>
                 )}
 
                 {card.badge && (
-                  <span className="mt-0.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[9px] font-medium text-primary">
+                  <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
                     {card.badge}
+                  </span>
+                )}
+
+                {isSelected && (
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary shadow-md">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </span>
                 )}
               </button>
@@ -161,7 +382,6 @@ export function CarouselInput({
         </div>
       </div>
 
-      {/* Custom text input */}
       {allowCustom && (
         <input
           type="text"
@@ -169,20 +389,19 @@ export function CarouselInput({
           onChange={(e) => setCustomText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           placeholder="Or type something specific..."
-          className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-primary/40 transition-colors"
+          className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white/90 placeholder:text-white/30 outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/30 transition-all"
         />
       )}
 
-      {/* Submit button */}
       <button
         type="button"
         onClick={handleSubmit}
         disabled={selected.length === 0 && !(allowCustom && customText.trim())}
-        className="self-end rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+        className="self-end rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/20 disabled:opacity-30 disabled:cursor-not-allowed active:scale-[0.98]"
       >
         {multiSelect && selected.length > 1
-          ? `Submit (${selected.length})`
-          : 'Submit'}
+          ? `Confirm (${selected.length})`
+          : 'Confirm'}
       </button>
     </div>
   );
