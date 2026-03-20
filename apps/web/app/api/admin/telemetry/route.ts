@@ -279,6 +279,181 @@ export async function GET(request: Request) {
     });
   }
 
+  if (view === 'latency') {
+    const taskId = url.searchParams.get('taskId');
+
+    if (taskId) {
+      // ─── Per-task waterfall ────────────────────────────────────────
+      // Get the task_latency summary event + all task_phase events for this task
+      const [latencyEvent, phaseEvents, taskInfo] = await Promise.all([
+        prisma.telemetryEvent.findFirst({
+          where: { taskId, event: 'task_latency' },
+          select: { id: true, timestamp: true, durationMs: true, success: true, metadata: true },
+        }),
+        prisma.telemetryEvent.findMany({
+          where: { taskId, event: 'task_phase' },
+          orderBy: { timestamp: 'asc' },
+          select: { id: true, timestamp: true, durationMs: true, success: true, metadata: true },
+        }),
+        prisma.task.findUnique({
+          where: { id: taskId },
+          select: { id: true, description: true, status: true, workflowType: true, createdAt: true, completedAt: true },
+        }),
+      ]);
+
+      // Parse the summary event metadata for markers and phases
+      let summary: Record<string, unknown> = {};
+      if (latencyEvent?.metadata) {
+        try { summary = JSON.parse(latencyEvent.metadata); } catch {}
+      }
+
+      const phases = phaseEvents.map((e) => {
+        let meta: Record<string, unknown> = {};
+        if (e.metadata) { try { meta = JSON.parse(e.metadata); } catch {} }
+        return {
+          phase: meta.phase as string || 'unknown',
+          durationMs: e.durationMs,
+          startMs: meta.startMs as number,
+          endMs: meta.endMs as number,
+          ...meta,
+        };
+      });
+
+      return NextResponse.json({
+        taskId,
+        task: taskInfo,
+        totalMs: latencyEvent?.durationMs || null,
+        ttfmMs: summary.ttfmMs ?? null,
+        success: latencyEvent?.success ?? null,
+        phases,
+        markers: summary.markers || [],
+      });
+    }
+
+    // ─── Aggregate latency breakdown ───────────────────────────────
+    // Get avg/p50/p95/max per phase across all tasks in the time window
+    const phaseStats = await prisma.$queryRaw<Array<{
+      phase: string;
+      count: bigint;
+      avg_ms: number;
+      p50_ms: number;
+      p95_ms: number;
+      max_ms: number;
+    }>>`
+      SELECT
+        metadata::jsonb->>'phase' as phase,
+        COUNT(*) as count,
+        AVG("durationMs") as avg_ms,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "durationMs") as p50_ms,
+        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs") as p95_ms,
+        MAX("durationMs") as max_ms
+      FROM "TelemetryEvent"
+      WHERE timestamp >= ${since}
+        AND event = 'task_phase'
+        AND "durationMs" IS NOT NULL
+      GROUP BY phase
+      ORDER BY avg_ms DESC
+    `;
+
+    // Get TTFM stats from task_latency events
+    const ttfmStats = await prisma.$queryRaw<Array<{
+      count: bigint;
+      avg_ms: number;
+      p50_ms: number;
+      p95_ms: number;
+      max_ms: number;
+    }>>`
+      SELECT
+        COUNT(*) as count,
+        AVG((metadata::jsonb->>'ttfmMs')::numeric) as avg_ms,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY (metadata::jsonb->>'ttfmMs')::numeric) as p50_ms,
+        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY (metadata::jsonb->>'ttfmMs')::numeric) as p95_ms,
+        MAX((metadata::jsonb->>'ttfmMs')::numeric) as max_ms
+      FROM "TelemetryEvent"
+      WHERE timestamp >= ${since}
+        AND event = 'task_latency'
+        AND metadata::jsonb->>'ttfmMs' IS NOT NULL
+        AND (metadata::jsonb->>'ttfmMs')::numeric > 0
+    `;
+
+    // Get overall task latency distribution
+    const taskLatencyStats = await prisma.$queryRaw<Array<{
+      count: bigint;
+      avg_ms: number;
+      p50_ms: number;
+      p95_ms: number;
+      max_ms: number;
+      success_count: bigint;
+      fail_count: bigint;
+    }>>`
+      SELECT
+        COUNT(*) as count,
+        AVG("durationMs") as avg_ms,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "durationMs") as p50_ms,
+        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs") as p95_ms,
+        MAX("durationMs") as max_ms,
+        COUNT(*) FILTER (WHERE success = true) as success_count,
+        COUNT(*) FILTER (WHERE success = false) as fail_count
+      FROM "TelemetryEvent"
+      WHERE timestamp >= ${since}
+        AND event = 'task_latency'
+        AND "durationMs" IS NOT NULL
+    `;
+
+    // Recent task latencies for the table
+    const recentLatencies = await prisma.telemetryEvent.findMany({
+      where: { timestamp: { gte: since }, event: 'task_latency' },
+      orderBy: { timestamp: 'desc' },
+      take: 50,
+      select: { id: true, timestamp: true, durationMs: true, success: true, taskId: true, metadata: true },
+    });
+
+    const ttfm = ttfmStats[0] || { count: 0n, avg_ms: 0, p50_ms: 0, p95_ms: 0, max_ms: 0 };
+    const overall = taskLatencyStats[0] || { count: 0n, avg_ms: 0, p50_ms: 0, p95_ms: 0, max_ms: 0, success_count: 0n, fail_count: 0n };
+
+    return NextResponse.json({
+      phases: phaseStats.map((p) => ({
+        phase: p.phase,
+        count: Number(p.count),
+        avgMs: Math.round(p.avg_ms || 0),
+        p50Ms: Math.round(p.p50_ms || 0),
+        p95Ms: Math.round(p.p95_ms || 0),
+        maxMs: Math.round(p.max_ms || 0),
+      })),
+      ttfm: {
+        count: Number(ttfm.count),
+        avgMs: Math.round(ttfm.avg_ms || 0),
+        p50Ms: Math.round(ttfm.p50_ms || 0),
+        p95Ms: Math.round(ttfm.p95_ms || 0),
+        maxMs: Math.round(ttfm.max_ms || 0),
+      },
+      overall: {
+        count: Number(overall.count),
+        avgMs: Math.round(overall.avg_ms || 0),
+        p50Ms: Math.round(overall.p50_ms || 0),
+        p95Ms: Math.round(overall.p95_ms || 0),
+        maxMs: Math.round(overall.max_ms || 0),
+        successCount: Number(overall.success_count),
+        failCount: Number(overall.fail_count),
+      },
+      recentTasks: recentLatencies.map((e) => {
+        let meta: Record<string, unknown> = {};
+        if (e.metadata) { try { meta = JSON.parse(e.metadata); } catch {} }
+        return {
+          taskId: e.taskId,
+          timestamp: e.timestamp,
+          totalMs: e.durationMs,
+          ttfmMs: meta.ttfmMs ?? null,
+          success: e.success,
+          skillName: meta.skillName || null,
+          completedVia: meta.completedVia || null,
+          phaseCount: meta.phaseCount || 0,
+        };
+      }),
+      hours,
+    });
+  }
+
   if (view === 'task-detail') {
     const taskId = url.searchParams.get('taskId');
     if (!taskId) {

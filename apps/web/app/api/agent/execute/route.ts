@@ -5,6 +5,7 @@ import { AgentExecutor, type AgentCallbacks, matchSkill } from '@shofferai/agent
 import { CredentialInjector } from '@/lib/credential-vault';
 import { remoteMcpHost, workflowEngine, vault, skills } from '@/lib/singletons';
 import { track, trackTimed } from '@/lib/telemetry';
+import { TaskLatencyTracker } from '@/lib/task-latency-tracker';
 import { getAuthUser } from '@/lib/auth-helper';
 import type {
   TaskRelayMessage,
@@ -25,6 +26,9 @@ async function ensureRelayConnected() {
 
 export async function POST(request: Request) {
   console.log('[execute] POST /api/agent/execute — incoming request');
+
+  // ─── Phase: auth ─────────────────────────────────────────────────
+  const authStart = Date.now();
   const authUser = await getAuthUser(request);
   if (!authUser) {
     console.warn('[execute] Unauthorized request');
@@ -39,10 +43,19 @@ export async function POST(request: Request) {
 
   const userId = authUser.userId;
 
-  // Create task in DB
+  // ─── Phase: task_setup ───────────────────────────────────────────
+  // Create task first so we have the taskId for the latency tracker
   const taskId = await workflowEngine.createTask(userId, message);
   await workflowEngine.updateTaskStatus(taskId, 'running');
   console.log('[execute] taskId=%s created, status=running', taskId);
+
+  // Initialize latency tracker — tracks all phases for this task
+  const lat = new TaskLatencyTracker(taskId, userId);
+  // Retroactively record auth phase duration
+  lat.startPhase('auth');
+  lat.endPhase('auth', { durationOverride: Date.now() - authStart });
+
+  lat.startPhase('task_setup');
 
   track({ event: 'task_created', category: 'task', userId, taskId, metadata: { message: message.slice(0, 200) } });
   const taskTimer = trackTimed({ event: 'task_execution', category: 'task', userId, taskId });
@@ -52,6 +65,8 @@ export async function POST(request: Request) {
     prisma.profile.findUnique({ where: { userId } }),
     vault.list(userId),
   ]);
+
+  lat.endPhase('task_setup');
 
   // Stream response via SSE
   const stream = new ReadableStream({
@@ -66,6 +81,10 @@ export async function POST(request: Request) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type, payload })}\n\n`)
           );
+          // Track time-to-first-message
+          if (type === 'message') {
+            lat.addMarker('first_message_sent');
+          }
         } catch {
           // Stream already closed (browser disconnected, timeout, etc.)
           streamClosed = true;
@@ -97,8 +116,11 @@ export async function POST(request: Request) {
         // Relay is only needed when handoff_to_browser_agent or browse_website is called.
         console.log('[execute] taskId=%s starting (relay connection deferred)', taskId);
 
+        // ─── Phase: skill_match ──────────────────────────────────────
+        lat.startPhase('skill_match');
         // Match a skill for the user's request
         const matchedSkill = matchSkill(skills, message);
+        lat.endPhase('skill_match', { skillName: matchedSkill?.name || 'none' });
         console.log('[execute] taskId=%s matched skill: %s', taskId, matchedSkill?.name || 'none');
 
         // ─── Chat LLM gathers requirements, then hands off ─────────
@@ -295,6 +317,8 @@ export async function POST(request: Request) {
                 .catch(e => console.error('[execute] DB addMessage(task_complete) failed:', e));
               workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: true, metadata: { skillName: matchedSkill?.name } });
+              lat.endPhase('browser_execution');
+              lat.finish(true, { skillName: matchedSkill?.name, completedVia: 'browser' });
               clearInterval(heartbeatTimer);
               if (taskEventCleanup) taskEventCleanup();
               try { controller.close(); } catch { /* already closed */ }
@@ -308,6 +332,8 @@ export async function POST(request: Request) {
               }).catch(e => console.error('[execute] DB addMessage(task_error) failed:', e));
               workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: false, metadata: { error: msg.error } });
+              lat.endPhase('browser_execution');
+              lat.finish(false, { error: msg.error, completedVia: 'browser' });
               clearInterval(heartbeatTimer);
               if (taskEventCleanup) taskEventCleanup();
               try { controller.close(); } catch { /* already closed */ }
@@ -357,7 +383,9 @@ export async function POST(request: Request) {
               format_hint: request.format_hint,
               sections: request.sections,
             });
+            lat.startPhase('user_input_wait');
             const response = await pauseManager.waitForInput({ ...request, taskId });
+            lat.endPhase('user_input_wait', { inputType: request.inputType, stepId: request.stepId });
             console.log('[execute] taskId=%s input received for stepId=%s', taskId, request.stepId);
             // Save user's response
             workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', { stepId: request.stepId, inputType: request.inputType }).catch(e => console.error('[execute] DB addMessage(input) failed:', e));
@@ -415,12 +443,15 @@ export async function POST(request: Request) {
             send('complete', { summary });
             workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB updateStatus failed:', e));
             taskTimer.end({ success: true, metadata: { skillName: agent.matchedSkill?.name } });
+            lat.endPhase('llm_chat');
+            lat.finish(true, { skillName: agent.matchedSkill?.name, completedVia: 'chat' });
           },
           onError(error) {
             console.error('[execute] taskId=%s ERROR: %s', taskId, error);
             send('error', { error });
             workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB updateStatus failed:', e));
             taskTimer.end({ success: false, metadata: { error } });
+            lat.finish(false, { error, completedVia: 'chat' });
           },
 
           // ─── Task handoff callback ─────────────────────────────────
@@ -435,12 +466,17 @@ export async function POST(request: Request) {
             console.log('[execute] taskId=%s TASK_HANDOFF to laptop', taskId);
             send('step_update', { action: 'Handing off to browser agent...', status: 'running' });
 
+            // ─── Phase: handoff_setup ──────────────────────────────────
+            lat.endPhase('llm_chat');  // end chat phase
+            lat.startPhase('handoff_setup');
+
             // Lazy relay connection — only connect when we actually need the laptop
             try {
               await ensureRelayConnected();
             } catch (relayErr) {
               const msg = relayErr instanceof Error ? relayErr.message : 'Relay connection failed';
               console.error('[execute] taskId=%s relay connect failed during handoff: %s', taskId, msg);
+              lat.endPhase('handoff_setup', { error: msg });
               // Throw so the agent knows the handoff failed and can tell the user
               throw new Error(`Cannot reach browser agent: ${msg}. Make sure the laptop relay is running.`);
             }
@@ -458,12 +494,15 @@ export async function POST(request: Request) {
 
             remoteMcpHost.sendTaskMessage(handoffMsg);
             handoffSent = true;
+            lat.endPhase('handoff_setup', { skill: handoff.skill?.name });
+            lat.startPhase('browser_execution');  // starts when handoff sent, ends on task_complete/error
             // Don't close the stream — keep it open for task events from the laptop
           },
         };
 
         await workflowEngine.addMessage(taskId, 'user', message);
         console.log('[execute] taskId=%s starting agent.execute()', taskId);
+        lat.startPhase('llm_chat');  // LLM conversation phase (ends on handoff or completion)
         await agent.execute(message, callbacks);
         console.log('[execute] taskId=%s agent.execute() finished', taskId);
 
@@ -474,6 +513,7 @@ export async function POST(request: Request) {
         send('error', { error: errorMsg });
         await workflowEngine.updateTaskStatus(taskId, 'failed');
         taskTimer.end({ success: false, metadata: { error: errorMsg } });
+        lat.finish(false, { error: errorMsg, completedVia: 'fatal_error' });
       } finally {
         if (handoffSent) {
           // Handoff was sent to laptop — keep the stream, heartbeat, and event listener alive.

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 type TimeRange = '1' | '6' | '24' | '72' | '168';
-type Tab = 'overview' | 'errors' | 'llm' | 'tools' | 'relay' | 'users' | 'chrome';
+type Tab = 'overview' | 'errors' | 'llm' | 'tools' | 'relay' | 'users' | 'chrome' | 'latency';
 
 interface OverviewData {
   totalEvents: number;
@@ -122,6 +122,32 @@ interface ChromeData {
   recentTasks: ChromeHistoricalTask[];
   totalTasks: number;
   activeTasks: number;
+}
+
+interface LatencyPhaseStats {
+  phase: string;
+  count: number;
+  avgMs: number;
+  p50Ms: number;
+  p95Ms: number;
+  maxMs: number;
+}
+
+interface LatencyData {
+  phases: LatencyPhaseStats[];
+  ttfm: { count: number; avgMs: number; p50Ms: number; p95Ms: number; maxMs: number };
+  overall: { count: number; avgMs: number; p50Ms: number; p95Ms: number; maxMs: number; successCount: number; failCount: number };
+  recentTasks: Array<{
+    taskId: string;
+    timestamp: string;
+    totalMs: number | null;
+    ttfmMs: number | null;
+    success: boolean;
+    skillName: string | null;
+    completedVia: string | null;
+    phaseCount: number;
+  }>;
+  hours: number;
 }
 
 interface TaskDetailData {
@@ -513,6 +539,7 @@ export default function AdminDashboard() {
   const [relay, setRelay] = useState<RelayData | null>(null);
   const [users, setUsers] = useState<UserData | null>(null);
   const [chrome, setChrome] = useState<ChromeData | null>(null);
+  const [latency, setLatency] = useState<LatencyData | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -547,6 +574,8 @@ export default function AdminDashboard() {
         setUsers(await fetchView('users'));
       } else if (tab === 'chrome') {
         setChrome(await fetchView('chrome'));
+      } else if (tab === 'latency') {
+        setLatency(await fetchView('latency'));
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch telemetry';
@@ -564,6 +593,7 @@ export default function AdminDashboard() {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
+    { key: 'latency', label: '⏱ Latency' },
     { key: 'chrome', label: 'Chrome Sessions' },
     { key: 'llm', label: 'LLM Usage' },
     { key: 'tools', label: 'Tool Calls' },
@@ -890,6 +920,137 @@ export default function AdminDashboard() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* LATENCY TAB */}
+            {tab === 'latency' && latency && (
+              <div className="space-y-6">
+                {/* Overall stats */}
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+                  <StatCard label="Tasks Tracked" value={latency.overall.count} sub={`${latency.overall.successCount} ok / ${latency.overall.failCount} fail`} />
+                  <StatCard label="Avg E2E Latency" value={latency.overall.count > 0 ? formatDuration(latency.overall.avgMs) : '-'} sub={latency.overall.count > 0 ? `p50: ${formatDuration(latency.overall.p50Ms)}` : ''} />
+                  <StatCard label="P95 E2E Latency" value={latency.overall.count > 0 ? formatDuration(latency.overall.p95Ms) : '-'} sub={latency.overall.count > 0 ? `max: ${formatDuration(latency.overall.maxMs)}` : ''} color={latency.overall.p95Ms > 60000 ? 'text-amber-400' : 'text-foreground'} />
+                  <StatCard label="TTFM (Avg)" value={latency.ttfm.count > 0 ? formatDuration(latency.ttfm.avgMs) : '-'} sub={latency.ttfm.count > 0 ? `p95: ${formatDuration(latency.ttfm.p95Ms)}` : 'Time to first message'} color={latency.ttfm.avgMs > 5000 ? 'text-amber-400' : 'text-green-400'} />
+                  <StatCard label="TTFM (P50)" value={latency.ttfm.count > 0 ? formatDuration(latency.ttfm.p50Ms) : '-'} sub={latency.ttfm.count > 0 ? `max: ${formatDuration(latency.ttfm.maxMs)}` : ''} />
+                </div>
+
+                {/* Phase breakdown */}
+                {latency.phases.length > 0 && (
+                  <div className="rounded-xl border border-border">
+                    <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">
+                      Phase Breakdown
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/30">
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Phase</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Count</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Avg</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">P50</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">P95</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Max</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Distribution</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {latency.phases.map((p) => {
+                            const maxP95 = Math.max(...latency.phases.map((ph) => ph.p95Ms), 1);
+                            const phaseColors: Record<string, string> = {
+                              auth: 'bg-slate-500',
+                              task_setup: 'bg-blue-500',
+                              skill_match: 'bg-violet-500',
+                              llm_chat: 'bg-amber-500',
+                              handoff_setup: 'bg-orange-500',
+                              browser_execution: 'bg-green-500',
+                              user_input_wait: 'bg-pink-500',
+                            };
+                            return (
+                              <tr key={p.phase} className="border-b border-border/50 hover:bg-muted/20">
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`h-2.5 w-2.5 rounded-full ${phaseColors[p.phase] || 'bg-primary'}`} />
+                                    <span className="font-mono text-xs font-medium">{p.phase}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-2 text-right text-xs text-muted-foreground">{p.count}</td>
+                                <td className="px-4 py-2 text-right text-xs font-medium">{formatDuration(p.avgMs)}</td>
+                                <td className="px-4 py-2 text-right text-xs text-muted-foreground">{formatDuration(p.p50Ms)}</td>
+                                <td className="px-4 py-2 text-right text-xs text-muted-foreground">{formatDuration(p.p95Ms)}</td>
+                                <td className="px-4 py-2 text-right text-xs text-muted-foreground">{formatDuration(p.maxMs)}</td>
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <MiniBar value={p.p95Ms} max={maxP95} color={phaseColors[p.phase] || 'bg-primary'} />
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent task latencies */}
+                <div className="rounded-xl border border-border">
+                  <h3 className="border-b border-border px-4 py-3 text-sm font-semibold">
+                    Recent Task Latencies ({latency.recentTasks.length})
+                  </h3>
+                  {latency.recentTasks.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      No latency data yet. Run a task to start tracking.
+                    </div>
+                  ) : (
+                    <div className="max-h-[400px] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-card">
+                          <tr className="border-b border-border">
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Task ID</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Skill</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Via</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Total</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">TTFM</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Phases</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {latency.recentTasks.map((t) => (
+                            <tr key={t.taskId} className="cursor-pointer border-b border-border/50 hover:bg-muted/30" onClick={() => t.taskId && setSelectedTaskId(t.taskId)}>
+                              <td className="px-4 py-2">
+                                <code className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                                  {t.taskId?.slice(0, 8) || '-'}
+                                </code>
+                              </td>
+                              <td className="px-4 py-2">
+                                {t.skillName ? (
+                                  <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">{t.skillName}</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-muted-foreground">{t.completedVia || '-'}</td>
+                              <td className="px-4 py-2 text-right text-xs font-medium">{t.totalMs ? formatDuration(t.totalMs) : '-'}</td>
+                              <td className="px-4 py-2 text-right text-xs text-muted-foreground">{t.ttfmMs ? formatDuration(t.ttfmMs) : '-'}</td>
+                              <td className="px-4 py-2">
+                                <span className={`rounded px-1.5 py-0.5 text-[10px] ${t.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                  {t.success ? 'ok' : 'fail'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-xs text-muted-foreground">{t.phaseCount}</td>
+                              <td className="whitespace-nowrap px-4 py-2 text-xs text-muted-foreground">
+                                {new Date(t.timestamp).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
