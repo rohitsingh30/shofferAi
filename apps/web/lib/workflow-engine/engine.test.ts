@@ -144,7 +144,7 @@ describe('WorkflowEngine', () => {
           taskId: 'task-1',
           role: 'user',
           content: 'Hello',
-          metadata: { source: 'chat' },
+          metadata: JSON.stringify({ source: 'chat' }),
         },
       });
     });

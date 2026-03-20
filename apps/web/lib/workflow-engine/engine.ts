@@ -99,7 +99,7 @@ export class WorkflowEngine {
         taskId,
         role,
         content,
-        metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : undefined,
+        metadata: metadata ? JSON.stringify(metadata) : undefined,
       },
     });
   }
