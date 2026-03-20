@@ -97,16 +97,38 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
   // Render rich input widget
   const renderRichInput = () => {
     switch (inputType) {
-      case 'card_grid':
+      case 'card_grid': {
+        const cards = richProps.cards || [];
+        // Fallback: if card_grid requested but no cards data, parse numbered items
+        // from the question text and render as multi-select choice buttons
+        if (cards.length === 0 && question) {
+          const parsed = question.split(/\n/).filter((l: string) => /^\s*\d+[.)]\s/.test(l))
+            .map((l: string, i: number) => ({
+              id: String(i + 1),
+              label: l.replace(/^\s*\d+[.)]\s*/, '').trim(),
+            }));
+          if (parsed.length >= 2) {
+            return (
+              <CardGridInput
+                cards={parsed}
+                showQuantity={richProps.show_quantity ?? true}
+                allowCustom={richProps.allow_custom}
+                multiSelect={richProps.multi_select ?? true}
+                onSubmit={onSubmit}
+              />
+            );
+          }
+        }
         return (
           <CardGridInput
-            cards={richProps.cards || []}
+            cards={cards}
             showQuantity={richProps.show_quantity}
             allowCustom={richProps.allow_custom}
             multiSelect={richProps.multi_select}
             onSubmit={onSubmit}
           />
         );
+      }
       case 'carousel':
         return (
           <CarouselInput

@@ -586,7 +586,10 @@ export class AgentExecutor {
               .filter(Boolean);
 
             const hasChoices = extractedOptions.length >= 2;
-            const inputType = hasChoices ? 'choice' : 'freetext';
+            // Use card_grid for product-like lists (3+ items with prices/weights)
+            const isProductList = hasChoices && extractedOptions.length >= 3 &&
+              extractedOptions.some((o: string) => /₹|rs\.?|price|ml|kg|ltr|litre|gram/i.test(o));
+            const inputType = isProductList ? 'card_grid' : (hasChoices ? 'choice' : 'freetext');
             const options = hasChoices ? extractedOptions : undefined;
 
             // Replace the last assistant message (already added above) with one
@@ -603,6 +606,8 @@ export class AgentExecutor {
               question: fullText,
               inputType,
               options,
+              multi_select: isProductList || undefined,
+              show_quantity: isProductList || undefined,
             });
 
             this.conversation.addToolResult(syntheticId, JSON.stringify({ userResponse: userResponse.value }));
