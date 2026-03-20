@@ -234,4 +234,21 @@ After making changes:
 
 ---
 
+## 16. Saving Screenshots / Images in the Repo Root
+
+**What happens:** During dev-loop testing or Playwright MCP usage, `browser_take_screenshot` saves files to the current working directory — which is the repo root. This clutters the project with `page-*.png`, `screenshot-*.png`, and similar junk files that don't belong there.
+
+**Examples:**
+- Dev-loop visual QA saved `page-1710936000.png` in the repo root
+- Agent took a screenshot for debugging and left it in `/Users/rohit/shofferAi/`
+- Multiple `.png` files accumulating in root after testing sessions
+
+**Rule:** NEVER save screenshots or images to the repo root. When using `browser_take_screenshot`:
+- Always use a **relative path** under the Copilot session folder (e.g., `~/.copilot/session-state/<id>/files/screenshot.png`)
+- Or use the `/tmp/` directory for throwaway screenshots
+- If a screenshot tool defaults to CWD, explicitly set `filename` to redirect output away from the repo root
+- After any testing session, clean up any stray images from the repo root: `rm -f *.png *.jpg *.jpeg` from the project root
+
+---
+
 *Last updated: 2026-03-20*
