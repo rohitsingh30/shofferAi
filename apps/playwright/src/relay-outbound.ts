@@ -240,10 +240,50 @@ export class RelayOutbound {
 
   async disconnect(): Promise<void> {
     this.shouldReconnect = false;
+    this.stopHealthCheck();
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
     logger.info('Relay outbound disconnected');
+  }
+
+  /**
+   * Periodically send native WS pings and check for dead connections.
+   * This detects silent TCP drops (e.g., Cloud Run instance restarts)
+   * faster than waiting for the OS TCP timeout.
+   */
+  private startHealthCheck(): void {
+    this.stopHealthCheck();
+    this.lastDataAt = Date.now();
+    this.healthCheckInterval = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+      const silentMs = Date.now() - this.lastDataAt;
+      if (silentMs > RelayOutbound.DEAD_CONNECTION_TIMEOUT_MS) {
+        logger.warn('RelayOutbound: no data for 45s, closing dead connection', {
+          silentMs,
+        });
+        this.ws.terminate(); // Hard close — faster than ws.close() which waits for handshake
+        return;
+      }
+
+      // Send native WS ping frame — the 'pong' listener updates lastDataAt
+      this.ws.ping((err: Error | undefined) => {
+        if (err) {
+          logger.warn('RelayOutbound: ping failed, connection likely dead', {
+            error: err.message,
+          });
+          this.ws?.terminate();
+        }
+      });
+    }, RelayOutbound.HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  private stopHealthCheck(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
   }
 }

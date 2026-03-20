@@ -143,6 +143,12 @@ httpServer.on('upgrade', (request, socket, head) => {
 // ─── Start ──────────────────────────────────────────────────────
 nextApp.prepare().then(() => {
   httpServer.listen(port, hostname, () => {
+    // Keep connections alive longer to survive Cloud Run's idle reaper.
+    // Cloud Run default request timeout is 300s; these keep the TCP socket
+    // alive between WebSocket frames so the LB doesn't drop it.
+    httpServer.keepAliveTimeout = 120000; // 120s
+    httpServer.headersTimeout = 125000;   // must be > keepAliveTimeout
+
     console.log(`> ShofferAI ready on http://${hostname}:${port}`);
     console.log(`> Relay WebSocket endpoint: ws://${hostname}:${port}/api/relay/ws`);
   });
