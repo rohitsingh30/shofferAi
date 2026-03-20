@@ -463,7 +463,7 @@ Every step instruction MUST include:
 
 ### Important Rules
 
-- Use `playwright` (port 9225) for all browsing — this is the single Chrome-Debug window with Profile 3
+- Each Playwright MCP session gets its own Chrome window (Profile 3, rsinghtomar3011@gmail.com) — see `docs/PLAYWRIGHT-MCP-CHROME.md`
 - Take snapshots frequently — they contain the real accessibility tree with selectors
 - If a site requires login and the session expired, note it and move on
 - Don't spend more than 3 minutes per skill when batch-compiling

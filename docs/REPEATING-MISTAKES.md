@@ -7,14 +7,14 @@
 
 ## 1. Not Reading Documentation Before Acting
 
-**What happens:** The agent jumps into code changes without reading `CLAUDE.md`, `DEPLOYMENT.md`, or existing skill files. It then makes changes that contradict established patterns or re-introduces already-fixed bugs.
+**What happens:** The agent jumps into code changes without reading `.github/copilot-instructions.md`, `DEPLOYMENT.md`, or existing skill files. It then makes changes that contradict established patterns or re-introduces already-fixed bugs.
 
 **Examples:**
 - Agent launched Chrome on hardcoded port 9222 after docs already specified `--remote-debugging-port=0`
 - Agent tried to connect relay on port 8765 after architecture switched to outbound mode
 - Agent modified ChromePool to pre-launch 3 instances after it was already refactored to lazy mode
 
-**Rule:** Always read `CLAUDE.md` and relevant docs/skill files BEFORE making any changes.
+**Rule:** Always read `.github/copilot-instructions.md` and relevant docs/skill files BEFORE making any changes.
 
 ---
 
@@ -79,7 +79,7 @@
 - Multi-browser setup removed → next session referenced `browser1`/`browser2`/`browser3`
 - User: "motherfucker, whatever issue you faced document it first you idiot keep cycling through same issue"
 
-**Rule:** After fixing any bug, update `CLAUDE.md` or relevant docs. This is the ONLY way to persist knowledge. If you fixed it, DOCUMENT it.
+**Rule:** After fixing any bug, update `.github/copilot-instructions.md` or relevant docs. This is the ONLY way to persist knowledge. If you fixed it, DOCUMENT it.
 
 ---
 
@@ -148,16 +148,16 @@
 
 ---
 
-## 12. Not Updating CLAUDE.md After Architecture Changes
+## 12. Not Updating .github/copilot-instructions.md After Architecture Changes
 
-**What happens:** Major architecture changes (relay mode, ChromePool, prompt rewrites) are implemented but `CLAUDE.md` still describes the old architecture. Next session reads stale docs and regresses.
+**What happens:** Major architecture changes (relay mode, ChromePool, prompt rewrites) are implemented but `.github/copilot-instructions.md` still describes the old architecture. Next session reads stale docs and regresses.
 
 **Examples:**
 - Outbound relay mode implemented but docs still described tunnel-based relay
 - Lazy ChromePool shipped but docs still said "3 Chrome instances pre-launched"
 - TaskManager bridge added but not documented anywhere
 
-**Rule:** If you change HOW something works, update `CLAUDE.md` in the SAME commit. This is non-negotiable.
+**Rule:** If you change HOW something works, update `.github/copilot-instructions.md` in the SAME commit. This is non-negotiable.
 
 ---
 
@@ -181,7 +181,7 @@
 ## Quick Reference Checklist
 
 Before starting ANY task:
-- [ ] Read `CLAUDE.md`
+- [ ] Read `.github/copilot-instructions.md`
 - [ ] Read relevant skill files
 - [ ] Check if this issue was fixed before (search this doc)
 
@@ -191,7 +191,7 @@ Before making changes:
 - [ ] Plan ONE comprehensive fix
 
 After making changes:
-- [ ] Update `CLAUDE.md` if architecture changed
+- [ ] Update `.github/copilot-instructions.md` if architecture changed
 - [ ] Update this doc if you encountered a new repeating pattern
 - [ ] Test E2E through the chat interface (not just `turbo build`)
 - [ ] Deploy and verify on prod if it's a prod-affecting change
@@ -421,6 +421,23 @@ These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitch
 5. Playwright MCP CONNECTS to our Chrome via CDP instead of launching its own
 
 **Rule:** NEVER let Playwright launch Chrome when you need real cookie sessions. Always launch Chrome yourself and connect Playwright via CDP. This applies to both `playwright-mcp-with-chrome.sh` and any future MCP launch scripts. Verify with: `ps aux | grep Chrome | grep mock-keychain` — should return nothing for your Chrome process.
+
+---
+
+## 27. Singleton Chrome Causes Browser Sharing Between Sessions
+
+**What happens:** When Copilot CLI triggers a task through the ShofferAI chat interface (Mode D testing), the relay-spawned agent navigates to the target site (e.g., blinkit.com) in the SAME Chrome window that the QA session is viewing. The QA browser tab gets hijacked — suddenly showing Blinkit instead of ShofferAI.
+
+**Root cause:** `playwright-mcp-with-chrome.sh` used a SINGLETON pattern — one Chrome instance in `/tmp/shofferai-chrome-singleton/` shared by ALL Copilot CLI processes via reference counting. The QA session's Playwright MCP and the relay's TaskManager-spawned CLI both connected to the same Chrome CDP port. Any navigation by one process affected all others.
+
+**The fix (2026-03-20):**
+1. Rewrote `playwright-mcp-with-chrome.sh` to use PER-INSTANCE Chrome: `/tmp/shofferai-chrome-$$/`
+2. Each invocation: copies Chrome-Debug/Profile 3 → launches its own Chrome → parses CDP port → connects Playwright MCP
+3. On exit: kills its own Chrome + removes temp dir
+4. Stale instance cleanup: finds `/tmp/shofferai-chrome-*` dirs older than 2 hours with dead PIDs
+5. Removed all singleton machinery: atomic locking, reference counting, shared PID/port files
+
+**Rule:** EVERY Playwright MCP invocation MUST get its own dedicated Chrome instance. Never share a Chrome window between sessions. The per-instance pattern in `playwright-mcp-with-chrome.sh` handles this automatically — each PID gets its own `/tmp/shofferai-chrome-<PID>/` directory with a separate Chrome process.
 
 ---
 

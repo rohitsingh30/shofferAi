@@ -1,6 +1,6 @@
-# ShofferAI — GitHub Copilot Instructions
+# ShofferAI
 
-Concierge-as-a-service: AI assistant that executes real-world web tasks (hotel booking, grocery ordering) on behalf of users. The operator's laptop runs Playwright with signed-in browser profiles; the web app deploys to GCP Cloud Run.
+Concierge-as-a-service: AI assistant that executes real-world web tasks (hotel booking, grocery ordering) on behalf of users via browser automation.
 
 ## Architecture
 
@@ -11,150 +11,130 @@ User → HTTPS + SSE → Cloud Run (Next.js + AgentExecutor) → Azure OpenAI (L
 
 - **Cloud Run**: Chat UI, auth, payments, LLM orchestration. No browser here.
 - **Operator Laptop**: All browser automation via Playwright MCP + ChromePool. Chrome Profile 3 is pre-authenticated.
-- **Relay**: WebSocket bridge between cloud and laptop. Dev: cloud connects OUT. Prod: laptop connects IN via WSS.
+- **Relay**: WebSocket bridge. Dev: cloud connects OUT to laptop :8765. Prod: laptop connects IN to Cloud Run via WSS.
 
 ## Tech Stack
 
 - **Monorepo**: Turborepo + npm workspaces
 - **Frontend**: Next.js 15 (App Router) + Tailwind CSS 4 + shadcn-style components
 - **Auth**: Auth.js v5 (NextAuth) — credentials + Google OAuth
-- **Database**: PostgreSQL via Prisma ORM
+- **Database**: PostgreSQL via Prisma ORM (Cloud SQL in prod)
 - **LLM**: Azure OpenAI via `openai` npm package (with Anthropic format translation)
-- **Browser Automation**: Playwright MCP via `@modelcontextprotocol/sdk`
+- **Browser**: Playwright MCP via `@modelcontextprotocol/sdk` (laptop only)
 - **Payments**: Razorpay (UPI, cards, net banking, wallets)
-- **Testing**: Vitest
+- **Testing**: Vitest — `npx vitest run`, colocated `*.test.ts`
 
 ## Package Structure
 
 ```
-apps/web/                    → Chat UI (Cloud Run): Next.js, auth, payments, SSE streaming
+apps/web/                    → Chat UI (Cloud Run)
   app/api/agent/execute/     → SSE endpoint — streams events to frontend
-  components/chat/           → ChatInterface, MessageBubble, TaskProgress, InputPrompt
-  lib/relay-client.ts        → RemoteMCPHost (dev WS client)
-  lib/relay-bridge.ts        → RelayBridge (prod WS server)
+  lib/relay-bridge.ts        → RelayBridge: accepts laptop WS (prod)
+  lib/relay-client.ts        → RemoteMCPHost: WS client to laptop (dev)
   lib/session-mcp-host.ts    → Per-task tab isolation wrapper
   lib/credential-vault/      → AES-256-GCM encrypted credential storage
   lib/workflow-engine/       → Task state machine + PauseResumeManager
 
 apps/playwright/             → Browser automation (Operator Laptop)
+  src/chrome-pool.ts         → ChromePool: lazy Chrome instances, OS-assigned ports
   src/task-manager.ts        → Spawns Copilot CLI per task, filters messages
-  src/chrome-pool.ts         → ChromePool + mcpToolEvents (MCP log stream)
   src/mcp-host.ts            → Local Playwright MCP connection
-  src/relay-server.ts        → WS server (dev mode)
-  src/relay-outbound.ts      → WS client to Cloud Run (prod mode)
+  src/relay-outbound.ts      → WS client to Cloud Run (prod)
+  src/relay-server.ts        → WS server (dev)
 
 packages/agent-core/         → LLM agent logic (cloud only)
-  src/agent.ts               → AgentExecutor — LLM loop, tool dispatch, skill matching
-  src/azure-openai-client.ts → Azure OpenAI wrapper
+  src/agent.ts               → AgentExecutor — LLM loop, tool dispatch
   src/conversation.ts        → ConversationManager (max 20 msgs, 4000 char truncation)
-  src/skills/                → Skill definitions, loader, matchSkill(), lessons
+  src/skills/                → 500 skill definitions (SKILL.md), loader, matchSkill()
+  src/scripts/               → ScriptRecorder/Compiler/Player — cached execution
 
-packages/shared/             → Shared types & utilities
-  src/relay.ts               → RelayMessage protocol types
-  src/mcp.ts                 → MCPHostLike interface
-  src/internal-message-filter.ts → isInternalToolLabel() — filters tool labels from chat UI
+packages/shared/             → Types, logger, errors, relay protocol, MCPHostLike
 ```
 
-## Key Interfaces
+## Commands
 
-### MCPHostLike (all MCP classes implement this)
-```typescript
-interface MCPHostLike {
-  connect(): Promise<void>;
-  getTools(): Promise<MCPTool[]>;
-  callTool(name: string, args: Record<string, unknown>): Promise<unknown>;
-  isConnected(): boolean;
-  isMCPTool(name: string): boolean;
-}
+```bash
+npx turbo build              # Build all packages
+npx vitest run               # Run tests
+cd apps/web && npx next dev  # Dev server (:3000)
+npx prisma migrate dev       # Run DB migrations
+npx prisma generate          # Regenerate Prisma client
+gcloud builds submit --config cloudbuild.yaml  # Deploy to Cloud Run
 ```
-
-### AgentCallbacks (execute route → SSE stream)
-```typescript
-interface AgentCallbacks {
-  onMessage: (content: string) => void;           // Chat bubble for user
-  onStepUpdate: (step: { action: string; status: string }) => void;
-  onInputRequired: (request: UserInputRequest) => Promise<UserInputResponse>;
-  onConfirmRequired: (details: { action: string; description: string }) => Promise<boolean>;
-  onPaymentRequired?: (details: { bookingSummary: string; amountInr: number }) => Promise<boolean>;
-  onComplete: (summary: string) => void;
-  onError: (error: string) => void;
-  onTaskHandoff?: (handoff: TaskHandoff) => Promise<void>;
-}
-```
-
-### SSE Event Types (sent to frontend)
-```typescript
-type SSEEvent = {
-  type: 'message' | 'step_update' | 'input_required' | 'payment_required' | 'complete' | 'error';
-  payload: Record<string, unknown>;
-};
-```
-
-## Coding Patterns
-
-### Message filtering — what the user sees
-Only natural language messages reach the chat UI. Internal tool labels are filtered:
-- **Layer 1** (`task-manager.ts`): `isInternalToolLabel()` filters `assistant.message` events
-- **Layer 2** (`execute/route.ts`): Defense-in-depth filter on `task_progress` before SSE
-- **Layer 3** (`ChatInterface.tsx`): Frontend hides `step_update` with `status: 'running'`
-
-Tool execution events go to `mcpToolEvents` → MCP log stream (dynamic port, printed in relay logs), not user chat.
-
-### Relay message flow
-```
-Laptop TaskManager → sendToRelay(TaskRelayMessage) → Cloud Run RemoteMCPHost
-  → handleTaskEvent() → SSE send() → Frontend handleSSEEvent()
-```
-
-Message types: `task_progress`, `task_input_required`, `task_payment_required`, `task_complete`, `task_error`.
-
-### Tab isolation
-Every task gets a unique `sessionId`. `SessionMCPHost` injects it into every MCP tool call. `ChromePool` maps sessions to separate Chrome tabs/instances.
-
-### Credential handling
-User credentials are AES-256-GCM encrypted at rest. `CredentialInjector` decrypts and fills them into forms — the LLM never sees raw credentials.
-
-### Skill matching
-`matchSkill(skills, userMessage)` scores user messages against skill triggers. Matched skills inject site-specific instructions and parameters into the system prompt.
-
-### Conversation management
-`ConversationManager` maintains a sliding window of max 20 messages. Tool results are truncated to 4000 characters. Old messages are pruned to stay within token limits.
 
 ## Conventions
 
-- **TypeScript strict mode** — no `any` unless unavoidable (cast with comment)
-- **Imports**: Use `@shofferai/shared` for shared types, `@shofferai/agent-core` for agent logic
-- **Path aliases**: `@/` maps to `apps/web/` in the web app
-- **Error handling**: Use custom error classes from `packages/shared/src/utils/errors.ts`
-- **Logging**: Use `logger` from `@shofferai/shared` (levels: debug, info, warn, error). Default level is `info`.
-- **Prisma**: Always run `npx prisma generate` after schema changes. Migrations via `npx prisma migrate dev`.
-- **Tests**: Vitest. Run with `npx vitest run`. Test files colocated as `*.test.ts`.
-- **No hardcoded ports** for Chrome — always `--remote-debugging-port=0` (OS-assigned).
-- **IPv4 only** — always `127.0.0.1`, never `localhost` (macOS resolves to IPv6).
-
-## Common Pitfalls (from docs/REPEATING-MISTAKES.md)
-
-1. **Never open target websites directly** — always go through the chat UI for E2E testing
-2. **Login first** — every site interaction must start with authentication
-3. **New tab per site** — never navigate the user's chat tab to an external site
-4. **Don't show tool calls to users** — internal browser actions are filtered from chat
-5. **Don't hardcode Chrome ports** — use `port=0` and parse from stderr
-6. **Don't retry navigation endlessly** — max 2 retries, then report error
-7. **Payment before irreversible actions** — always pause for payment confirmation
-8. **Credential safety** — never log or expose raw credentials; use CredentialInjector
+- TypeScript strict mode — no `any` unless unavoidable (cast with comment)
+- Imports: `@shofferai/shared` for shared types, `@shofferai/agent-core` for agent logic
+- Path aliases: `@/` maps to `apps/web/`
+- Error handling: custom classes from `packages/shared/src/utils/errors.ts`
+- Logging: `logger` from `@shofferai/shared` (levels: debug, info, warn, error)
+- IPv4 only — always `127.0.0.1`, never `localhost` (macOS resolves to IPv6)
 
 ## Environment
 
-- `.env` at root — see `.env.example` for all variables
+- `.env` at root — see `.env.example`
 - `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` — LLM access
 - `LLM_MODEL` — Azure deployment name (default `gpt-5.1-chat`)
 - `RELAY_MODE=local` for dev, `RELAY_MODE=cloud` for production
-- Ports: dev server 3000, relay 8765 (dev). TaskManager bridge and MCP logs use dynamic ports (9400-9499 range, printed in relay startup logs).
+- Dev server :3000, relay :8765 (dev). TaskManager bridge: dynamic port 9400-9499 (printed in logs).
+
+## Mandatory Skills
+
+- Always activate `/cofounder` mode at the start of every conversation before doing any work
+- After ANY UI change, run `/dev-loop` to self-test with Playwright MCP
+- When creating a new E2E workflow/skill, use `/dev-loop` mode B
+
+## Testing — ALWAYS on Production
+
+- **Prod URL**: `https://shofferai-27188185100.asia-south1.run.app`
+- Deploy first (`/deploy`), then test on prod. NEVER test on localhost for functional flows.
+- localhost is ONLY for rapid CSS/layout iteration — no message sending, no agent flows.
+- After deploy, wait 30 seconds before E2E testing (relay reconnect delay).
+- Dev login: `demo@shofferai.com` / `demo1234` — see `apps/web/app/api/auth/dev-login/route.ts`
+
+## Critical Rules (NEVER violate these)
+
+These are the top mistakes from `docs/REPEATING-MISTAKES.md`. Breaking any of these wastes hours.
+
+### Ports & Infrastructure
+1. **NEVER hardcode Chrome ports** — always `--remote-debugging-port=0`, parse port from stderr
+2. **NEVER curl localhost ports** to check service health — operator manages services manually
+3. **NEVER use `open` command** to launch browsers — you can't interact with them
+4. **NEVER use `npx @playwright/mcp@latest`** — use the globally-installed `playwright-mcp` binary
+5. **NEVER trust `/tmp/shofferai-relay.log`** for relay status — check `lsof` for ports 9400-9499 instead
+
+### Browser Automation
+6. **Login FIRST** — every site interaction must start with authentication
+7. **New tab per site** — never navigate the user's chat tab to an external site
+8. **Max 2 retries** — if same action fails twice, STOP and report error to user
+9. **Always use SessionMCPHost** with unique `sessionId` for tab isolation
+10. **Every Playwright MCP launch MUST include `--output-dir /tmp/playwright-mcp-output`**
+11. **Each Playwright MCP gets its OWN Chrome** — `playwright-mcp-with-chrome.sh` creates per-instance Chrome in `/tmp/shofferai-chrome-<PID>/`. Never share Chrome between sessions.
+
+### User Experience
+11. **NEVER show tool calls to users** — only show: questions, choices, results, errors, confirmations
+12. **Extract params from user's message FIRST** — only `ask_user` for genuinely missing info
+13. **NEVER re-ask info already provided** — dates, location, preferences are in the conversation
+14. **`ask_user` fires ONLY `onInputRequired()`** — never `onStepUpdate()` (breaks UI)
+15. **Payment before irreversible actions** — always pause for payment confirmation
+
+### Development Process
+16. **Read docs before coding** — read relevant skill files and this instructions file first
+17. **Trace FULL code path before fixing** — ONE comprehensive commit, not six incremental guesses
+18. **Test E2E through chat interface** — build passing ≠ feature working
+19. **Update instructions after architecture changes** — in the SAME commit
+20. **NEVER open target websites directly** (booking.com, swiggy.com) — always go through chat UI
+21. **Plain .md files are NOT bundled by Next.js** — COPY them explicitly in Dockerfile
+22. **Never use singleton patterns for per-task state** — key handlers/callbacks by taskId
+23. **Credential safety** — never log or expose raw credentials; use CredentialInjector
+24. **Screenshots go to `/tmp/` or session folder** — NEVER save to repo root
+25. **Relay connection must be LAZY** — only connect when `handoff_to_browser_agent` is called
 
 ## Reference Docs
 
-- `docs/REPEATING-MISTAKES.md` — **Read first** — known anti-patterns
-- `docs/ARCHITECTURE.md` — Full system architecture with diagrams
-- `docs/WORKFLOWS.md` — E2E workflow docs per skill
+- `docs/REPEATING-MISTAKES.md` — Full details on all anti-patterns above
+- `docs/ARCHITECTURE.md` — System architecture with Mermaid diagrams
+- `docs/WORKFLOWS.md` — E2E workflow docs per skill (Booking.com, Blinkit, Zomato)
+- `docs/DEPLOYMENT.md` — Cloud Run vs laptop, startup guide, LaunchAgent setup
 - `docs/PRD.md` — Product requirements
-- `docs/DEPLOYMENT.md` — Cloud Run vs laptop, startup guide
