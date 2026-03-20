@@ -73,10 +73,10 @@ export class RelayBridge implements MCPHostLike {
       // RelayOutbound on the laptop auto-reconnects with exponential backoff.
       setTimeout(() => {
         if (!this.connected) {
-          logger.warn('RelayBridge: laptop did not reconnect within 30s grace period, rejecting %d pending requests', this.pending.size);
+          logger.warn('RelayBridge: laptop did not reconnect within 30s grace period, rejecting pending requests', { pendingCount: this.pending.size });
           this.rejectAllPending('Laptop disconnected (grace period expired)');
         } else {
-          logger.info('RelayBridge: laptop reconnected within grace period, %d pending requests preserved', this.pending.size);
+          logger.info('RelayBridge: laptop reconnected within grace period', { pendingCount: this.pending.size });
         }
       }, 30_000);
     });
