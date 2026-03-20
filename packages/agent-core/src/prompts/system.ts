@@ -126,12 +126,16 @@ export function buildSystemPrompt(
 
     // Inject param definitions so LLM knows what to extract vs ask
     if (activeSkill.params?.length) {
-      skillSection += `\n### Skill Parameters\nExtract these from the user's message. ONLY ask for values NOT already provided:\n`;
+      skillSection += `\n### Skill Parameters (OVERRIDE any conflicting instructions below)\n`;
+      skillSection += `RULE: Extract parameter values from the user's ORIGINAL message. Do NOT ask for values already provided.\n`;
+      skillSection += `If the user said "order milk and bread" → items=["milk","bread"] is ALREADY KNOWN. Do NOT show an items input.\n`;
+      skillSection += `If the user said "fruits and veggies" → items=["fruits","veggies"] is ALREADY KNOWN. Do NOT show an items input.\n`;
+      skillSection += `Only call ask_user for parameters that are TRULY MISSING from the user's message.\n`;
+      skillSection += `If Step 0 below says "ask for items" but items are already in the message, SKIP the items section — only ask for what's missing (usually just the address).\n\n`;
       for (const param of activeSkill.params) {
         const tag = param.required ? 'REQUIRED' : 'optional';
         skillSection += `- **${param.name}** (${tag}): ${param.hint}\n`;
       }
-      skillSection += `\nIf the user already mentioned a value (e.g. "milk and bread"), pre-fill it — do NOT ask again.\n`;
     }
 
     skillSection += `\n${activeSkill.instructions}`;

@@ -37,10 +37,14 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Collect delivery address and shopping list
-Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
-1. **address** (type: "address", required): Ask for delivery address. Show saved addresses if available.
-2. **items** (type: "card_grid", required): Ask what items to buy. Show common grocery items as cards with emoji (🥛 Milk, 🍞 Bread, 🥚 Eggs, 🍚 Rice, 🌾 Atta, 🫒 Oil, 🍬 Sugar, 🫘 Dal, 🧈 Butter, 🍌 Banana, 🧅 Onion, 🥔 Potato). Enable quantity steppers and custom item input.
+### Step 0: Collect missing information
+**EXTRACT FIRST**: If the user already mentioned items in their message, use those directly — do NOT ask again.
+Only call `ask_user` for information NOT already in the user's message.
+
+- If items ARE in the message but address is NOT → call `ask_user` with `input_type: "layout"` with ONE section: **address** (type: "address", required). Show saved addresses if available.
+- If BOTH items and address are missing → call `ask_user` with `input_type: "layout"` and two sections:
+  1. **address** (type: "address", required): Ask for delivery address. Show saved addresses if available.
+  2. **items** (type: "card_grid", required): Show common items as cards with emoji. Enable quantity steppers and custom item input.
 
 **CRITICAL**: Do NOT open the browser until you have both the delivery address and at least one item. Without a delivery location, these sites show ZERO products.
 
