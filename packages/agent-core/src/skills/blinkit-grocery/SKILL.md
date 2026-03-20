@@ -1,6 +1,6 @@
 ---
 name: blinkit-grocery
-description: Order groceries from Blinkit with 10-minute delivery — search items, add to cart, checkout, pay.
+description: Order groceries from Blinkit with 10-minute delivery — browse real products visually, add to cart, checkout, pay.
 triggers:
   - blinkit
   - order from blinkit
@@ -21,8 +21,8 @@ siteUrl: https://blinkit.com
 requiresAuth: true
 params:
   - name: items
-    required: true
-    hint: List of items to order (e.g. "milk, bread, eggs")
+    required: false
+    hint: List of items to order (e.g. "milk, bread, eggs") — optional, user can browse visually
   - name: address
     required: false
     hint: Delivery address or area name
@@ -35,24 +35,16 @@ params:
 
 Chrome profile: rsinghtomar3011@gmail.com. Operator phone: 8109137158.
 
+**KEY PRINCIPLE**: Show real products with actual images and prices from Blinkit — never generic emoji cards. The user should feel like they're browsing a grocery app, not filling out a text form.
+
 ## Steps
 
-### Step 0: Collect delivery address and shopping list
-Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
-1. **address** (type: "address", required): Ask for delivery address. Show saved addresses if available.
-2. **items** (type: "card_grid", required): Ask what items to buy. Show common grocery items as cards with emoji (🥛 Milk, 🍞 Bread, 🥚 Eggs, 🍚 Rice, 🌾 Atta, 🫒 Oil, 🍬 Sugar, 🫘 Dal, 🧈 Butter, 🍌 Banana, 🧅 Onion, 🥔 Potato). Enable quantity steppers and custom item input.
+### Step 0: Collect delivery address
+Before opening the browser, ask for the delivery address ONLY (not items). Call `ask_user` with `input_type: "address"`, showing saved addresses if available. If the user already provided an address in their message, skip this step.
 
-**CRITICAL**: Do NOT open the browser until you have both the delivery address and at least one item. Without a delivery location, these sites show ZERO products.
+Do NOT ask what items to buy yet — we'll show them real products from the website.
 
-### 1. Gather ALL Requirements Upfront
-- BEFORE opening the browser, check what the user already provided: items to order, delivery address.
-- If ANY info is missing, use ONE SINGLE `ask_user` call to collect ALL missing info at once.
-  Example: "I need a couple of details to order from Blinkit:\n• Delivery address or area name\n• Anything else to add to the order?"
-- Do NOT ask questions one at a time. Batch everything into a single prompt.
-- If user has saved addresses in profile, present them as choices.
-- If user provided both items and address already, skip straight to Step 2.
-
-### 2. Open Blinkit & Verify Login
+### 1. Open Blinkit & Verify Login
 - Open a NEW tab and navigate to `https://blinkit.com`.
 - Take a snapshot. Check if logged in — look for "Account" text in the header right section `[class*="Header__HeaderRight"]`.
 - If Blinkit shows a location popup (`[class*="LocationModal"]`), type the user's address in the location search input, wait for suggestions, click best match.
@@ -62,27 +54,60 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - **If you see a login page or wrong account, STOP and tell the user: "Session expired, please re-login in Chrome Debug."**
 - Take snapshot to confirm location set and products visible (homepage shows category grid with 20 categories like "Dairy, Bread & Eggs", "Fruits & Vegetables", etc.).
 
-### 3. Search & Add Items
-For each item the user requested:
-- Click the search bar link `a[href="/s/"]` in the header (it shows a "!" icon and rotating placeholder text like Search "chocolate", Search "curd").
-- This navigates to `https://blinkit.com/s/`. The search input `input[placeholder*="Search for"]` (`[class*="SearchBarContainer__Input"]`) auto-focuses.
-- Type the item name and press Enter. URL becomes `/s/?q={item}`.
-- Take snapshot of results. Results are `div[role="button"][id][data-pf]` cards — each has:
-  - Product name (text content)
-  - Weight/size (e.g., "500 ml", "1 kg")
-  - Price (text with "₹")
-  - "ADD" button `div[role="button"]` with text "ADD"
-  - Delivery time badge (e.g., "21 mins")
-  - Optional discount badge (e.g., "6% OFF", "10% OFF")
-- Category sub-filters appear above results (e.g., "Milk", "Amul milk", "Cow milk") — use to narrow if too many results.
-- Find closest match. If multiple variants (500ml vs 1L, different brands), use `ask_user` (input_type "choice") presenting name, size, and price.
-- Click the "ADD" button on the chosen product card. After adding, the ADD button transforms into a quantity counter with `-`/count/`+` buttons.
-- To add more of same item, click `+`. To remove, click `-`.
-- If out of stock (item not in results or greyed out), inform user and suggest alternatives from results.
-- To search next item: click the search input, clear it (`p` icon clears text), type next item name, press Enter.
-- Repeat for all items. Cart count updates in the header `[class*="CartButton__Button"]` showing "X items ₹Y".
+### 2. Show Real Categories to User
+After login, the Blinkit homepage shows category tiles with images. Scrape them:
+- Take a `browser_snapshot` of the homepage.
+- Extract all visible category tiles — each has: category name (text), category image URL (from `cdn.grofers.com`), and link.
+- Call `ask_user` with `input_type: "carousel"` and `multi_select: true`:
+  - `question`: "What would you like to browse? Pick categories or search for something specific."
+  - `cards`: Array of real categories from the homepage, each with:
+    - `id`: category slug or link path (e.g., "/cn/dairy-bread-eggs/cid/9/921")
+    - `label`: category name (e.g., "Dairy, Bread & Eggs")
+    - `image`: real category image URL from cdn.grofers.com
+    - `subtitle`: optional subcategory hint (e.g., "Milk, Curd, Paneer...")
+  - `allow_custom`: true (so user can type "paneer" or "chocolate" to search directly)
+- If the user typed specific items in their original message (e.g., "order milk and bread"), skip the category picker and go directly to Step 3 for those items.
 
-### 4. Review Cart
+### 3. Show Real Products with Images
+Based on what the user selected (category or search term):
+
+**If user selected a category:**
+- Click the category tile/link on Blinkit to navigate to the category page.
+- Take a `browser_snapshot` of the category page.
+- Extract product cards — each has: product name, weight/size, price (₹), image URL from cdn.grofers.com, discount badge (e.g., "10% OFF"), delivery time badge.
+
+**If user typed a search term:**
+- Click the search bar link `a[href="/s/"]` → type the term → press Enter.
+- Take a `browser_snapshot` of the search results page.
+- Extract product cards from results (same data as above).
+
+**Then show products to user:**
+- Call `ask_user` with `input_type: "card_grid"`:
+  - `question`: "Here's what's available — tap to add items:"
+  - `cards`: Array of REAL products (up to 12-16), each with:
+    - `id`: product ID from the page (the `id` attribute on the product card element)
+    - `label`: product name (e.g., "Amul Taaza Toned Fresh Milk")
+    - `image`: REAL product image URL from `cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=270/...`
+    - `subtitle`: price and weight (e.g., "₹32 · 500 ml")
+    - `badge`: discount if any (e.g., "10% OFF")
+  - `show_quantity`: true
+  - `multi_select`: true
+  - `allow_custom`: true (so user can type more items to search)
+
+**CRITICAL**: Use REAL image URLs from the page. Blinkit images are on `cdn.grofers.com` — these are public CDN URLs, no auth needed. Extract the `src` attribute from `<img>` tags inside product cards.
+
+### 4. Add Selected Items to Cart
+For each product the user selected (with quantities):
+- Find the product on the current page (it should still be visible).
+- Click the "ADD" button on the product card. After adding, the ADD button transforms into a quantity counter with `-`/count/`+`.
+- Adjust quantity to match what the user requested.
+- If user selected items from different categories, search for each one:
+  - Click search bar, type item name, press Enter, find the matching product, click ADD, adjust qty.
+- Cart count updates in the header `[class*="CartButton__Button"]` showing "X items ₹Y".
+
+**If user wants to browse more**: They can type additional items in the custom input. For each, search on Blinkit, scrape results, show another `card_grid` with real products, and let them pick. Repeat until they say they're done.
+
+### 5. Review Cart
 - Click the cart button in header `[class*="CartButton__Button"]` (shows items count and total, e.g., "2 items ₹84").
 - Cart opens as a right-side panel (React Modal via `.ReactModalPortal`).
 - Take snapshot. The cart panel shows:
@@ -102,7 +127,7 @@ For each item the user requested:
   - Estimated delivery time
 - Do NOT proceed unless user confirms. If cancelled, ask what to change.
 
-### 5. Checkout & Payment
+### 6. Checkout & Payment
 - Click "Proceed To Pay" button at bottom of cart panel (shows "₹XX TOTAL" + "Proceed To Pay").
 - This navigates to the payment page. Verify delivery address is correct.
 - Use `collect_payment` to collect via Razorpay:
@@ -112,7 +137,7 @@ For each item the user requested:
 - STOP and WAIT — payment panel opens for user.
 - Only proceed if payment confirmed. If cancelled, ask what to change.
 
-### 6. Place Order & Confirm
+### 7. Place Order & Confirm
 - After payment is confirmed on Blinkit, handle payment OTP via `ask_user` if needed.
 - Take snapshot of confirmation page.
 - Report: order number/ID, items ordered, total paid, estimated delivery time, delivery address.
@@ -120,8 +145,10 @@ For each item the user requested:
 ## Site Notes
 
 - **Tech stack**: React + styled-components (`SearchBarContainer__*`, `Header__*`, `CartButton__*`) + Tailwind CSS (`tw-*` prefix). No `data-testid` attributes — use `role`, text, and styled-component class patterns.
-- **Product images**: Served from `cdn.grofers.com` (Blinkit's legacy CDN from Grofers rebrand).
+- **Product images**: Served from `cdn.grofers.com` (Blinkit's legacy CDN from Grofers rebrand). Images are PUBLIC — no auth needed to load them in the chat UI. Use `w=270` size for product cards.
 - **Product cards**: `div[role="button"][id][data-pf="reset"]` — the `id` attribute is the numeric product ID.
+- **Image URL pattern**: `https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=270/{path}` — extract from `<img>` tag `src` inside product cards.
+- **Category tiles on homepage**: Have category name (text) + category image (from cdn.grofers.com) + link to category page. Scrape these for the visual category picker.
 - **Delivery**: 10-21 minutes depending on area — time-sensitive, don't waste time.
 - **Operator Chrome Profile 3** should be logged in. Do NOT ask user for phone or credentials.
 - If session expired, login with operator phone 8109137158. OTP goes to operator.

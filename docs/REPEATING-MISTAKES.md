@@ -251,4 +251,17 @@ After making changes:
 
 ---
 
+## 17. Running localhost Health Checks / curl Against Local Ports
+
+**What happens:** Agent runs `curl http://localhost:3000`, `curl http://localhost:8765`, or checks Chrome CDP ports (9222-9225) to "check health" — but these services are operator-managed, not agent-managed. The agent has no business probing localhost ports. The relay, Chrome, and dev server are started by the operator manually.
+
+**Examples:**
+- Agent ran `curl http://localhost:8765` to check relay → wasted time, operator hadn't started it
+- Agent curled Chrome ports 9222-9225 checking "pool health" → these are dynamic ports, never hardcoded
+- Agent ran health checks against localhost:3000 before testing → should just deploy to prod and test there
+
+**Rule:** NEVER curl localhost ports to check service health. The operator starts services manually. If you need to test, deploy to prod and test there. Do NOT try to start, stop, or health-check local services — they are the operator's responsibility.
+
+---
+
 *Last updated: 2026-03-20*

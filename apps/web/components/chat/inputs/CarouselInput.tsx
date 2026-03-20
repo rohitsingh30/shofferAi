@@ -123,7 +123,7 @@ export function CarouselInput({
                 key={card.id}
                 type="button"
                 onClick={() => toggle(card.id)}
-                className={`snap-start shrink-0 w-20 flex flex-col items-center gap-1 rounded-lg border p-3 cursor-pointer transition-all ${
+                className={`snap-start shrink-0 w-24 flex flex-col items-center gap-1.5 rounded-xl border p-3 cursor-pointer transition-all ${
                   isSelected
                     ? 'border-primary/60 bg-primary/10'
                     : 'border-white/[0.08] bg-white/[0.03] hover:border-white/[0.15] hover:bg-white/[0.06]'
@@ -133,10 +133,11 @@ export function CarouselInput({
                   <img
                     src={card.image}
                     alt={card.label}
-                    className="h-8 w-8 rounded-md object-cover"
+                    className="h-12 w-12 rounded-lg object-cover"
+                    loading="lazy"
                   />
                 ) : card.emoji ? (
-                  <span className="text-2xl leading-none">{card.emoji}</span>
+                  <span className="text-3xl leading-none">{card.emoji}</span>
                 ) : null}
 
                 <span className="text-xs font-medium text-white/90 text-center leading-tight line-clamp-2">
