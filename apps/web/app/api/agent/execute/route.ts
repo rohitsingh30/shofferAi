@@ -12,6 +12,7 @@ import type {
   TaskInputResponseMessage,
   TaskPaymentResponseMessage,
 } from '@shofferai/shared';
+import { isInternalToolLabel } from '@shofferai/shared';
 
 /** Lazy relay connection — only needed when agent actually tries to use the browser */
 async function ensureRelayConnected() {
@@ -128,7 +129,12 @@ export async function POST(request: Request) {
               // Only forward LLM text messages (no step field) as chat bubbles.
               // Tool call progress (has step field) goes only to MCP logs, not to the user.
               if (!msg.step) {
-                send('message', { content: msg.message });
+                // Defense-in-depth: skip internal tool-call labels that slipped through
+                if (isInternalToolLabel(msg.message)) {
+                  console.log('[execute] taskId=%s suppressed internal msg: %s', taskId, msg.message?.slice(0, 80));
+                } else {
+                  send('message', { content: msg.message });
+                }
               }
               break;
 

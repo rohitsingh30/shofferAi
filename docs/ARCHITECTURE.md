@@ -159,6 +159,7 @@ sequenceDiagram
         Agent->>LLM: chat.completions.create(messages)
         LLM-->>Agent: tool_call: browse_website(url, instruction)
         Agent-->>UI: SSE: {type: "step", content: "Searching hotels..."}
+        Note over Agent,UI: Internal tool calls (browser_navigate, browser_snapshot) are<br/>filtered by isInternalToolLabel() — only natural language reaches the user
         Agent->>SMCP: callTool("browser_snapshot", {sessionId})
         SMCP->>SMCP: Inject sessionId into args
         SMCP->>Relay: callTool(name, args + sessionId)
@@ -519,7 +520,7 @@ shofferai/
 │   │   ├── app/
 │   │   │   ├── api/
 │   │   │   │   ├── agent/
-│   │   │   │   │   ├── execute/route.ts  ← SSE execution entry point
+│   │   │   │   │   ├── execute/route.ts  ← SSE entry point + isInternalToolLabel() filter
 │   │   │   │   │   └── input/route.ts    ← User input (OTP, confirmations)
 │   │   │   │   ├── payments/             ← Razorpay create-order + verify
 │   │   │   │   ├── auth/                 ← NextAuth
@@ -557,7 +558,8 @@ shofferai/
 │       │   ├── mcp-host.ts                ← Local MCPHost (Playwright MCP stdio)
 │       │   ├── relay-server.ts            ← RelayServer (WS server on port 8765, dev mode only)
 │       │   ├── relay-outbound.ts         ← RelayOutbound (connects to Cloud Run, prod mode)
-│       │   └── task-manager.ts           ← TaskManager (bridge WS on port 9400, always active)
+│       │   ├── task-manager.ts           ← TaskManager (bridge WS on port 9400, isInternalToolLabel filter)
+│       │   └── chrome-pool.ts            ← ChromePool + mcpToolEvents (tool log stream on port 9401)
 │       └── scripts/
 │           ├── start-debug-chrome.sh      ← Launch Chrome Debug with Profile 3
 │           └── setup-chrome-profile.sh    ← Sync Chrome profile sessions
@@ -583,6 +585,7 @@ shofferai/
 │           ├── mcp.ts                     ← MCPHostLike interface, MCPTool
 │           ├── agent.ts                   ← TaskStatus, StepStatus enums
 │           ├── credentials.ts             ← CardData, UPIData, SiteLoginData types
+│           ├── internal-message-filter.ts ← isInternalToolLabel() — shared filter for chat UI
 │           ├── logger.ts                  ← Structured logger
 │           └── errors.ts                  ← Custom error classes
 │

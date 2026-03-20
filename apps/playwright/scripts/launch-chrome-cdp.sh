@@ -53,6 +53,7 @@ nohup "$CHROME" \
   --profile-directory="$PROFILE" \
   --no-first-run \
   --no-default-browser-check \
+  --disable-blink-features=AutomationControlled \
   --disable-background-timer-throttling \
   --disable-backgrounding-occluded-windows \
   --disable-renderer-backgrounding \

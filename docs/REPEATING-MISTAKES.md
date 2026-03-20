@@ -200,15 +200,22 @@ After making changes:
 
 ## 14. Showing Browser Tool Calls to the User in Chat
 
-**What happens:** Internal browser tool calls (navigate, click, snapshot, screenshot, bash) appear as chat bubbles in the ShofferAI UI, cluttering the conversation with technical noise the user doesn't need to see.
+**What happens:** Internal browser tool calls (navigate, click, snapshot, screenshot, bash) and tool-call label text (e.g. `"Browser: report_intent"`, `"Browser: playwright-browser_navigate"`) appear as chat bubbles in the ShofferAI UI, cluttering the conversation with technical noise the user doesn't need to see.
 
-**Root cause:** The relay handoff path in `task-manager.ts` was sending ALL tool calls as `task_progress` messages. The execute route then rendered them as chat bubbles (`send('message', ...)`) with no filtering. The MCP log stream (`mcpToolEvents.emit`) is the correct destination for tool call visibility — NOT the user's chat.
+**Root cause (two layers):**
+1. The relay handoff path in `task-manager.ts` was sending ALL tool calls as `task_progress` messages. Fixed by routing tool calls ONLY to `mcpToolEvents.emit`.
+2. The `gh copilot --output-format json` JSONL includes `assistant.message` events that contain tool-call label text (e.g. `"Browser: report_intent"`). These were forwarded as `task_progress` (no `step` field) → SSE `message` → rendered in chat.
 
 **The fix (2026-03-20):**
-- `task-manager.ts`: Tool calls ONLY go to the MCP log stream (`mcpToolEvents.emit`). They are NOT forwarded as `task_progress` to the relay.
-- `execute/route.ts`: Safety net — `task_progress` messages with a `step` field (tool calls) are never sent as chat bubbles. Only LLM text messages (no `step` field) render in chat.
+- `task-manager.ts`: `assistant.tool_call` events ONLY go to the MCP log stream (`mcpToolEvents.emit`). `assistant.message` events pass through `isInternalMessage()` filter — tool-label-like text (`Browser: <name>`, raw tool names, status labels) is suppressed. Still logged at debug level.
+- `execute/route.ts`: Defense-in-depth — `isInternalToolLabel()` filter on `task_progress` messages before sending as SSE. Catches anything that slips through.
+- `ChatInterface.tsx` (frontend): Existing filter hides `step_update` events with `status: 'running'` (unchanged, acts as third safety net).
 
-**Rule:** The user should ONLY see in the chat: LLM text messages, `ask_user` prompts, `confirm_action` prompts, payment panels, and completion/error messages. ALL browser actions are invisible to the user — they go to the MCP log stream for debugging.
+**Patterns suppressed:** `"Browser: report_intent"`, `"Browser: playwright-browser_navigate"`, `"browser_snapshot"`, `"mcp__playwright__browser_click"`, `"report_intent"`, `"Agent starting..."`.
+
+**Rule:** The user should ONLY see in the chat: LLM natural language messages, `ask_user` prompts, `confirm_action` prompts, payment panels, and completion/error messages. ALL browser tool actions and internal labels are invisible to the user — they go to the MCP log stream (`mcpToolEvents`) and console debug logs for monitoring.
+
+**Where to view tool logs:** The MCP log stream emits via `mcpToolEvents` in `task-manager.ts`. Use the relay terminal (`start-laptop.sh`) or the `/api/mcp-logs` SSE endpoint to monitor tool execution in real time.
 
 ---
 

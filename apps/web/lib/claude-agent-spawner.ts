@@ -326,7 +326,7 @@ export class ClaudeAgentSpawner {
       '--remote-debugging-address=127.0.0.1',
       `--user-data-dir=${userDataDir}`,
       `--profile-directory=${this.options.profileDirectory}`,
-      '--no-first-run', '--no-default-browser-check', '--disable-sync', '--disable-default-apps',
+      '--no-first-run', '--no-default-browser-check', '--disable-blink-features=AutomationControlled', '--disable-sync', '--disable-default-apps',
     ], { stdio: 'ignore', detached: false });
   }
 

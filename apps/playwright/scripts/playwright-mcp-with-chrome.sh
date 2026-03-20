@@ -64,6 +64,7 @@ echo "🚀 Launching Chrome-Debug (Profile 3 / rsinghtomar3011@gmail.com) — OS
   --profile-directory="$PROFILE" \
   --no-first-run \
   --no-default-browser-check \
+  --disable-blink-features=AutomationControlled \
   --disable-background-timer-throttling \
   --disable-backgrounding-occluded-windows \
   --disable-renderer-backgrounding \

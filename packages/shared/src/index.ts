@@ -7,3 +7,4 @@ export * from './types/relay';
 export * from './types/bridge';
 export * from './utils/logger';
 export * from './utils/errors';
+export * from './internal-message-filter';

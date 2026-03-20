@@ -70,6 +70,7 @@ packages/
       relay.ts           → RelayMessage protocol types
       mcp.ts             → MCPHostLike interface (implemented by all MCP classes)
       credentials.ts     → CardData, UPIData, SiteLoginData, AddressData types
+      internal-message-filter.ts → isInternalToolLabel() — filters tool labels from chat UI
 prisma/                → Database schema + migrations (PostgreSQL, 10 models)
 docs/                  → PRD, Architecture, Pitch, Workflows + Mermaid diagrams
 ```
@@ -195,7 +196,8 @@ Full E2E flow: Ask Address → Open Blinkit → Login (phone+OTP) → Search Ite
 - **New tab for every site**: Agent ALWAYS opens a new browser tab before navigating to external sites. The user's chat tab must never be hijacked.
 - **Auto-ask_user**: If the LLM outputs a question as text instead of calling the `ask_user` tool, the agent auto-converts it to an interactive input prompt
 - **Payment before booking**: Agent pauses via `PauseResumeManager`, L2 panel collects Razorpay payment, agent resumes
-- **SSE streaming**: Real-time agent progress updates to the UI
+- **SSE streaming**: Real-time agent progress updates to the UI — internal tool calls are filtered by `isInternalToolLabel()` (three layers: task-manager → execute/route → frontend)
+- **MCP tool log stream**: Tool execution events go to `mcpToolEvents` → `http://localhost:9401/logs/mcp` (SSE), not to the user chat
 - **Direct relay**: Laptop connects OUT to Cloud Run via WSS (`RelayOutbound`) — no Cloudflare Tunnel needed
 
 ## Playwright MCP — Chrome Launching

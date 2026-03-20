@@ -9,6 +9,7 @@ import { createServer, type Server as HttpServer } from 'http';
 import { mcpToolEvents } from './chrome-pool';
 import {
   logger,
+  isInternalToolLabel,
   type TaskHandoffMessage,
   type TaskRelayMessage,
   type BridgeMessage,
@@ -442,13 +443,17 @@ export class TaskManager {
     if (type === 'assistant.message') {
       const content = data.content as string;
       if (content && content !== state.lastMessage) {
-        // Forward as progress message (the user sees this in chat)
-        this.sendToRelay({
-          id: randomUUID(),
-          type: 'task_progress',
-          taskId,
-          message: content,
-        });
+        // Skip internal tool-call labels — the user should only see natural language.
+        if (isInternalToolLabel(content)) {
+          logger.info(`[copilot-msg] suppressed internal message: ${content.slice(0, 80)}`);
+        } else {
+          this.sendToRelay({
+            id: randomUUID(),
+            type: 'task_progress',
+            taskId,
+            message: content,
+          });
+        }
       }
     } else if (type === 'assistant.tool_call' || type === 'tool.execution_start') {
       const toolName = (data.toolName || data.name || 'tool') as string;

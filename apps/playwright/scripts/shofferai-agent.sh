@@ -84,6 +84,7 @@ fi
   --profile-directory="Profile 3" \
   --no-first-run \
   --no-default-browser-check \
+  --disable-blink-features=AutomationControlled \
   --disable-sync \
   --disable-default-apps \
   > /dev/null 2>&1 &

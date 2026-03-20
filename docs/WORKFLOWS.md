@@ -327,11 +327,27 @@ The agent streams events to the frontend via Server-Sent Events:
 
 | Event Type | Payload | When |
 |------------|---------|------|
-| `step` | `{content: string}` | Agent starts a new action |
-| `tool_call` | `{name, args}` | MCP tool is being called |
-| `tool_result` | `{name, result}` | MCP tool returned |
-| `thinking` | `{content: string}` | LLM reasoning (optional) |
-| `user_input_required` | `{prompt, type}` | Agent needs user input (OTP, choice) |
-| `payment_required` | `{summary, amount, taskId}` | Agent wants to collect payment |
-| `error` | `{message, code}` | Something went wrong |
+| `message` | `{content: string}` | LLM natural-language text for the user |
+| `step_update` | `{action, status}` | Milestone step completed (e.g. skill activation) |
+| `input_required` | `{taskId, stepId, question, inputType, options?, ...}` | Agent needs user input (OTP, choice, address) |
+| `payment_required` | `{taskId, bookingSummary, amountCents, ...}` | Agent wants to collect payment |
+| `error` | `{error: string}` | Something went wrong |
 | `complete` | `{summary: string}` | Task finished successfully |
+
+### What the User Does NOT See
+
+Internal tool calls and status labels are **filtered out** before reaching the chat UI:
+
+| Suppressed Pattern | Example | Where Logged Instead |
+|---|---|---|
+| `Browser: <toolname>` | `Browser: report_intent` | `logger.info` in relay terminal |
+| Raw tool names | `browser_navigate`, `mcp__playwright__browser_click` | `logger.info` in relay terminal |
+| Status labels | `Agent starting...`, `Thinking...` | `logger.info` in relay terminal |
+| Tool execution events | `assistant.tool_call`, `tool.execution_start` | `mcpToolEvents` → `http://localhost:9401/logs/mcp` (SSE) |
+
+**Three-layer filtering** prevents internal details from reaching users:
+1. **task-manager.ts**: `isInternalToolLabel()` filters `assistant.message` events at the source
+2. **execute/route.ts**: Defense-in-depth filter on `task_progress` before sending SSE
+3. **ChatInterface.tsx**: Frontend hides `step_update` events with `status: 'running'`
+
+The shared filter lives in `packages/shared/src/internal-message-filter.ts`.
