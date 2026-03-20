@@ -122,7 +122,20 @@ export function buildSystemPrompt(
   // Level 2: Active skill full instructions (only when matched)
   if (activeSkill) {
     const today = new Date().toISOString().split('T')[0];
-    parts.push(`## ACTIVE SKILL: ${activeSkill.name}\nToday's date: ${today}\n\n${activeSkill.instructions}`);
+    let skillSection = `## ACTIVE SKILL: ${activeSkill.name}\nToday's date: ${today}\n`;
+
+    // Inject param definitions so LLM knows what to extract vs ask
+    if (activeSkill.params?.length) {
+      skillSection += `\n### Skill Parameters\nExtract these from the user's message. ONLY ask for values NOT already provided:\n`;
+      for (const param of activeSkill.params) {
+        const tag = param.required ? 'REQUIRED' : 'optional';
+        skillSection += `- **${param.name}** (${tag}): ${param.hint}\n`;
+      }
+      skillSection += `\nIf the user already mentioned a value (e.g. "milk and bread"), pre-fill it — do NOT ask again.\n`;
+    }
+
+    skillSection += `\n${activeSkill.instructions}`;
+    parts.push(skillSection);
   }
 
   // Level 3: Lessons learned from past executions (only for active skill)
