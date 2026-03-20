@@ -248,16 +248,18 @@ Both the `.mcp.json` path (local dev/Copilot) and the relay path (production) la
 
 ## Testing Workflow
 
-**E2E / Agent Testing**: Always use the **real production website**, not localhost:
+**E2E / Agent Testing**: Always test through the **ShofferAI chat interface**, NEVER by opening target sites directly:
 - **Prod URL**: `https://shofferai-27188185100.asia-south1.run.app`
 - Log in with real credentials (not test accounts)
 - Mimic actual user flow: landing page → login → chat → send request → watch agent execute
 - **E2E means END TO END**: Complete every action until the conversation is fully done
-- **Login first on every site**: Before any browsing, the agent must login to the target website
+- **NEVER open target websites (swiggy.com, booking.com, etc.) directly** — always go through the chat UI so the full pipeline is tested: User → Chat → Agent → Relay → Chrome → Target Site
+- The agent handles login on target sites via Chrome Profile 3 (signed-in sessions)
 
 **Before testing, ensure laptop relay is running:**
 ```bash
 ./apps/playwright/scripts/start-laptop.sh
+# Verify: curl -s http://localhost:9400 (TaskManager bridge, always active)
 ```
 
 **UI Development**: Use `localhost:3000` only for frontend iteration. After UI changes, deploy and verify on prod.

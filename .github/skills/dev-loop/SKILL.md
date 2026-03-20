@@ -8,10 +8,12 @@ This skill has five modes:
 - **Mode A: Visual QA** — Browse the running app with Playwright MCP, evaluate, fix, repeat
 - **Mode B: Create a NEW E2E skill** — Research a website, write SKILL.md, auto-compile
 - **Mode C: Batch-compile EXISTING skills** — Browse each site, record real selectors, update compiled scripts
-- **Mode D: Continue Skill** — Pick ONE existing skill, browse the real site, improve its SKILL.md + compiled script with real selectors
+- **Mode D: Continue Skill** — Pick ONE existing skill, test it E2E via the ShofferAI chat interface, improve SKILL.md + compiled script
 - **Mode E: Multi-browser** — Test Chrome Pool with 3 parallel orders, verify slot isolation
 
 Ask the user which mode, or infer from context.
+
+> ⚠️ **MANDATORY FOR ALL MODES EXCEPT A**: Testing MUST go through the **ShofferAI chat interface** (prod: `https://shofferai-27188185100.asia-south1.run.app`). NEVER open target websites (swiggy.com, booking.com, etc.) directly in the browser. The pipeline is: **User → Chat UI → Agent → Relay → Chrome → Target Site**. Skipping to the target site tests nothing.
 
 ---
 
@@ -212,14 +214,16 @@ Report:
 
 ## Mode C: Batch-Compile Existing Skills
 
-Browse each skill's website, record the real UI flow via Playwright MCP, and compile production-ready Playwright scripts with actual selectors.
+Browse each skill's website **through the ShofferAI chat interface**, record the real UI flow, and compile production-ready Playwright scripts with actual selectors.
+
+> 🚫 **DO NOT** open target websites directly. Test through the chat UI: `https://shofferai-27188185100.asia-south1.run.app`
 
 ```
 For each skill (sequential):
   1. Read SKILL.md → extract siteUrl, params, steps
-  2. Open site in playwright (Chrome-Debug on 9225)
-  3. Follow the SKILL.md steps using Playwright MCP
-  4. Record every MCP action (navigate, click, type, snapshot)
+  2. Send a trigger message in ShofferAI chat to invoke the skill
+  3. Watch the agent execute via relay → Chrome → Target Site
+  4. Record every real selector from agent snapshot tool calls
   5. Compile recorded actions → native Playwright script
   6. Save to packages/agent-core/src/scripts/compiled/{skill-name}.ts
   7. Move to next skill
@@ -304,7 +308,10 @@ npx turbo build --filter=@shofferai/agent-core
 
 Pick ONE existing skill and improve it by testing E2E through the **real ShofferAI production app**.
 
-**CRITICAL: NEVER navigate directly to the target site (e.g. swiggy.com, booking.com). ALWAYS start from the ShofferAI chat interface on prod.** The whole point is to test the full pipeline: User → ShofferAI Chat → Agent → Relay → Chrome → Target Site. Skipping to the target site tests nothing real.
+> 🚫 **DO NOT** open the target website directly (e.g. swiggy.com, booking.com, amazon.in).
+> ✅ **ALWAYS** start from the ShofferAI chat interface: `https://shofferai-27188185100.asia-south1.run.app`
+> The full pipeline is: **User → Chat UI → Agent → Relay → Chrome → Target Site**.
+> If you navigate to the target site directly, you are testing nothing useful. STOP and go to the chat UI.
 
 ### Step 0: Prerequisites
 
