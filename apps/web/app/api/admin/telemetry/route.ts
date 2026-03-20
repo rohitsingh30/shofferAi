@@ -279,5 +279,93 @@ export async function GET(request: Request) {
     });
   }
 
+  if (view === 'task-detail') {
+    const taskId = url.searchParams.get('taskId');
+    if (!taskId) {
+      return NextResponse.json({ error: 'taskId required' }, { status: 400 });
+    }
+
+    const [task, steps, messages, telemetry, payments] = await Promise.all([
+      prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+          id: true,
+          description: true,
+          status: true,
+          workflowType: true,
+          result: true,
+          createdAt: true,
+          completedAt: true,
+          user: { select: { id: true, email: true, name: true } },
+        },
+      }),
+      prisma.taskStep.findMany({
+        where: { taskId },
+        orderBy: { stepNumber: 'asc' },
+        select: {
+          id: true,
+          stepNumber: true,
+          action: true,
+          toolCalls: true,
+          status: true,
+          result: true,
+          error: true,
+          startedAt: true,
+          completedAt: true,
+          inputNeeded: true,
+          userInput: true,
+        },
+      }),
+      prisma.message.findMany({
+        where: { taskId },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          role: true,
+          content: true,
+          createdAt: true,
+        },
+      }),
+      prisma.telemetryEvent.findMany({
+        where: { taskId },
+        orderBy: { timestamp: 'asc' },
+        select: {
+          id: true,
+          timestamp: true,
+          event: true,
+          category: true,
+          success: true,
+          durationMs: true,
+          metadata: true,
+        },
+      }),
+      prisma.payment.findMany({
+        where: { taskId },
+        select: {
+          id: true,
+          status: true,
+          amountCents: true,
+          totalCents: true,
+          currency: true,
+          bookingSummary: true,
+          createdAt: true,
+          paidAt: true,
+        },
+      }),
+    ]);
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      task,
+      steps,
+      messages,
+      telemetry,
+      payments,
+    });
+  }
+
   return NextResponse.json({ error: 'Unknown view' }, { status: 400 });
 }

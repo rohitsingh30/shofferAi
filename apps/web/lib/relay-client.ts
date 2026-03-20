@@ -41,7 +41,7 @@ export class RelayClient {
   private shouldReconnect = true;
   private lastPongAt = Date.now();
   private options: Required<RelayClientOptions>;
-  private taskEventHandler: ((msg: TaskRelayMessage) => void) | null = null;
+  private taskEventHandlers: Map<string, (msg: TaskRelayMessage) => void> = new Map();
 
   constructor(options: RelayClientOptions = {}) {
     this.options = {
@@ -119,10 +119,12 @@ export class RelayClient {
       return;
     }
 
-    // Route task-level messages to the task event handler
+    // Route task-level messages to the task event handlers
     if (isTaskMessage(msg)) {
-      if (this.taskEventHandler) {
-        this.taskEventHandler(msg as TaskRelayMessage);
+      if (this.taskEventHandlers.size > 0) {
+        for (const handler of this.taskEventHandlers.values()) {
+          handler(msg as TaskRelayMessage);
+        }
       } else {
         logger.warn('RelayClient: received task message but no handler set', { type: msg.type });
       }
@@ -201,8 +203,15 @@ export class RelayClient {
   }
 
   /** Register a handler for incoming task events from the laptop */
-  onTaskEvent(handler: (msg: TaskRelayMessage) => void): void {
-    this.taskEventHandler = handler;
+  onTaskEvent(handler: (msg: TaskRelayMessage) => void, taskId?: string): void {
+    const key = taskId || '__default';
+    this.taskEventHandlers.set(key, handler);
+  }
+
+  /** Remove a task event handler */
+  removeTaskEventHandler(taskId?: string): void {
+    const key = taskId || '__default';
+    this.taskEventHandlers.delete(key);
   }
 
   async listTools(): Promise<MCPToolInfo[]> {

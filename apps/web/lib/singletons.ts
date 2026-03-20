@@ -13,7 +13,8 @@ const g = globalThis as unknown as {
     isConnected(): boolean;
     releaseSession(sessionId: string): Promise<void>;
     sendTaskMessage(msg: TaskRelayMessage): void;
-    onTaskEvent(handler: (msg: TaskRelayMessage) => void): void;
+    onTaskEvent(handler: (msg: TaskRelayMessage) => void, taskId?: string): void;
+    removeTaskEventHandler(taskId?: string): void;
   };
   relayBridge: RelayBridge;
   workflowEngine: WorkflowEngine;
@@ -51,8 +52,12 @@ export const vault = g.vault || new CredentialVault(prisma);
 
 // Skills loaded from SKILL.md files in packages/agent-core/src/skills/
 if (!g.skills) {
-  g.skills = loadSkills();
-  console.log('[singletons] Loaded %d skills', g.skills.length);
+  // In Docker/prod: SKILL.md files are copied to /app/skills
+  // In dev: resolve from monorepo root
+  const skillsDir = process.env.SKILLS_DIR
+    || require('path').join(process.cwd(), 'packages', 'agent-core', 'src', 'skills');
+  g.skills = loadSkills(skillsDir);
+  console.log('[singletons] Loaded %d skills from %s', g.skills.length, skillsDir);
 }
 export const skills = g.skills;
 

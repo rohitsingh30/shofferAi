@@ -124,6 +124,57 @@ interface ChromeData {
   activeTasks: number;
 }
 
+interface TaskDetailData {
+  task: {
+    id: string;
+    description: string;
+    status: string;
+    workflowType: string | null;
+    result: string | null;
+    createdAt: string;
+    completedAt: string | null;
+    user: { id: string; email: string | null; name: string | null };
+  };
+  steps: Array<{
+    id: string;
+    stepNumber: number;
+    action: string;
+    toolCalls: string | null;
+    status: string;
+    result: string | null;
+    error: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    inputNeeded: string | null;
+    userInput: string | null;
+  }>;
+  messages: Array<{
+    id: string;
+    role: string;
+    content: string;
+    createdAt: string;
+  }>;
+  telemetry: Array<{
+    id: string;
+    timestamp: string;
+    event: string;
+    category: string;
+    success: boolean;
+    durationMs: number | null;
+    metadata: string | null;
+  }>;
+  payments: Array<{
+    id: string;
+    status: string;
+    amountCents: number;
+    totalCents: number;
+    currency: string;
+    bookingSummary: string;
+    createdAt: string;
+    paidAt: string | null;
+  }>;
+}
+
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;

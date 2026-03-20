@@ -88,8 +88,13 @@ export class RemoteMCPHost implements MCPHostLike {
   }
 
   /** Register a handler for incoming task events from the laptop */
-  onTaskEvent(handler: (msg: TaskRelayMessage) => void): void {
-    this.relayClient.onTaskEvent(handler);
+  onTaskEvent(handler: (msg: TaskRelayMessage) => void, taskId?: string): void {
+    this.relayClient.onTaskEvent(handler, taskId);
+  }
+
+  /** Remove a task event handler */
+  removeTaskEventHandler(taskId?: string): void {
+    this.relayClient.removeTaskEventHandler(taskId);
   }
 
   async disconnect(): Promise<void> {

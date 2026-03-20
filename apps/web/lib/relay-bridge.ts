@@ -37,7 +37,7 @@ export class RelayBridge implements MCPHostLike {
   private toolCallTimeoutMs = 60000;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private lastPongAt = Date.now();
-  private taskEventHandler: ((msg: TaskRelayMessage) => void) | null = null;
+  private taskEventHandlers: Map<string, (msg: TaskRelayMessage) => void> = new Map();
   private latestStatus: RelayStatusMessage | null = null;
 
   /**
@@ -118,8 +118,10 @@ export class RelayBridge implements MCPHostLike {
 
     // Route task-level messages (from laptop) to the task event handler
     if (isTaskMessage(msg)) {
-      if (this.taskEventHandler) {
-        this.taskEventHandler(msg as TaskRelayMessage);
+      if (this.taskEventHandlers.size > 0) {
+        for (const handler of this.taskEventHandlers.values()) {
+          handler(msg as TaskRelayMessage);
+        }
       } else {
         logger.warn('RelayBridge: received task message but no handler set', { type: msg.type });
       }
@@ -248,9 +250,16 @@ export class RelayBridge implements MCPHostLike {
     logger.debug('RelayBridge sent task message', { type: msg.type, taskId: (msg as { taskId?: string }).taskId });
   }
 
-  /** Register a handler for incoming task events from the laptop */
-  onTaskEvent(handler: (msg: TaskRelayMessage) => void): void {
-    this.taskEventHandler = handler;
+  /** Register a handler for incoming task events from the laptop (keyed by taskId) */
+  onTaskEvent(handler: (msg: TaskRelayMessage) => void, taskId?: string): void {
+    const key = taskId || '__default';
+    this.taskEventHandlers.set(key, handler);
+  }
+
+  /** Remove a task event handler */
+  removeTaskEventHandler(taskId?: string): void {
+    const key = taskId || '__default';
+    this.taskEventHandlers.delete(key);
   }
 
   /** Get the latest relay status snapshot (tasks + Chrome pool) */

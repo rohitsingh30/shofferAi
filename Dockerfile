@@ -38,6 +38,10 @@ COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 # Copy public dir if it exists
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
+# Copy skill definitions (SKILL.md files read at runtime by loadSkills)
+COPY --from=builder /app/packages/agent-core/src/skills ./skills
+ENV SKILLS_DIR=/app/skills
+
 # Copy custom server (replaces default server.js for WebSocket relay support)
 COPY --from=builder /app/apps/web/custom-server.js ./apps/web/server.js
 

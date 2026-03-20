@@ -285,10 +285,9 @@ export async function POST(request: Request) {
           }
         };
 
-        remoteMcpHost.onTaskEvent(handleTaskEvent);
+        remoteMcpHost.onTaskEvent(handleTaskEvent, taskId);
         taskEventCleanup = () => {
-          // Remove our handler (simple approach — last handler wins)
-          remoteMcpHost.onTaskEvent(() => {});
+          remoteMcpHost.removeTaskEventHandler(taskId);
         };
 
         // ─── AgentExecutor callbacks (chat-only mode) ────────────────
