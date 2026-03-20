@@ -183,6 +183,8 @@ export async function POST(request: Request) {
                   console.log('[execute] taskId=%s suppressed internal msg: %s', taskId, msg.message?.slice(0, 80));
                 } else {
                   send('message', { content: msg.message });
+                  workflowEngine.addMessage(taskId, 'assistant', msg.message)
+                    .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
                 }
               }
               break;
@@ -211,6 +213,12 @@ export async function POST(request: Request) {
                 format_hint: msg.format_hint,
                 sections: msg.sections,
               });
+              // Persist the agent's question
+              workflowEngine.addMessage(taskId, 'assistant', msg.question, {
+                type: 'input_required', inputType: msg.inputType, stepId: msg.stepId,
+                options: msg.options, cards: msg.cards,
+              }).catch(e => console.error('[execute] DB addMessage(task_input_required) failed:', e));
+
               // Wait for user input then send back to laptop
               pauseManager.waitForInput({
                 taskId,
@@ -219,6 +227,11 @@ export async function POST(request: Request) {
                 inputType: msg.inputType,
               }).then((response) => {
                 console.log('[execute] taskId=%s input received for stepId=%s', taskId, msg.stepId);
+                // Persist the user's response
+                workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
+                  type: 'input_response', stepId: msg.stepId, inputType: msg.inputType,
+                }).catch(e => console.error('[execute] DB addMessage(task_input_response) failed:', e));
+
                 const inputMsg: TaskInputResponseMessage = {
                   id: randomUUID(),
                   type: 'task_input_response',
@@ -242,6 +255,12 @@ export async function POST(request: Request) {
                 serviceFeeCents: 0,
                 description: msg.description,
               });
+              // Persist the payment request
+              workflowEngine.addMessage(taskId, 'assistant',
+                `Payment required: ₹${msg.amount}${msg.bookingSummary ? '\n' + msg.bookingSummary : ''}`,
+                { type: 'payment_required', amount: msg.amount, stepId: msg.stepId },
+              ).catch(e => console.error('[execute] DB addMessage(task_payment_required) failed:', e));
+
               pauseManager.waitForInput({
                 taskId,
                 stepId: msg.stepId,
@@ -250,6 +269,12 @@ export async function POST(request: Request) {
                 timeout: 600000,
               }).then((response) => {
                 console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
+                // Persist the payment confirmation/decline
+                workflowEngine.addMessage(taskId, 'user',
+                  response.value === 'confirmed' ? 'Payment confirmed' : 'Payment declined',
+                  { type: 'payment_response', stepId: msg.stepId },
+                ).catch(e => console.error('[execute] DB addMessage(task_payment_response) failed:', e));
+
                 const paymentMsg: TaskPaymentResponseMessage = {
                   id: randomUUID(),
                   type: 'task_payment_response',
@@ -266,6 +291,8 @@ export async function POST(request: Request) {
             case 'task_complete':
               console.log('[execute] taskId=%s TASK_COMPLETE: %s', taskId, msg.summary?.slice(0, 120));
               send('complete', { summary: msg.summary });
+              workflowEngine.addMessage(taskId, 'assistant', msg.summary, { type: 'task_complete' })
+                .catch(e => console.error('[execute] DB addMessage(task_complete) failed:', e));
               workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: true, metadata: { skillName: matchedSkill?.name } });
               clearInterval(heartbeatTimer);
@@ -276,6 +303,9 @@ export async function POST(request: Request) {
             case 'task_error':
               console.error('[execute] taskId=%s TASK_ERROR: %s', taskId, msg.error);
               send('error', { error: msg.error });
+              workflowEngine.addMessage(taskId, 'assistant', `Error: ${msg.error}`, {
+                type: 'task_error', recoverable: msg.recoverable,
+              }).catch(e => console.error('[execute] DB addMessage(task_error) failed:', e));
               workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB error:', e));
               taskTimer.end({ success: false, metadata: { error: msg.error } });
               clearInterval(heartbeatTimer);
