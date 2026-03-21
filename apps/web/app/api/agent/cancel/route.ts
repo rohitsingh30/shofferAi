@@ -38,22 +38,18 @@ export async function POST(request: Request) {
 
   console.log('[cancel] taskId=%s user=%s explicit cancel request', taskId, user.userId);
 
-  // Send task_cancel to laptop relay (best-effort)
-  if (remoteMcpHost.isConnected()) {
-    try {
-      const cancelMsg: TaskCancelMessage = {
-        id: randomUUID(),
-        type: 'task_cancel',
-        taskId,
-        reason: 'user_cancelled',
-      };
-      remoteMcpHost.sendTaskMessage(cancelMsg);
-      console.log('[cancel] taskId=%s sent task_cancel to laptop relay', taskId);
-    } catch (e) {
-      console.warn('[cancel] taskId=%s failed to send task_cancel:', taskId, e);
-    }
-  } else {
-    console.warn('[cancel] taskId=%s relay not connected, cannot send task_cancel', taskId);
+  // Send task_cancel to laptop relay — queued automatically if relay is offline
+  try {
+    const cancelMsg: TaskCancelMessage = {
+      id: randomUUID(),
+      type: 'task_cancel',
+      taskId,
+      reason: 'user_cancelled',
+    };
+    remoteMcpHost.sendTaskMessage(cancelMsg);
+    console.log('[cancel] taskId=%s sent task_cancel to laptop relay (connected=%s)', taskId, remoteMcpHost.isConnected());
+  } catch (e) {
+    console.warn('[cancel] taskId=%s failed to send task_cancel:', taskId, e);
   }
 
   // Update task status in DB

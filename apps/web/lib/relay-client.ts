@@ -42,6 +42,7 @@ export class RelayClient {
   private lastPongAt = Date.now();
   private options: Required<RelayClientOptions>;
   private taskEventHandlers: Map<string, (msg: TaskRelayMessage) => void> = new Map();
+  private pendingCancels: Set<string> = new Set();
 
   constructor(options: RelayClientOptions = {}) {
     this.options = {
@@ -77,6 +78,26 @@ export class RelayClient {
         logger.info('Relay client connected', { url: this.url });
         track({ event: 'relay_connected', category: 'relay', metadata: { url: this.url } });
         this.startHeartbeat();
+
+        // Flush any cancel messages queued while disconnected
+        if (this.pendingCancels.size > 0) {
+          const taskIds = [...this.pendingCancels];
+          this.pendingCancels.clear();
+          logger.info('RelayClient: flushing pending cancels on reconnect', { count: taskIds.length });
+          for (const taskId of taskIds) {
+            try {
+              this.ws!.send(JSON.stringify({
+                id: randomUUID(),
+                type: 'task_cancel',
+                taskId,
+                reason: 'user_cancelled',
+              }));
+            } catch (e) {
+              logger.warn('RelayClient: failed to flush cancel', { taskId });
+            }
+          }
+        }
+
         resolve();
       });
 
@@ -197,6 +218,12 @@ export class RelayClient {
   /** Send a task-level message to the laptop */
   sendTaskMessage(msg: TaskRelayMessage): void {
     if (!this.ws || !this.connected) {
+      // Queue cancel messages for delivery when relay reconnects
+      if (msg.type === 'task_cancel' && 'taskId' in msg) {
+        this.pendingCancels.add((msg as { taskId: string }).taskId);
+        logger.info('RelayClient: queued cancel for offline delivery', { taskId: (msg as { taskId: string }).taskId });
+        return;
+      }
       throw new BrowserError('RelayClient: not connected');
     }
     this.ws.send(JSON.stringify(msg));

@@ -39,6 +39,7 @@ export class RelayBridge implements MCPHostLike {
   private lastPongAt = Date.now();
   private taskEventHandlers: Map<string, (msg: TaskRelayMessage) => void> = new Map();
   private latestStatus: RelayStatusMessage | null = null;
+  private pendingCancels: Set<string> = new Set();
 
   /**
    * Called by the custom server when a laptop WebSocket connects.
@@ -86,6 +87,27 @@ export class RelayBridge implements MCPHostLike {
     });
 
     this.startHeartbeat();
+
+    // Flush any cancel messages queued while the laptop was disconnected
+    if (this.pendingCancels.size > 0) {
+      const taskIds = [...this.pendingCancels];
+      this.pendingCancels.clear();
+      logger.info('RelayBridge: flushing pending cancels on reconnect', { count: taskIds.length });
+      for (const taskId of taskIds) {
+        try {
+          const cancelMsg: TaskRelayMessage = {
+            id: randomUUID(),
+            type: 'task_cancel',
+            taskId,
+            reason: 'user_cancelled',
+          } as TaskRelayMessage;
+          ws.send(JSON.stringify(cancelMsg));
+          logger.info('RelayBridge: flushed pending cancel', { taskId });
+        } catch (e) {
+          logger.warn('RelayBridge: failed to flush cancel', { taskId, error: e instanceof Error ? e.message : 'Unknown' });
+        }
+      }
+    }
 
     // Fetch tool list from laptop
     this.fetchTools().catch((err) => {
@@ -244,6 +266,12 @@ export class RelayBridge implements MCPHostLike {
   /** Send a task-level message to the laptop (task_handoff, task_input_response, etc.) */
   sendTaskMessage(msg: TaskRelayMessage): void {
     if (!this.laptopSocket || !this.connected) {
+      // Queue cancel messages for delivery when laptop reconnects
+      if (msg.type === 'task_cancel' && 'taskId' in msg) {
+        this.pendingCancels.add((msg as { taskId: string }).taskId);
+        logger.info('RelayBridge: queued cancel for offline delivery', { taskId: (msg as { taskId: string }).taskId });
+        return;
+      }
       throw new BrowserError('RelayBridge: laptop not connected');
     }
     this.laptopSocket.send(JSON.stringify(msg));
