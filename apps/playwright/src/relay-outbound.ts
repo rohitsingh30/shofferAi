@@ -56,7 +56,7 @@ export class RelayOutbound {
   private static readonly DEAD_CONNECTION_TIMEOUT_MS = 20_000;
   /** If no application-level message for 45s, backend is dead.
    *  Server sends heartbeat pings every 15s, so 3 missed = dead. */
-  private static readonly STALE_CONNECTION_TIMEOUT_MS = 45_000;
+  private static readonly STALE_CONNECTION_TIMEOUT_MS = 25_000;
 
   constructor(chromePool: ChromePool, cloudUrl: string, options: RelayOutboundOptions = {}) {
     this.chromePool = chromePool;
@@ -97,6 +97,33 @@ export class RelayOutbound {
         this.lastDataAt = Date.now();
         this.lastAppMessageAt = Date.now();
         logger.info('Connected to Cloud Run relay', { url: this.cloudUrl });
+
+        // Verify the connection reaches the actual backend (not just the LB).
+        // Send an app-level ping and expect an app-level message back within 10s.
+        // Cloud Run's load balancer can hold phantom WS connections that never
+        // reach the container after a deploy.
+        const verifyTimeout = setTimeout(() => {
+          // If lastAppMessageAt hasn't been updated since open, no real server behind this WS
+          if (Date.now() - this.lastAppMessageAt >= 9000) {
+            logger.warn('RelayOutbound: no app-level response within 10s of connect — phantom connection, terminating');
+            this.ws?.terminate();
+          }
+        }, 10_000);
+
+        // Send status so server has something to respond to (heartbeat ping from server comes every 15s)
+        this.sendStatus();
+
+        // Clean up verify timer if we get a real message (handled by the message listener)
+        const origLastApp = this.lastAppMessageAt;
+        const earlyCheck = setInterval(() => {
+          if (this.lastAppMessageAt > origLastApp) {
+            clearTimeout(verifyTimeout);
+            clearInterval(earlyCheck);
+          }
+        }, 1000);
+        // Also clear on timeout fire
+        setTimeout(() => clearInterval(earlyCheck), 11_000);
+
         this.startHealthCheck();
         this.startStatusBroadcast();
         resolved = true;
