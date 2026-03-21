@@ -4,6 +4,30 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Fixed relay duplicate-instance detection (false self-match)
+
+**Goal**: Diagnose why task `cmn0oodi` (Blinkit grocery order) died mid-execution, and fix relay startup failures.
+
+**What was done**:
+- Diagnosed task death: relay process received SIGINT at 18:51:24 while Copilot CLI was mid-reasoning (~15s into task)
+- Diagnosed startup failure: `checkDuplicateInstance()` used `ps aux | grep 'tsx.*apps/playwright/src/index'` which matched the relay's OWN process tree (npx → tsx → node), making it impossible to start
+- Replaced grep-based detection with **pidfile lock** (`/tmp/shofferai-relay.pid`) — checks if PID in file is alive via `process.kill(pid, 0)`, overwrites if stale
+- Added pidfile cleanup on graceful shutdown
+- Improved `start-laptop.sh` kill-wait loop (polls every 0.5s up to 10s instead of fixed `sleep 2`)
+- Added anti-patterns #34 (ps aux | grep self-match) and #35 (agent starting relay) to REPEATING-MISTAKES.md
+
+**Files changed**:
+- `apps/playwright/src/index.ts` (updated — pidfile lock replaces ps grep)
+- `apps/playwright/scripts/start-laptop.sh` (updated — better kill-wait loop)
+- `docs/REPEATING-MISTAKES.md` (updated — anti-patterns #33 diagnosis updated, #34 and #35 added)
+
+**Key decisions**:
+- Pidfile is more reliable than ps grep for singleton detection — immune to process tree depth
+- Agent must NEVER start the relay (violates rule #6, and async shells die with session)
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Fixed relay WebSocket flapping + duplicate instance prevention
 
 **Goal**: Diagnose why relay kept disconnecting and tasks failed with "laptop not connected."

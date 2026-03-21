@@ -611,14 +611,38 @@ This applies to: port scanning, reconnect backoff, file path fallbacks, API endp
 
 **How to diagnose:**
 ```bash
-# Count relay processes — should be exactly 1 (plus its parent npm/tsx wrappers)
-ps aux | grep 'tsx.*apps/playwright/src/index' | grep -v grep
+# Check pidfile — should contain PID of the running relay
+cat /tmp/shofferai-relay.pid
+
+# Verify that PID is alive
+kill -0 $(cat /tmp/shofferai-relay.pid) 2>/dev/null && echo "running" || echo "stale pidfile"
 
 # Check if LaunchAgent is also running
 launchctl list | grep shofferai
 ```
 
-**Rule:** NEVER run more than one relay instance. `start-laptop.sh` now automatically kills existing instances and stops the LaunchAgent daemon before starting. If starting manually, always check for existing processes first.
+**Rule:** NEVER run more than one relay instance. `start-laptop.sh` automatically kills existing instances and stops the LaunchAgent daemon before starting. Duplicate detection uses a pidfile (`/tmp/shofferai-relay.pid`), NOT `ps aux | grep` (which falsely matches its own process tree).
+
+---
+
+## 34. Using `ps aux | grep` for Process Detection (False Self-Matches)
+
+**What happens:** The relay duplicate-instance guard used `ps aux | grep 'tsx.*apps/playwright/src/index'` to detect other relay processes. But `npx tsx` spawns a process tree (npx → tsx → node), and the grep matches ALL of them — including the current process's own parent/child. Filtering by `process.pid` or even `process.ppid` is insufficient because the tree can be 3+ levels deep.
+
+**Symptoms:**
+- Relay exits immediately on startup with "Another relay instance is already running" when no other relay exists
+- The listed PIDs belong to the relay's own process tree
+- Relay is impossible to start
+
+**Rule:** Use a **pidfile lock** (`/tmp/shofferai-relay.pid`) for singleton detection. On startup, check if the PID in the file is alive (`process.kill(pid, 0)`). If dead, overwrite. If alive, abort. Clean up the pidfile on graceful shutdown.
+
+---
+
+## 35. Agent Starting/Stopping the Laptop Relay
+
+**What happens:** The Copilot agent starts the relay in an async shell. When the agent session ends, the shell is killed, taking the relay down with it — causing the exact same "relay died mid-task" failure it was trying to fix.
+
+**Rule:** NEVER start, stop, or restart the laptop relay. The operator manages the relay lifecycle manually. If the relay is down, inform the operator and wait.
 
 ---
 
