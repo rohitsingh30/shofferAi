@@ -12,6 +12,10 @@ import {
   type UserInputResponse,
   type FillCredentialRequest,
   shouldSuppressMessage,
+  SHOPPING_SKILLS,
+  looksLikeProductPresentation,
+  extractProductData,
+  inferStoreFromSkill,
 } from '@shofferai/shared';
 import type { SkillMetadata, LessonStore, LessonEntry } from './skills/types';
 import { loadSkills, matchSkill } from './skills/loader';
@@ -641,6 +645,35 @@ export class AgentExecutor {
 
             this.conversation.addToolResult(syntheticId, JSON.stringify({ userResponse: userResponse.value }));
             continue; // Loop back to LLM with the user's answer
+          }
+
+          // Detect product presentation — convert to product_card widget
+          // (agent sent product details as text instead of calling ask_user with product_card)
+          const isShopSkill = this.matchedSkill && SHOPPING_SKILLS.has(this.matchedSkill.name);
+          if (isShopSkill && !looksLikeError && looksLikeProductPresentation(fullText)) {
+            logger.info('Auto-converting product text to product_card widget', { text: fullText.slice(0, 100) });
+            const syntheticId = `auto_product_${Date.now()}`;
+            const store = inferStoreFromSkill(this.matchedSkill!.name);
+            const product = extractProductData(fullText, store);
+
+            this.conversation.replaceLastMessage([
+              { type: 'text', text: fullText } as ContentBlock,
+              {
+                type: 'tool_use', id: syntheticId, name: 'ask_user',
+                input: { question: 'Here\'s what I found:', input_type: 'product_card', product },
+              } as ContentBlock,
+            ]);
+
+            const userResponse = await callbacks.onInputRequired({
+              taskId: '',
+              stepId: syntheticId,
+              question: 'Here\'s what I found:',
+              inputType: 'product_card',
+              product,
+            });
+
+            this.conversation.addToolResult(syntheticId, JSON.stringify({ userResponse: userResponse.value }));
+            continue;
           }
 
           // Not a question — send text to frontend as normal message

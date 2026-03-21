@@ -14,7 +14,7 @@ import type {
   TaskPaymentResponseMessage,
   TaskCancelMessage,
 } from '@shofferai/shared';
-import { UserInputTimeoutError } from '@shofferai/shared';
+import { UserInputTimeoutError, SHOPPING_SKILLS, looksLikeProductPresentation } from '@shofferai/shared';
 
 /** Lazy relay connection — only needed when agent actually tries to use the browser */
 async function ensureRelayConnected() {
@@ -245,19 +245,73 @@ export async function POST(request: Request) {
                 // Accumulate raw messages for InputEnricher context
                 progressMessages.push(msg.message);
 
-                // Two-tier filter: regex fast path + AI rewrite layer
-                const rewriteP = getMessageRewriter().rewrite(msg.message).then(rewritten => {
-                  if (rewritten) {
-                    send('message', { content: rewritten });
-                    workflowEngine.addMessage(taskId, 'assistant', rewritten)
-                      .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
-                  }
-                }).catch(err => {
-                  console.error('[execute] taskId=%s rewriter error:', taskId, err);
-                  // Safety: suppress on rewriter failure — never leak unfiltered agent messages
-                  console.warn('[execute] taskId=%s suppressed message (rewriter failed): %s', taskId, msg.message?.slice(0, 100));
-                });
-                pendingRewrites.push(rewriteP);
+                // Detect product presentation text → convert to interactive product_card widget
+                const isShopSkill = matchedSkill && SHOPPING_SKILLS.has(matchedSkill.name);
+                if (isShopSkill && looksLikeProductPresentation(msg.message)) {
+                  const enrichP = (async () => {
+                    try {
+                      const enriched = await getInputEnricher().enrich(
+                        { question: msg.message, inputType: 'text' as import('@shofferai/shared').RichInputType },
+                        { skillName: matchedSkill?.name, progressMessages },
+                      );
+                      if (enriched.enriched && (enriched.inputType === 'product_card' || enriched.inputType === 'carousel')) {
+                        const stepId = `auto_product_${Date.now()}`;
+                        console.log('[execute] taskId=%s product detected in task_progress → %s', taskId, enriched.inputType);
+                        send('input_required', {
+                          taskId,
+                          stepId,
+                          question: enriched.question,
+                          inputType: enriched.inputType,
+                          product: enriched.product,
+                          cards: enriched.cards,
+                        });
+                        // Wait for user interaction (Add to Cart, etc.)
+                        // Don't forward to relay — this was a task_progress, not task_input_required
+                        pauseManager.waitForInput({
+                          taskId,
+                          stepId,
+                          question: enriched.question,
+                          inputType: enriched.inputType,
+                          timeout: 600_000,
+                        }).then((response) => {
+                          console.log('[execute] taskId=%s product widget response: %s', taskId, response.value);
+                          workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
+                            type: 'product_widget_response', stepId,
+                          }).catch(e => console.error('[execute] DB addMessage(product_widget) failed:', e));
+                        }).catch((err) => {
+                          if (err instanceof UserInputTimeoutError) {
+                            console.log('[execute] taskId=%s product widget input timed out (OK)', taskId);
+                          }
+                        });
+                        return; // Skip rewriter — we sent input_required instead
+                      }
+                    } catch (err) {
+                      console.warn('[execute] taskId=%s product enrichment failed, falling through:', taskId, err);
+                    }
+                    // Enrichment failed or didn't match — fall through to normal rewriter
+                    const rewritten = await getMessageRewriter().rewrite(msg.message);
+                    if (rewritten) {
+                      send('message', { content: rewritten });
+                      workflowEngine.addMessage(taskId, 'assistant', rewritten)
+                        .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
+                    }
+                  })();
+                  pendingRewrites.push(enrichP);
+                } else {
+                  // Two-tier filter: regex fast path + AI rewrite layer
+                  const rewriteP = getMessageRewriter().rewrite(msg.message).then(rewritten => {
+                    if (rewritten) {
+                      send('message', { content: rewritten });
+                      workflowEngine.addMessage(taskId, 'assistant', rewritten)
+                        .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
+                    }
+                  }).catch(err => {
+                    console.error('[execute] taskId=%s rewriter error:', taskId, err);
+                    // Safety: suppress on rewriter failure — never leak unfiltered agent messages
+                    console.warn('[execute] taskId=%s suppressed message (rewriter failed): %s', taskId, msg.message?.slice(0, 100));
+                  });
+                  pendingRewrites.push(rewriteP);
+                }
               }
               break;
 
