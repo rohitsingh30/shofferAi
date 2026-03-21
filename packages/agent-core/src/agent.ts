@@ -617,7 +617,10 @@ export class AgentExecutor {
 
           // Not a question — send text to frontend as normal message
           for (const block of textBlocks) {
-            callbacks.onMessage(block.text);
+            const text = block.text.trim();
+            if (text && !shouldSuppressMessage(text)) {
+              callbacks.onMessage(text);
+            }
           }
 
           const summary = fullText;

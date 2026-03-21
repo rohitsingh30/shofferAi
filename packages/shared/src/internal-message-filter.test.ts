@@ -106,15 +106,6 @@ describe('isAgentNarration', () => {
     expect(isAgentNarration('Wait for the page to load')).toBe(true);
   });
 
-  it('allows legitimate user-facing messages through', () => {
-    expect(isAgentNarration('Here are the dal options I found for you')).toBe(false);
-    expect(isAgentNarration('Your order has been placed! Order ID: #12345')).toBe(false);
-    expect(isAgentNarration('The total comes to ₹145. Would you like to proceed?')).toBe(false);
-    expect(isAgentNarration('Toor Dal 1kg is currently out of stock')).toBe(false);
-    expect(isAgentNarration('Which type of dal would you prefer?')).toBe(false);
-    expect(isAgentNarration('Added Toor Dal 1kg (₹89) to your cart')).toBe(false);
-  });
-
   it('filters internal reasoning and chain-of-thought', () => {
     expect(isAgentNarration('We need product: user wants wireless earbuds under ₹2000')).toBe(true);
     expect(isAgentNarration('Step 0 asks layout. Let\'s ask layout with product prefilled?')).toBe(true);
@@ -142,6 +133,83 @@ describe('isAgentNarration', () => {
     expect(isAgentNarration('Skip Step 0 since product is given')).toBe(true);
   });
 
+  // --- NEW: Multi-sentence messages (the root cause of the original leak) ---
+  it('filters multi-sentence messages where any sentence is narration', () => {
+    expect(isAgentNarration(
+      'It opened a wrong product tab. Let me switch to tab 1 and navigate to the correct boAt Airdopes 161 product.'
+    )).toBe(true);
+    expect(isAgentNarration(
+      'Perfect, the address is now updated. Let me search for the items.'
+    )).toBe(true);
+    expect(isAgentNarration(
+      'Great, Blinkit is loaded. Let me set the delivery location.'
+    )).toBe(true);
+    expect(isAgentNarration(
+      'The page has loaded successfully. I can see the search bar. Let me type the query.'
+    )).toBe(true);
+    expect(isAgentNarration(
+      'I see the results page. There are 5 options available. Let me scroll down to find the best one.'
+    )).toBe(true);
+  });
+
+  // --- NEW: "It <verb>" patterns ---
+  it('filters "It opened/loaded/redirected..." observations', () => {
+    expect(isAgentNarration('It opened a wrong product tab.')).toBe(true);
+    expect(isAgentNarration('It redirected to the login page.')).toBe(true);
+    expect(isAgentNarration('It loaded the homepage.')).toBe(true);
+    expect(isAgentNarration('It shows multiple options.')).toBe(true);
+    expect(isAgentNarration('It has a search bar at the top.')).toBe(true);
+  });
+
+  // --- NEW: Filler prefix stripping ---
+  it('filters narration with filler prefixes ("Good,", "Got it,", "Alright,")', () => {
+    expect(isAgentNarration('Good, the page has loaded successfully.')).toBe(true);
+    expect(isAgentNarration('Got it, the location has been updated.')).toBe(true);
+    expect(isAgentNarration('Done, I have set the delivery address.')).toBe(true);
+    expect(isAgentNarration('Alright, I can see the search results now.')).toBe(true);
+    expect(isAgentNarration('OK so the page shows multiple dal options.')).toBe(true);
+    expect(isAgentNarration('Interesting, there are 5 results.')).toBe(true);
+    expect(isAgentNarration('Cool, the cart has been updated.')).toBe(true);
+  });
+
+  // --- NEW: "Here/This/That" patterns ---
+  it('filters "Here we can see", "This looks like", "That was" patterns', () => {
+    expect(isAgentNarration('Here we can see several options.')).toBe(true);
+    expect(isAgentNarration('This looks like the right product.')).toBe(true);
+    expect(isAgentNarration('That was the wrong page.')).toBe(true);
+    expect(isAgentNarration('Here I can see the delivery form.')).toBe(true);
+  });
+
+  it('allows legitimate user-facing messages through', () => {
+    expect(isAgentNarration('Here are the dal options I found for you')).toBe(false);
+    expect(isAgentNarration('Your order has been placed! Order ID: #12345')).toBe(false);
+    expect(isAgentNarration('The total comes to ₹145. Would you like to proceed?')).toBe(false);
+    expect(isAgentNarration('Toor Dal 1kg is currently out of stock')).toBe(false);
+    expect(isAgentNarration('Which type of dal would you prefer?')).toBe(false);
+    expect(isAgentNarration('Added Toor Dal 1kg (₹89) to your cart')).toBe(false);
+  });
+
+  // --- NEW: Ensure no false positives on user-facing content ---
+  it('does NOT suppress questions to the user', () => {
+    expect(isAgentNarration('Would you like the 500g or 1kg pack?')).toBe(false);
+    expect(isAgentNarration('What is your delivery address?')).toBe(false);
+    expect(isAgentNarration('Please enter the OTP sent to your phone.')).toBe(false);
+    expect(isAgentNarration('Which hotel would you prefer?')).toBe(false);
+  });
+
+  it('does NOT suppress results and confirmations', () => {
+    expect(isAgentNarration('I found 3 hotels under ₹4000/night in Mumbai.')).toBe(false);
+    expect(isAgentNarration('Your hotel booking is confirmed! Booking ID: ABC123.')).toBe(false);
+    expect(isAgentNarration('The total for your grocery order is ₹567.')).toBe(false);
+    expect(isAgentNarration('boAt Airdopes 161 is available for ₹1,299.')).toBe(false);
+  });
+
+  it('does NOT suppress error messages meant for the user', () => {
+    expect(isAgentNarration('Sorry, that hotel is no longer available.')).toBe(false);
+    expect(isAgentNarration('The payment failed. Please try again.')).toBe(false);
+    expect(isAgentNarration('Blinkit delivery is not available in your area.')).toBe(false);
+  });
+
   it('handles empty/undefined', () => {
     expect(isAgentNarration(undefined)).toBe(true);
     expect(isAgentNarration('')).toBe(true);
@@ -159,7 +227,7 @@ describe('shouldSuppressMessage', () => {
     expect(shouldSuppressMessage('Let me click on the search button')).toBe(true);
   });
 
-  it('suppresses the exact messages from the user complaint', () => {
+  it('suppresses the exact messages from the original user complaint', () => {
     expect(shouldSuppressMessage(
       'I can see Blinkit is loaded and logged in. The current delivery address is in Nallagandla, Hyderabad — I need to change it to ISB Road, K.V.Rangareddy. Let me update the location first.'
     )).toBe(true);
@@ -171,6 +239,12 @@ describe('shouldSuppressMessage', () => {
     )).toBe(true);
     expect(shouldSuppressMessage(
       'Location is now set to ISB Road, Gachibowli with 22 minutes delivery. Now let me search for dal.'
+    )).toBe(true);
+  });
+
+  it('suppresses the exact message from the latest complaint (wrong product tab)', () => {
+    expect(shouldSuppressMessage(
+      'It opened a wrong product tab. Let me switch to tab 1 and navigate to the correct boAt Airdopes 161 product.'
     )).toBe(true);
   });
 

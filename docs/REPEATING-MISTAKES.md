@@ -208,10 +208,22 @@ After making changes:
 
 **The fix (2026-03-20):**
 - `task-manager.ts`: `assistant.tool_call` events ONLY go to the MCP log stream (`mcpToolEvents.emit`). `assistant.message` events pass through `isInternalMessage()` filter — tool-label-like text (`Browser: <name>`, raw tool names, status labels) is suppressed. Still logged at debug level.
-- `execute/route.ts`: Defense-in-depth — `isInternalToolLabel()` filter on `task_progress` messages before sending as SSE. Catches anything that slips through.
-- `ChatInterface.tsx` (frontend): Existing filter hides `step_update` events with `status: 'running'` (unchanged, acts as third safety net).
+- `execute/route.ts`: Defense-in-depth — `shouldSuppressMessage()` filter on `task_progress` messages before sending as SSE. Catches anything that slips through. Also applied to `onMessage` callback for chat-only mode.
+- `ChatInterface.tsx` (frontend): `shouldSuppressMessage()` filter on `message` events — last line of defense before rendering.
 
-**Patterns suppressed:** `"Browser: report_intent"`, `"Browser: playwright-browser_navigate"`, `"browser_snapshot"`, `"mcp__playwright__browser_click"`, `"report_intent"`, `"Agent starting..."`.
+**Patterns suppressed:** `"Browser: report_intent"`, `"Browser: playwright-browser_navigate"`, `"browser_snapshot"`, `"mcp__playwright__browser_click"`, `"report_intent"`, `"Agent starting..."`, plus 100+ narration patterns (observations, actions, status, reasoning, browser internals).
+
+**Architecture (2026-03-21 fix):**
+- `isAgentNarration()` splits multi-sentence messages on `.!?` boundaries and tests EACH sentence independently. If ANY sentence is narration → whole message suppressed.
+- Filler prefixes ("Good,", "Great,", "OK so", "Got it,", "Alright,", "Done,") are stripped before testing patterns.
+- New patterns for: "It opened/loaded/redirected...", "This looks/seems...", "Here we/I can see...", "That was/is..."
+
+**Five filter gates (all use `shouldSuppressMessage()`):**
+1. `task-manager.ts` — filters `assistant.message` events from Copilot CLI
+2. `bridge-mcp-server.ts` — filters `send_progress` tool calls
+3. `agent.ts` — filters LLM text blocks (BOTH tool-mixed and text-only responses)
+4. `execute/route.ts` — filters `task_progress` relay messages AND `onMessage` callback
+5. `ChatInterface.tsx` — client-side defense-in-depth
 
 **Rule:** The user should ONLY see in the chat: LLM natural language messages, `ask_user` prompts, `confirm_action` prompts, payment panels, and completion/error messages. ALL browser tool actions and internal labels are invisible to the user — they go to the MCP log stream (`mcpToolEvents`) and console debug logs for monitoring.
 

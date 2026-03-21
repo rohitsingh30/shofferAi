@@ -382,6 +382,11 @@ export async function POST(request: Request) {
         const callbacks: AgentCallbacks = {
           onMessage(content) {
             console.log('[execute] taskId=%s message: %s', taskId, content?.slice(0, 100));
+            // Defense-in-depth: filter narration that slipped through agent.ts
+            if (shouldSuppressMessage(content)) {
+              console.log('[execute] taskId=%s suppressed narration in onMessage: %s', taskId, content?.slice(0, 80));
+              return;
+            }
             send('message', { content });
             workflowEngine.addMessage(taskId, 'assistant', content).catch(e => console.error('[execute] DB addMessage failed:', e));
           },
