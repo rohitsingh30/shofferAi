@@ -418,6 +418,14 @@ export async function POST(request: Request) {
                   workflowEngine.addMessage(taskId, 'assistant', err.message, { type: 'task_error' })
                     .catch(e => console.error('[execute] DB addMessage(input-timeout) failed:', e));
                   workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
+                  // Cancel the relay task so TaskManager cleans up browser resources
+                  remoteMcpHost.sendTaskMessage({ id: randomUUID(), type: 'task_cancel', taskId });
+                  taskTimer.end({ success: false, metadata: { error: 'input_timeout' } });
+                  lat.endPhase('browser_execution');
+                  lat.finish(false, { error: 'input_timeout', completedVia: 'browser' });
+                  clearInterval(heartbeatTimer);
+                  if (taskEventCleanup) taskEventCleanup();
+                  try { controller.close(); } catch { /* already closed */ }
                 }
               });
               break;
@@ -468,6 +476,13 @@ export async function POST(request: Request) {
                   workflowEngine.addMessage(taskId, 'assistant', err.message, { type: 'task_error' })
                     .catch(e => console.error('[execute] DB addMessage(payment-timeout) failed:', e));
                   workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
+                  remoteMcpHost.sendTaskMessage({ id: randomUUID(), type: 'task_cancel', taskId });
+                  taskTimer.end({ success: false, metadata: { error: 'payment_timeout' } });
+                  lat.endPhase('browser_execution');
+                  lat.finish(false, { error: 'payment_timeout', completedVia: 'browser' });
+                  clearInterval(heartbeatTimer);
+                  if (taskEventCleanup) taskEventCleanup();
+                  try { controller.close(); } catch { /* already closed */ }
                 }
               });
               break;

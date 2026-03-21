@@ -100,7 +100,7 @@ export class TaskManager {
       copilotBin: options.copilotBin || process.env.COPILOT_BIN || 'gh',
       model: options.model || process.env.COPILOT_MODEL || 'claude-opus-4.6',
       chromeDebugPort: options.chromeDebugPort || Number(process.env.CHROME_DEBUG_PORT) || 9222,
-      taskTimeoutMs: options.taskTimeoutMs || 10 * 60_000,
+      taskTimeoutMs: options.taskTimeoutMs || 15 * 60_000,
       maxConcurrent: options.maxConcurrent || 5,
     };
   }
@@ -782,12 +782,12 @@ export class TaskManager {
     const task = this.tasks.get(taskId);
     if (!task || task.status === 'complete' || task.status === 'error') return;
 
-    logger.warn(`TaskManager: task ${taskId} timed out`);
+    logger.warn(`TaskManager: task ${taskId} timed out after ${this.options.taskTimeoutMs / 60_000} min`);
     this.sendToRelay({
       id: randomUUID(),
       type: 'task_error',
       taskId,
-      error: 'Task timed out',
+      error: 'This task has been running for a while without completing, so I\'ve ended it. Feel free to start a new chat whenever you\'re ready!',
       recoverable: false,
     });
     this.cancelTask(taskId, 'timeout');

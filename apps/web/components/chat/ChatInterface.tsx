@@ -285,13 +285,16 @@ function ChatInterfaceInner() {
         const errorText = event.payload.error as string;
         const errorCode = event.payload.code as string | undefined;
         const errorTaskId = event.payload.taskId as string | undefined;
-        const ref = errorTaskId ? ` (${errorCode || 'ERR'}:${errorTaskId.slice(-8)})` : '';
+        // Friendly timeout messages are already user-facing — show as-is
+        const isFriendlyError = errorCode === 'INPUT_TIMEOUT';
+        const ref = (!isFriendlyError && errorTaskId) ? ` (${errorCode || 'ERR'}:${errorTaskId.slice(-8)})` : '';
+        const displayText = isFriendlyError ? errorText : `Something went wrong: ${errorText}${ref}`;
         setMessages((prev) => [
           ...prev,
           {
             id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             role: 'assistant',
-            content: `Something went wrong: ${errorText}${ref}`,
+            content: displayText,
           },
         ]);
         setCurrentSteps([]);
