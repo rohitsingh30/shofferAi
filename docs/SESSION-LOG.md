@@ -4,6 +4,44 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-22 — Product widget auto-detection, cart Pay Now, relay gracefulClose
+
+**Goal**: Auto-detect product text from agent → render as rich ProductCard widget. Merge payment into cart panel ("Pay Now" → Razorpay). Fix relay disconnect during deploys.
+
+**What was done**:
+- Created `product-parser.ts` with `looksLikeProductPresentation()` heuristic + `extractProductData()` regex extraction
+- Added product auto-detection in `agent.ts` (cloud path) and `route.ts` (relay `task_progress` path) — converts product text into `ask_user` with `product_card` type
+- Rewrote `L2CartPanel.tsx` — replaced "Proceed to Buy" with "Pay Now" that creates Razorpay order + launches checkout modal directly
+- Added close (X) button to `PaymentPanel.tsx`
+- Fixed `custom-server.js` SIGTERM handler: `disconnect()` → `gracefulClose()` with close code 1001 ("Going Away")
+- Added `relay-outbound.ts` reconnect delay reset on close code 1001 — no exponential backoff when server says "reconnect"
+- Fixed leaked message "I can get those image URLs for you" — added first-person capability pattern to regex filter + updated AI rewriter prompt
+- 21 tests for product-parser, 10,029 total filter tests all passing
+
+**Files changed**:
+- `packages/shared/src/product-parser.ts` (created — product detection heuristic + extraction)
+- `packages/shared/src/product-parser.test.ts` (created — 21 tests)
+- `packages/shared/src/index.ts` (updated — export product-parser)
+- `packages/shared/src/internal-message-filter.ts` (updated — first-person capability regex)
+- `packages/agent-core/src/agent.ts` (updated — product auto-detection block ~line 648)
+- `packages/agent-core/src/message-rewriter.ts` (updated — capability offers in prompt)
+- `apps/web/app/api/agent/execute/route.ts` (updated — product detection in relay task_progress)
+- `apps/web/components/chat/L2CartPanel.tsx` (updated — Pay Now + Razorpay integration)
+- `apps/web/components/chat/PaymentPanel.tsx` (updated — close button)
+- `apps/web/custom-server.js` (updated — gracefulClose on SIGTERM)
+- `apps/playwright/src/relay-outbound.ts` (updated — reset delay on 1001)
+
+**Key decisions**:
+- Product detection uses heuristic (₹ price + 2 of 6 signals) rather than LLM — free, <1ms, catches ~95% of formatted product text
+- Two detection paths needed: cloud agent (agent.ts) and relay (route.ts task_progress handler) — relay messages bypass enricher
+- Cart "Pay Now" creates Razorpay order inline. PaymentPanel still exists for agent-initiated payment_required SSE events (food delivery tips)
+- Relay gracefulClose sends 1001 close code so laptop knows to reconnect ASAP, not back off
+
+**What worked / what didn't** *(fill in after review)*:
+- 
+
+---
+
 ## 2026-03-22 — Cart slide-up + relay auto-heal across deploys
 
 **Goal**: Show CartBar at bottom as soon as user adds an item; fix relay disconnection after every Cloud Run deploy.
