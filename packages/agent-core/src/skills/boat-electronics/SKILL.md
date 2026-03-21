@@ -63,21 +63,40 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Click selected product.
 - Take snapshot of product page.
 - Extract: model name, price, MRP, discount, color options, key specs (driver size, frequency, battery, charging time, water resistance, ANC level).
-- If product has color variants, present them via `ask_user` (input_type "choice").
+- If product has color variants, present them via `ask_user` (input_type "chip_bar").
 - Highlight standout features: BEAST mode for gaming, ENx ANC, ASAP charge, IWP (Insta Wake N' Pair).
-- Confirm with user: "Add boAt [model] ([color]) at ₹X,XXX to cart?"
+- Present the final product using `ask_user` with `input_type: "product_card"`:
+  ```json
+  {
+    "input_type": "product_card",
+    "question": "Here's what I found:",
+    "product": {
+      "id": "boat-product-id",
+      "name": "boAt Airdopes 161",
+      "image": "https://www.boat-lifestyle.com/cdn/...",
+      "price": 899,
+      "mrp": 2999,
+      "discount": "70% off",
+      "rating": 4.1,
+      "ratingCount": "15.5L+",
+      "delivery": "24 Mar, Tue",
+      "deliveryFree": true,
+      "specs": ["ENx™ ANC", "50h battery", "IPX5", "BEAST mode"],
+      "offers": ["₹45 off with HDFC Bank"],
+      "color": "Carbon Black",
+      "store": "boAt"
+    }
+  }
+  ```
+  Extract REAL values from the product page. User clicks "Add to Cart" in the widget.
 
-### 5. Add to Cart & Review
-- Click "Add to Cart".
+### 5. Cart on Website
+- After user adds to cart via widget, click "Add to Cart" on boAt website.
 - Go to cart, take snapshot.
 - Check for coupon codes or bundle offers (boAt often has combos: earbuds + case).
 - Apply coupon if available.
-- Use `confirm_action` to present order summary:
-  - Product: model name, color
-  - Price, MRP, discount, coupon savings
-  - Delivery date and charges
-  - Total amount
-- Do NOT proceed unless user confirms. If cancelled, ask what to change.
+- Use `report_cart` to update the cart display with actual items and total.
+- User reviews cart in the cart panel and clicks "Proceed to Buy" when ready.
 
 ### 6. Checkout & Payment
 - Click "Checkout" or "Buy Now".
@@ -108,5 +127,5 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - IPX4/IPX5 water resistance is common — important for gym/outdoor use.
 - ASAP charge feature: 10 min charge = hours of playback — highlight if available.
 - COD available on most products — mention if user prefers.
-- Use `confirm_action` for cart review, `collect_payment` for checkout.
-- When using confirm_action or collect_payment, WAIT for user response. Do NOT auto-proceed.
+- Use `product_card` to present final product with "Add to Cart". Cart review happens in the cart panel.
+- Use `collect_payment` for checkout. WAIT for user response. Do NOT auto-proceed.

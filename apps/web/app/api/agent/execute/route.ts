@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { AgentExecutor, type AgentCallbacks, matchSkill } from '@shofferai/agent-core';
+import { AgentExecutor, type AgentCallbacks, matchSkill, getMessageRewriter } from '@shofferai/agent-core';
 import { CredentialInjector } from '@/lib/credential-vault';
 import { remoteMcpHost, workflowEngine, vault, skills } from '@/lib/singletons';
 import { track, trackTimed } from '@/lib/telemetry';
@@ -14,7 +14,6 @@ import type {
   TaskPaymentResponseMessage,
   TaskCancelMessage,
 } from '@shofferai/shared';
-import { shouldSuppressMessage } from '@shofferai/shared';
 
 /** Lazy relay connection — only needed when agent actually tries to use the browser */
 async function ensureRelayConnected() {
@@ -232,14 +231,16 @@ export async function POST(request: Request) {
               // Only forward LLM text messages (no step field) as chat bubbles.
               // Tool call progress (has step field) goes only to MCP logs, not to the user.
               if (!msg.step) {
-                // Defense-in-depth: skip internal tool-call labels that slipped through
-                if (shouldSuppressMessage(msg.message)) {
-                  console.log('[execute] taskId=%s suppressed internal msg: %s', taskId, msg.message?.slice(0, 80));
-                } else {
-                  send('message', { content: msg.message });
-                  workflowEngine.addMessage(taskId, 'assistant', msg.message)
-                    .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
-                }
+                // Two-tier filter: regex fast path + AI rewrite layer
+                getMessageRewriter().rewrite(msg.message).then(rewritten => {
+                  if (rewritten) {
+                    send('message', { content: rewritten });
+                    workflowEngine.addMessage(taskId, 'assistant', rewritten)
+                      .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
+                  }
+                }).catch(err => {
+                  console.error('[execute] taskId=%s rewriter error:', taskId, err);
+                });
               }
               break;
 
@@ -266,8 +267,8 @@ export async function POST(request: Request) {
                 placeholder: msg.placeholder,
                 format_hint: msg.format_hint,
                 sections: msg.sections,
+                product: msg.product,
               });
-              // Persist the agent's question
               workflowEngine.addMessage(taskId, 'assistant', msg.question, {
                 type: 'input_required', inputType: msg.inputType, stepId: msg.stepId,
                 options: msg.options, cards: msg.cards,
@@ -382,13 +383,15 @@ export async function POST(request: Request) {
         const callbacks: AgentCallbacks = {
           onMessage(content) {
             console.log('[execute] taskId=%s message: %s', taskId, content?.slice(0, 100));
-            // Defense-in-depth: filter narration that slipped through agent.ts
-            if (shouldSuppressMessage(content)) {
-              console.log('[execute] taskId=%s suppressed narration in onMessage: %s', taskId, content?.slice(0, 80));
-              return;
-            }
-            send('message', { content });
-            workflowEngine.addMessage(taskId, 'assistant', content).catch(e => console.error('[execute] DB addMessage failed:', e));
+            // Two-tier filter: regex fast path + AI rewrite layer
+            getMessageRewriter().rewrite(content).then(rewritten => {
+              if (rewritten) {
+                send('message', { content: rewritten });
+                workflowEngine.addMessage(taskId, 'assistant', rewritten).catch(e => console.error('[execute] DB addMessage failed:', e));
+              }
+            }).catch(err => {
+              console.error('[execute] taskId=%s rewriter error in onMessage:', taskId, err);
+            });
           },
           onStepUpdate(step) {
             console.log('[execute] taskId=%s step_update: %o', taskId, step);
@@ -419,6 +422,7 @@ export async function POST(request: Request) {
               placeholder: request.placeholder,
               format_hint: request.format_hint,
               sections: request.sections,
+              product: request.product,
             });
             lat.startPhase('user_input_wait');
             const response = await pauseManager.waitForInput({ ...request, taskId });

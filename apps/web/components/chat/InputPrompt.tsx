@@ -11,6 +11,8 @@ import { StepperInput } from './inputs/StepperInput';
 import { SliderInput } from './inputs/SliderInput';
 import { TextInput as RichTextInput } from './inputs/TextInput';
 import { LayoutInput } from './inputs/LayoutInput';
+import { ProductCardInput } from './inputs/ProductCardInput';
+import type { ProductCardData } from '@shofferai/shared';
 
 interface InputPromptProps {
   question: string;
@@ -54,6 +56,7 @@ interface InputPromptProps {
     placeholder?: string;
     format_hint?: string;
   }>;
+  product?: ProductCardData;
 }
 
 export function InputPrompt({ question, inputType, options, onSubmit, ...richProps }: InputPromptProps) {
@@ -193,6 +196,13 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
             onSubmit={onSubmit}
           />
         );
+      case 'product_card':
+        return richProps.product ? (
+          <ProductCardInput
+            product={richProps.product}
+            onSubmit={onSubmit}
+          />
+        ) : null;
       default:
         return null;
     }
@@ -322,7 +332,7 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
   );
 }
 
-const RICH_TYPES = new Set(['card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'text', 'layout']);
+const RICH_TYPES = new Set(['card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'text', 'layout', 'product_card']);
 function isRichType(type: string): boolean {
   return RICH_TYPES.has(type);
 }

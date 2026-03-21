@@ -1,4 +1,4 @@
-import type { RichInputType, InputSection, CardItem, InputSavedAddress, CounterConfig } from './agent';
+import type { RichInputType, InputSection, CardItem, InputSavedAddress, CounterConfig, ProductCardData } from './agent';
 
 export interface MCPToolInfo {
   name: string;
@@ -105,6 +105,7 @@ export interface TaskInputRequiredMessage {
   placeholder?: string;
   format_hint?: string;
   sections?: InputSection[];
+  product?: ProductCardData;
 }
 
 /** Cloud → Laptop: user's response to an input request */

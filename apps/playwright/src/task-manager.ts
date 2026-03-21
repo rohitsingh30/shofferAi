@@ -689,6 +689,7 @@ export class TaskManager {
         placeholder: msg.placeholder,
         format_hint: msg.format_hint,
         sections: msg.sections,
+        product: msg.product,
       });
       return;
     }

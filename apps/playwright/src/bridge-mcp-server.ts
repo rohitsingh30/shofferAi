@@ -174,9 +174,9 @@ mcpServer.registerTool(
         .optional()
         .describe('Optional list of choices for a multiple-choice question'),
       input_type: z
-        .enum(['text', 'choice', 'otp', 'confirmation', 'freetext', 'card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'layout'])
+        .enum(['text', 'choice', 'otp', 'confirmation', 'freetext', 'card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'layout', 'product_card'])
         .optional()
-        .describe('Type of input widget to show. Use "card_grid" for product selection with images, "carousel" for visual choices, "chip_bar" for toggleable filters'),
+        .describe('Type of input widget to show. Use "card_grid" for product selection with images, "carousel" for visual choices, "chip_bar" for toggleable filters, "product_card" for final product display with Add to Cart'),
       cards: z
         .array(z.object({
           id: z.string().describe('Unique card identifier'),
@@ -198,9 +198,25 @@ mcpServer.registerTool(
       presets: z.array(z.number()).optional().describe('Preset values for stepper/slider'),
       placeholder: z.string().optional().describe('Placeholder text for text input'),
       format_hint: z.string().optional().describe('Format hint for text input'),
+      product: z.object({
+        id: z.string(),
+        name: z.string(),
+        image: z.string().optional(),
+        price: z.number(),
+        mrp: z.number().optional(),
+        discount: z.string().optional(),
+        rating: z.number().optional(),
+        ratingCount: z.string().optional(),
+        delivery: z.string().optional(),
+        deliveryFree: z.boolean().optional(),
+        specs: z.array(z.string()).optional(),
+        offers: z.array(z.string()).optional(),
+        color: z.string().optional(),
+        store: z.string(),
+      }).optional().describe('Product data for product_card input type'),
     },
   },
-  async ({ question, options, input_type, cards, show_quantity, allow_custom, multi_select, shortcuts, min, max, step, presets, placeholder, format_hint }) => {
+  async ({ question, options, input_type, cards, show_quantity, allow_custom, multi_select, shortcuts, min, max, step, presets, placeholder, format_hint, product }) => {
     const stepId = randomUUID();
     const inputType = input_type || (options?.length ? 'choice' : 'text');
 
@@ -222,6 +238,7 @@ mcpServer.registerTool(
       presets,
       placeholder,
       format_hint,
+      product: product as BridgeAskUserMessage['product'],
     };
 
     sendToTaskManager(msg);

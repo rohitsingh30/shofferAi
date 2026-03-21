@@ -6,7 +6,7 @@
  * Messages are routed by taskId.
  */
 
-import type { RichInputType, CardItem, InputSavedAddress, CounterConfig, InputSection } from './agent';
+import type { RichInputType, CardItem, InputSavedAddress, CounterConfig, InputSection, ProductCardData } from './agent';
 
 // ─── Bridge MCP → TaskManager ─────────────────────────────────────────────
 
@@ -37,6 +37,7 @@ export interface BridgeAskUserMessage {
   placeholder?: string;
   format_hint?: string;
   sections?: InputSection[];
+  product?: ProductCardData;
 }
 
 export interface BridgeRequestPaymentMessage {

@@ -73,6 +73,24 @@ export interface CardItem {
   badge?: string;
 }
 
+/** Rich product data for the product_card widget */
+export interface ProductCardData {
+  id: string;
+  name: string;
+  image?: string;
+  price: number;
+  mrp?: number;
+  discount?: string;
+  rating?: number;
+  ratingCount?: string;
+  delivery?: string;
+  deliveryFree?: boolean;
+  specs?: string[];
+  offers?: string[];
+  color?: string;
+  store: string;
+}
+
 export interface CounterConfig {
   label: string;
   min?: number;
@@ -99,7 +117,8 @@ export type RichInputType =
   | 'stepper'
   | 'slider'
   | 'text'
-  | 'layout';
+  | 'layout'
+  | 'product_card';
 
 export interface InputSection {
   name: string;
@@ -155,6 +174,8 @@ export interface UserInputRequest {
   format_hint?: string;
   // Layout composite
   sections?: InputSection[];
+  // Product card widget
+  product?: ProductCardData;
 }
 
 export interface UserInputResponse {

@@ -69,17 +69,36 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Take snapshot of product page.
 - Extract: full name, price, offers (bank discount, exchange), delivery date, seller info, warranty.
 - If product has variants (color, storage, size), present them via `ask_user` with `input_type: "chip_bar"` and `options` array (e.g. `["Midnight Black", "Starlight White", "Thunder Grey"]`).
-- Confirm with user: "Add [product] at ₹X,XXX to cart?"
+- Present the final product using `ask_user` with `input_type: "product_card"`:
+  ```json
+  {
+    "input_type": "product_card",
+    "question": "Here's what I found:",
+    "product": {
+      "id": "flipkart-product-id",
+      "name": "Full Product Name",
+      "image": "https://rukminim2.flixcart.com/...",
+      "price": 1599,
+      "mrp": 2999,
+      "discount": "47% off",
+      "rating": 4.4,
+      "ratingCount": "12K+",
+      "delivery": "25 Mar, Tue",
+      "deliveryFree": true,
+      "specs": ["Key spec 1", "Key spec 2"],
+      "offers": ["₹100 off with HDFC Bank"],
+      "color": "Selected Color",
+      "store": "Flipkart"
+    }
+  }
+  ```
+  Extract REAL values from the product page. User clicks "Add to Cart" in the widget.
 
-### 5. Add to Cart & Review
-- Click "Add to Cart".
-- Go to cart, take snapshot.
-- Use `confirm_action` to present order summary:
-  - Product name, variant, quantity
-  - Price, any discounts/offers applied
-  - Delivery date and charges
-  - Total amount
-- Do NOT proceed unless user confirms. If cancelled, ask what to change.
+### 5. Cart on Website
+- After user adds to cart via widget, click "Add to Cart" on Flipkart.
+- Go to cart, take snapshot to verify item was added.
+- Use `report_cart` to update the cart display with actual items and total.
+- User reviews cart in the cart panel and clicks "Proceed to Buy" when ready.
 
 ### 6. Checkout & Payment
 - Click "Place Order" in cart.
@@ -110,5 +129,5 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Product prices may include "effective price" after bank offers — clarify actual vs effective.
 - Seller matters for warranty/returns — prefer Flipkart-assured or RetailNet sellers.
 - Login popup appears frequently — dismiss with X button.
-- Use `confirm_action` for cart review, `collect_payment` for checkout.
-- When using confirm_action or collect_payment, WAIT for user response. Do NOT auto-proceed.
+- Use `product_card` to present final product with "Add to Cart". Cart review happens in the cart panel.
+- Use `collect_payment` for checkout. WAIT for user response. Do NOT auto-proceed.

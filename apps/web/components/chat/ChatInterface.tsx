@@ -7,9 +7,14 @@ import { ThinkingIndicator } from './ThinkingIndicator';
 import { InputPrompt } from './InputPrompt';
 import { CartSummary, type CartItem } from './CartSummary';
 import { shouldSuppressMessage } from '@shofferai/shared';
+import type { ProductCardData } from '@shofferai/shared';
 import { L2PaymentProvider, useL2Payment } from './L2PaymentContext';
+import { L2CartProvider, useL2Cart } from './L2CartContext';
+import { CartProvider, useCart } from './CartContext';
 import { L2SplitView } from './L2SplitView';
 import { PaymentPanel } from './PaymentPanel';
+import { L2CartPanel } from './L2CartPanel';
+import { CartBar } from './CartBar';
 
 const ALL_SUGGESTIONS = [
   { text: 'Book a hotel in Goa this weekend under ₹4000/night', icon: '🏨', category: 'Travel' },
@@ -55,6 +60,7 @@ function ChatInterfaceInner() {
     placeholder?: string;
     format_hint?: string;
     sections?: Array<Record<string, unknown>>;
+    product?: ProductCardData;
   } | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartTotal, setCartTotal] = useState('');
@@ -192,6 +198,7 @@ function ChatInterfaceInner() {
           placeholder: p.placeholder as string | undefined,
           format_hint: p.format_hint as string | undefined,
           sections: p.sections as Array<Record<string, unknown>> | undefined,
+          product: p.product as ProductCardData | undefined,
         });
         setIsLoading(false);
         break;
@@ -449,6 +456,7 @@ function ChatInterfaceInner() {
                     placeholder={pendingInput.placeholder}
                     format_hint={pendingInput.format_hint}
                     sections={pendingInput.sections as any}
+                    product={pendingInput.product}
                     onSubmit={handleInputResponse}
                   />
                 </div>
@@ -464,6 +472,9 @@ function ChatInterfaceInner() {
           </div>
         </div>
       )}
+
+      {/* ─── Cart Bar ─── */}
+      {!isEmpty && <CartBar />}
 
       {/* ─── Input Area ─── */}
       <div className={`px-4 pb-5 pt-3 ${isEmpty ? '' : 'border-t border-white/[0.04]'}`}>
@@ -514,7 +525,7 @@ function ChatInterfaceInner() {
   );
 
   return (
-    <L2SplitView rightPanel={<PaymentPanel />}>
+    <L2SplitView paymentPanel={<PaymentPanel />} cartPanel={<L2CartPanel />}>
       {chatContent}
     </L2SplitView>
   );
@@ -522,8 +533,12 @@ function ChatInterfaceInner() {
 
 export function ChatInterface() {
   return (
-    <L2PaymentProvider>
-      <ChatInterfaceInner />
-    </L2PaymentProvider>
+    <CartProvider>
+      <L2PaymentProvider>
+        <L2CartProvider>
+          <ChatInterfaceInner />
+        </L2CartProvider>
+      </L2PaymentProvider>
+    </CartProvider>
   );
 }

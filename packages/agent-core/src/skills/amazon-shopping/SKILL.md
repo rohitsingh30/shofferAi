@@ -80,20 +80,38 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
   ```
   Use separate chip_bar calls for each variant type (e.g., one for color, one for storage).
 - Mention any active deals: "Save ₹X with coupon", "10% off with HDFC card", "No-cost EMI available".
-- Confirm with user: "Add [product] at ₹X,XXX to cart?"
+- Present the final product using `ask_user` with `input_type: "product_card"`:
+  ```json
+  {
+    "input_type": "product_card",
+    "question": "Here's what I found:",
+    "product": {
+      "id": "amazon-asin",
+      "name": "Full Product Title",
+      "image": "https://m.media-amazon.com/images/I/...",
+      "price": 1599,
+      "mrp": 2999,
+      "discount": "47% off",
+      "rating": 4.4,
+      "ratingCount": "12K+",
+      "delivery": "25 Mar, Tue",
+      "deliveryFree": true,
+      "specs": ["Key spec 1", "Key spec 2"],
+      "offers": ["₹100 off with HDFC Bank", "No-cost EMI from ₹534/mo"],
+      "color": "Selected Color",
+      "store": "Amazon"
+    }
+  }
+  ```
+  Extract REAL values from the product page. User clicks "Add to Cart" in the widget.
 
-### 5. Add to Cart & Review
-- Click "Add to Cart" button.
+### 5. Cart on Website
+- After user adds to cart via widget, click "Add to Cart" on Amazon.
 - If "Add-on" or "Subscribe & Save" popup appears, dismiss or inform user.
-- Navigate to cart: click `link "0 items in cart"` in header or go to `/gp/cart/view.html`.
-- Take snapshot of cart page.
+- Navigate to cart and take snapshot.
 - Check for applicable coupons — click "Apply" if visible.
-- Use `confirm_action` to present order summary:
-  - Product name, variant, quantity
-  - Price, any coupons/offers applied, savings
-  - Delivery date and charges (free if Prime/above threshold)
-  - Total amount
-- Do NOT proceed unless user confirms. If cancelled, ask what to change.
+- Use `report_cart` to update the cart display with actual items and total.
+- User reviews cart in the cart panel and clicks "Proceed to Buy" when ready.
 
 ### 6. Checkout & Payment
 - Click "Proceed to Buy" / "Proceed to checkout".
@@ -142,5 +160,5 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Gift wrapping available on some items — ask if it's a gift.
 - **Keyboard shortcuts**: Amazon has keyboard shortcuts (/ for search, Shift+Option+C for cart) — visible in accessibility tree but not needed.
 - **Department filter**: The search bar has a department dropdown — use it to narrow results for ambiguous queries.
-- Use `confirm_action` for cart review, `collect_payment` for checkout.
-- When using confirm_action or collect_payment, WAIT for user response. Do NOT auto-proceed.
+- Use `product_card` to present final product with "Add to Cart". Cart review happens in the cart panel.
+- Use `collect_payment` for checkout. WAIT for user response. Do NOT auto-proceed.

@@ -42,6 +42,7 @@ Ask the user for ONE piece of missing info. **Always use the richest input type 
 | Budget / price range | \`slider\` | Price filters. Pass \`min\`, \`max\`, \`presets\`. |
 | Open-ended answer | \`freetext\` | ONLY when answer is truly unpredictable (special instructions, names). |
 | Multi-section form | \`layout\` | Combine multiple widgets (rare — prefer one question at a time). |
+| Final product display | \`product_card\` | Show a selected product with full details (image, price, specs, offers) + Add to Cart button. |
 
 **Carousel cards format** (for product results):
 \`\`\`json
@@ -49,6 +50,31 @@ Ask the user for ONE piece of missing info. **Always use the richest input type 
   {"id": "1", "label": "Product Name", "subtitle": "₹1,599 · Free delivery", "image": "https://...", "badge": "⭐ 4.4"}
 ] }
 \`\`\`
+
+**product_card format** (for final product confirmation — replaces confirm_action for products):
+\`\`\`json
+{
+  "input_type": "product_card",
+  "question": "Here's what I found:",
+  "product": {
+    "id": "product-123",
+    "name": "boAt Airdopes 161",
+    "image": "https://...",
+    "price": 899,
+    "mrp": 2999,
+    "discount": "70% off",
+    "rating": 4.1,
+    "ratingCount": "15.5L+",
+    "delivery": "24 Mar, Tue",
+    "deliveryFree": true,
+    "specs": ["ENx™ ANC", "50h battery", "IPX5"],
+    "offers": ["₹45 off with HDFC Bank"],
+    "color": "Carbon Black",
+    "store": "Flipkart"
+  }
+}
+\`\`\`
+When showing a final selected product to the user, ALWAYS use \`product_card\` instead of \`confirm_action\`. The user clicks "Add to Cart" and can review items in the cart panel before checkout.
 
 **chip_bar format** (for options/preferences):
 \`\`\`json

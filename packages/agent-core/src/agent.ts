@@ -843,6 +843,7 @@ export class AgentExecutor {
         placeholder: args.placeholder as string | undefined,
         format_hint: args.format_hint as string | undefined,
         sections: args.sections as UserInputRequest['sections'],
+        product: args.product as UserInputRequest['product'],
       });
 
       // Track the collected response so we can pass it to forced handoff
