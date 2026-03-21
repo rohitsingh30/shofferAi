@@ -133,17 +133,20 @@ function ChatInterfaceInner() {
   }, []);
 
   // Cancel running task when user closes the tab or browser window.
-  // sendBeacon is guaranteed to fire even during page unload and includes cookies for auth.
+  // fetch+keepalive survives page teardown (like sendBeacon) but supports
+  // proper Content-Type headers so the cancel endpoint parses JSON correctly.
   useEffect(() => {
     const cancelOnUnload = () => {
-      if (taskIdRef.current) {
-        const blob = new Blob(
-          [JSON.stringify({ taskId: taskIdRef.current })],
-          { type: 'application/json' }
-        );
-        navigator.sendBeacon('/api/agent/cancel', blob);
-        taskIdRef.current = null;
-      }
+      const tid = taskIdRef.current;
+      if (!tid) return;
+      taskIdRef.current = null;
+      // keepalive: true keeps the request alive after page destruction
+      fetch('/api/agent/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: tid }),
+        keepalive: true,
+      }).catch(() => {});
     };
     window.addEventListener('beforeunload', cancelOnUnload);
     window.addEventListener('pagehide', cancelOnUnload);

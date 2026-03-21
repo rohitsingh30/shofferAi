@@ -16,18 +16,23 @@ import type { TaskCancelMessage } from '@shofferai/shared';
 export async function POST(request: Request) {
   const user = await getAuthUser(request);
   if (!user) {
+    console.warn('[cancel] auth failed — no session/token');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { taskId?: string };
+  // Parse body defensively — supports both fetch(JSON) and sendBeacon(Blob)
+  let taskId: string | undefined;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    const text = await request.text();
+    const body = text ? JSON.parse(text) : {};
+    taskId = body.taskId;
+  } catch (e) {
+    console.warn('[cancel] body parse failed:', e);
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
 
-  const { taskId } = body;
   if (!taskId) {
+    console.warn('[cancel] no taskId in body');
     return NextResponse.json({ error: 'taskId required' }, { status: 400 });
   }
 
