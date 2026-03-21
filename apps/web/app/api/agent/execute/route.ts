@@ -47,6 +47,7 @@ export async function POST(request: Request) {
   // Create task first so we have the taskId for the latency tracker
   const taskId = await workflowEngine.createTask(userId, message);
   await workflowEngine.updateTaskStatus(taskId, 'running');
+  let stepCounter = 0; // monotonic step counter (avoids Date.now() INT4 overflow)
   console.log('[execute] taskId=%s created, status=running', taskId);
 
   // Initialize latency tracker — tracks all phases for this task
@@ -470,7 +471,7 @@ export async function POST(request: Request) {
             prisma.taskStep.create({
               data: {
                 taskId,
-                stepNumber: Date.now(), // monotonic ordering
+                stepNumber: ++stepCounter,
                 action: step.action,
                 status,
                 startedAt: new Date(),

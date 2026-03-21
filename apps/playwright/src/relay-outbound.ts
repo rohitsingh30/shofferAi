@@ -109,8 +109,8 @@ export class RelayOutbound {
         this.lastDataAt = Date.now();
       });
 
-      this.ws.on('close', () => {
-        logger.info('Disconnected from Cloud Run relay');
+      this.ws.on('close', (code: number, reason: Buffer) => {
+        logger.info('Disconnected from Cloud Run relay', { code, reason: reason?.toString() || '' });
         this.stopHealthCheck();
         this.stopStatusBroadcast();
         if (this.shouldReconnect) {
