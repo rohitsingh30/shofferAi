@@ -4,6 +4,37 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Fix fake product cards + always confirm address & phone
+
+**Goal**: Fix BigBasket (and all grocery/food skills) showing hallucinated product cards before browsing, and ensure address is always confirmed even when user provides a partial location.
+
+**What was done**:
+- **Bug 1 — Fake product cards**: SKILL.md Step 0 told LLM to show `card_grid` with emoji items/fake prices before browser visit. The `agent.ts` image validation had a bypass: `layout` sections with nested `card_grid` weren't checked.
+  - Fixed `agent.ts` to validate card_grids inside `layout.sections[]`
+  - Removed `card_grid` from Step 0 in 18 grocery SKILL.md files
+- **Bug 2 — Skipping address**: When user said "deliver to Tellapur Hyderabad", agent treated it as complete address and skipped the address picker. Area name ≠ full delivery address.
+  - Changed Step 0 to **always** show address picker (saved addresses + new address form)
+  - Only skip if user provides FULL address with building, street, city, pincode, AND phone
+  - Updated 24 grocery/food delivery skills
+- Deployed and E2E verified on prod via Playwright MCP:
+  - ✅ "order milk and eggs from bigbasket, deliver to Tellapur Hyderabad" → agent shows address picker with "Confirm your delivery address and phone for BigBasket:"
+  - ✅ No fake product cards, no hallucinated prices
+  - ✅ After address selection → handoff → browser opens BigBasket → real OTP prompt
+
+**Files changed**:
+- `packages/agent-core/src/agent.ts` (updated — layout section validation for nested card_grid/carousel)
+- 24 grocery/food SKILL.md files (updated — Step 0: always confirm address & phone, no fake cards)
+- `docs/REPEATING-MISTAKES.md` (updated — anti-pattern #31: fake product cards + layout bypass)
+
+**Key decisions**:
+- Address is ALWAYS confirmed for delivery orders — area names are not enough
+- Phone is critical for delivery — address widget already captures it, skill just needs to trigger it
+- `agent.ts` validation is systemic safety net; SKILL.md changes are per-skill prevention
+- Two validation points needed: `agent.ts` (Cloud Run) + `bridge-mcp-server.ts` (relay/laptop)
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Cart UX E2E verified on prod (images + ProductCard + CartBar + L2 Panel)
 
 **Goal**: Verify the entire cart UX pipeline on production — carousel with real images, ProductCard widget, CartBar, and L2 Cart Panel.
