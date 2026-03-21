@@ -45,8 +45,12 @@ export class RelayBridge implements MCPHostLike {
    * Called by the custom server when a laptop WebSocket connects.
    */
   setLaptopSocket(ws: WebSocket): void {
-    // Close previous connection if any
+    // Close previous connection if any — but remove its listeners first
+    // to prevent the old close handler from clobbering state after we
+    // set up the new socket (race condition: old close fires async and
+    // sets connected=false even though the new socket is alive).
     if (this.laptopSocket) {
+      this.laptopSocket.removeAllListeners();
       this.laptopSocket.close();
     }
 
@@ -65,6 +69,8 @@ export class RelayBridge implements MCPHostLike {
     });
 
     ws.on('close', () => {
+      // Guard: only handle if this is still the active socket
+      if (this.laptopSocket !== ws) return;
       logger.info('RelayBridge: laptop disconnected — waiting 30s grace period before rejecting pending requests');
       this.laptopSocket = null;
       this.connected = false;
