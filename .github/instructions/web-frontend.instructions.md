@@ -16,9 +16,12 @@ applyTo: "apps/web/**"
 | `complete` | `{summary: string}` | Task finished |
 
 ### What the user does NOT see
-Internal tool calls and status labels are filtered before reaching chat UI:
-- `Browser: <toolname>`, raw tool names, status labels → filtered by `isInternalToolLabel()`
+Internal tool calls, status labels, and agent narration are filtered before reaching the chat UI via a two-tier architecture:
+- **Tier 1 (Regex)**: `shouldSuppressMessage()` catches ~90% instantly — tool labels, narration (`"I can see..."`, `"Let me click..."`), reasoning (`"Step 0 asks..."`). Splits multi-sentence messages, strips filler prefixes.
+- **Tier 2 (AI rewrite)**: `MessageRewriter` sends ambiguous messages through a lightweight LLM (`gpt-4o-mini`) that either SUPPRESSes or rewrites into clean user-facing text.
 - Tool execution events → `mcpToolEvents` log stream, not SSE
+- Regex filter: `packages/shared/src/internal-message-filter.ts`
+- AI rewriter: `packages/agent-core/src/message-rewriter.ts`
 
 ## AgentCallbacks (execute route → SSE stream)
 

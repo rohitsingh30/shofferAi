@@ -336,18 +336,32 @@ The agent streams events to the frontend via Server-Sent Events:
 
 ### What the User Does NOT See
 
-Internal tool calls and status labels are **filtered out** before reaching the chat UI:
+Internal tool calls, status labels, and agent narration are **filtered out** before reaching the chat UI via a **two-tier filtering architecture**:
 
 | Suppressed Pattern | Example | Where Logged Instead |
 |---|---|---|
 | `Browser: <toolname>` | `Browser: report_intent` | `logger.info` in relay terminal |
 | Raw tool names | `browser_navigate`, `mcp__playwright__browser_click` | `logger.info` in relay terminal |
 | Status labels | `Agent starting...`, `Thinking...` | `logger.info` in relay terminal |
+| Agent narration | `I can see the page...`, `Let me click...` | `logger.debug` in relay terminal |
+| Internal reasoning | `We need to...`, `Step 0 asks...` | `logger.debug` in relay terminal |
 | Tool execution events | `assistant.tool_call`, `tool.execution_start` | `mcpToolEvents` → MCP log stream (dynamic port, printed in relay logs) |
 
-**Three-layer filtering** prevents internal details from reaching users:
-1. **task-manager.ts**: `isInternalToolLabel()` filters `assistant.message` events at the source
-2. **execute/route.ts**: Defense-in-depth filter on `task_progress` before sending SSE
-3. **ChatInterface.tsx**: Frontend hides `step_update` events with `status: 'running'`
+**Two-tier filtering architecture:**
 
-The shared filter lives in `packages/shared/src/internal-message-filter.ts`.
+**Tier 1 — Regex fast path** (`shouldSuppressMessage()` in `packages/shared/src/internal-message-filter.ts`):
+- Catches ~90% of internal messages instantly (free, <1ms)
+- Splits multi-sentence messages on `.!?` boundaries, tests each sentence independently
+- Strips filler prefixes ("Good,", "Got it,", "OK so") before pattern matching
+- 100+ patterns across 7 categories: observational, action, status, third-person, browser internals, reasoning, chain-of-thought
+- Applied at 5 gates: task-manager.ts → bridge-mcp-server.ts → agent.ts → execute/route.ts → ChatInterface.tsx
+
+**Tier 2 — AI rewrite layer** (`MessageRewriter` in `packages/agent-core/src/message-rewriter.ts`):
+- Messages that pass the regex go through a lightweight LLM call (~200ms)
+- LLM classifies: SUPPRESS (internal) or rewrites into clean 1-2 sentence user-facing text
+- Uses `REWRITER_MODEL` env var (default: `LLM_MODEL`) — configure a fast/cheap model like `gpt-4o-mini`
+- Integrated in `execute/route.ts` at both message paths (relay `task_progress` + chat-only `onMessage`)
+- Fallback: if LLM fails, original message passes through (already cleared regex)
+
+The shared regex filter lives in `packages/shared/src/internal-message-filter.ts`.
+The AI rewriter lives in `packages/agent-core/src/message-rewriter.ts`.

@@ -159,7 +159,7 @@ sequenceDiagram
         Agent->>LLM: chat.completions.create(messages)
         LLM-->>Agent: tool_call: browse_website(url, instruction)
         Agent-->>UI: SSE: {type: "step", content: "Searching hotels..."}
-        Note over Agent,UI: Internal tool calls (browser_navigate, browser_snapshot) are<br/>filtered by isInternalToolLabel() — only natural language reaches the user
+        Note over Agent,UI: Internal messages filtered by two-tier architecture:<br/>1) Regex shouldSuppressMessage() catches ~90% instantly<br/>2) AI MessageRewriter rewrites/suppresses the rest via LLM
         Agent->>SMCP: callTool("browser_snapshot", {sessionId})
         SMCP->>SMCP: Inject sessionId into args
         SMCP->>Relay: callTool(name, args + sessionId)
@@ -182,6 +182,7 @@ sequenceDiagram
 | Class | File | Role |
 |-------|------|------|
 | **AgentExecutor** | `packages/agent-core/src/agent.ts` | LLM loop (max 50 iterations), skill matching, tool dispatch |
+| **MessageRewriter** | `packages/agent-core/src/message-rewriter.ts` | AI rewrite layer — classifies browser agent messages via LLM, suppresses narration or rewrites into user-facing text |
 | **ConversationManager** | `packages/agent-core/src/conversation.ts` | Message history (max 20 messages, tool results truncated to 4000 chars) |
 | **AzureOpenAIClient** | `packages/agent-core/src/azure-openai-client.ts` | Azure OpenAI via `openai` npm package, translates internal Anthropic format ↔ OpenAI API |
 | **SessionMCPHost** | `apps/web/lib/session-mcp-host.ts` | Per-task wrapper, injects `sessionId` for tab isolation |
@@ -520,7 +521,7 @@ shofferai/
 │   │   ├── app/
 │   │   │   ├── api/
 │   │   │   │   ├── agent/
-│   │   │   │   │   ├── execute/route.ts  ← SSE entry point + isInternalToolLabel() filter
+│   │   │   │   │   ├── execute/route.ts  ← SSE entry point + MessageRewriter (AI rewrite layer)
 │   │   │   │   │   └── input/route.ts    ← User input (OTP, confirmations)
 │   │   │   │   ├── payments/             ← Razorpay create-order + verify
 │   │   │   │   ├── auth/                 ← NextAuth
@@ -574,6 +575,7 @@ shofferai/
 │   ├── agent-core/                        ← LLM Agent Logic (cloud only)
 │   │   └── src/
 │   │       ├── agent.ts                   ← AgentExecutor (LLM loop, tool dispatch)
+│   │       ├── message-rewriter.ts        ← MessageRewriter (AI rewrite layer for browser messages)
 │   │       ├── azure-openai-client.ts     ← AzureOpenAIClient (openai npm + Azure)
 │   │       ├── conversation.ts            ← ConversationManager (max 20 msgs)
 │   │       ├── prompts/system.ts          ← buildSystemPrompt() with lessons
@@ -591,7 +593,7 @@ shofferai/
 │           ├── mcp.ts                     ← MCPHostLike interface, MCPTool
 │           ├── agent.ts                   ← TaskStatus, StepStatus enums
 │           ├── credentials.ts             ← CardData, UPIData, SiteLoginData types
-│           ├── internal-message-filter.ts ← isInternalToolLabel() — shared filter for chat UI
+│           ├── internal-message-filter.ts ← shouldSuppressMessage() — regex fast path for message filtering
 │           ├── logger.ts                  ← Structured logger
 │           └── errors.ts                  ← Custom error classes
 │

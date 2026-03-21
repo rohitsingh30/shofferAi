@@ -51,18 +51,30 @@ Script needs OTP → stdout: {"type":"need_input","prompt":"Enter OTP"}
 ScriptPlayer → ask_user → user responds → stdin: {"type":"input","value":"123456"}
 ```
 
-## Message Filtering (3 layers)
+## Message Filtering (Two-Tier Architecture)
 
-Only natural language messages reach the chat UI. Internal tool labels are filtered:
-1. **task-manager.ts**: `isInternalToolLabel()` filters `assistant.message` events
-2. **execute/route.ts**: defense-in-depth filter on `task_progress` before SSE
-3. **ChatInterface.tsx**: frontend hides `step_update` with `status: 'running'`
+Browser agent messages pass through a **two-tier filtering architecture** before reaching the user:
+
+**Tier 1 — Regex fast path** (`shouldSuppressMessage()` in `packages/shared/src/internal-message-filter.ts`):
+- Catches ~90% of internal messages instantly (free, <1ms)
+- Splits multi-sentence messages on `.!?` boundaries, tests each sentence
+- Strips filler prefixes ("Good,", "Got it,", "OK so") before pattern matching
+- 100+ patterns: observations, actions, status, reasoning, browser internals
+- Applied at 5 gates: task-manager.ts → bridge-mcp-server.ts → agent.ts → execute/route.ts → ChatInterface.tsx
+
+**Tier 2 — AI rewrite layer** (`MessageRewriter` in `packages/agent-core/src/message-rewriter.ts`):
+- Messages passing regex go through a lightweight LLM call (~200ms via `gpt-4o-mini`)
+- LLM either SUPPRESSes or rewrites into clean 1-2 sentence user-facing text
+- Integrated in `execute/route.ts` at both relay and chat-only message paths
+- Uses `REWRITER_MODEL` env var (defaults to `LLM_MODEL`)
+- Fallback: if LLM fails, original message passes through
 
 Tool execution events → `mcpToolEvents` → MCP log stream (dynamic port), NOT user chat.
 
-Suppressed patterns: `"Browser: report_intent"`, `"browser_snapshot"`, `"mcp__playwright__browser_click"`, `"Agent starting..."`, all raw tool names.
+Suppressed patterns include: `"Browser: report_intent"`, `"browser_snapshot"`, all raw tool names, agent narration (`"I can see..."`, `"Let me click..."`), internal reasoning (`"Step 0 asks..."`, `"We need..."`).
 
-Shared filter: `packages/shared/src/internal-message-filter.ts`
+Shared regex filter: `packages/shared/src/internal-message-filter.ts`
+AI rewriter: `packages/agent-core/src/message-rewriter.ts`
 
 ## Key Interfaces
 

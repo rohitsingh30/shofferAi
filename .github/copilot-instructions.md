@@ -44,6 +44,7 @@ apps/playwright/             → Browser automation (Operator Laptop)
 
 packages/agent-core/         → LLM agent logic (cloud only)
   src/agent.ts               → AgentExecutor — LLM loop, tool dispatch
+  src/message-rewriter.ts    → MessageRewriter — AI rewrite layer for browser agent messages
   src/conversation.ts        → ConversationManager (max 20 msgs, 4000 char truncation)
   src/skills/                → 500 skill definitions (SKILL.md), loader, matchSkill()
   src/scripts/               → ScriptRecorder/Compiler/Player — cached execution
@@ -76,6 +77,7 @@ gcloud builds submit --config cloudbuild.yaml  # Deploy to Cloud Run
 - `.env` at root — see `.env.example`
 - `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` — LLM access
 - `LLM_MODEL` — Azure deployment name (default `gpt-5.1-chat`)
+- `REWRITER_MODEL` — Optional fast/cheap model for message rewriting (default: `LLM_MODEL`). Set to `gpt-4o-mini` for cost savings.
 - `RELAY_MODE=local` for dev, `RELAY_MODE=cloud` for production
 - Dev server :3000, relay :8765 (dev). TaskManager bridge: dynamic port 9400-9499 (printed in logs).
 
@@ -177,5 +179,6 @@ Every Copilot CLI session MUST follow these rules:
 - `docs/ARCHITECTURE.md` — System architecture with Mermaid diagrams
 - `docs/WORKFLOWS.md` — E2E workflow docs per skill (Booking.com, Blinkit, Zomato)
 - `docs/DEPLOYMENT.md` — Cloud Run vs laptop, startup guide, LaunchAgent setup
+- `docs/MESSAGE-REWRITE-LAYER.md` — Two-tier message filtering architecture (regex + AI rewrite)
 - `docs/PRD.md` — Product requirements
 - `docs/SESSION-LOG.md` — Development session log (review & feedback loop)
