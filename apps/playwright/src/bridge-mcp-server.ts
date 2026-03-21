@@ -241,6 +241,25 @@ mcpServer.registerTool(
       product: product as BridgeAskUserMessage['product'],
     };
 
+    // ── Image validation: bounce back if carousel/card_grid/product_card lacks real image URLs ──
+    if (inputType === 'carousel' || inputType === 'card_grid') {
+      const cardsList = cards as Array<{ id: string; image?: string }> | undefined;
+      const hasRealImages = cardsList?.some(c => c.image?.startsWith('http'));
+      if (cardsList && cardsList.length > 0 && !hasRealImages) {
+        return {
+          content: [{ type: 'text' as const, text: '[SYSTEM: Your carousel/card_grid cards are missing real image URLs — they have emoji or placeholder text instead. Take a browser_snapshot of the current page, find the <img> src URLs for each product card, then re-call ask_user with the image field set to the actual https:// URL for each card. Do NOT use emoji or placeholder text.]' }],
+        };
+      }
+    }
+    if (inputType === 'product_card') {
+      const prod = product as { image?: string } | undefined;
+      if (prod && !prod.image?.startsWith('http')) {
+        return {
+          content: [{ type: 'text' as const, text: '[SYSTEM: Your product_card is missing an image URL. Take a browser_snapshot, find the product image <img> src URL, then re-call ask_user with product.image set to the actual https:// URL.]' }],
+        };
+      }
+    }
+
     sendToTaskManager(msg);
 
     try {

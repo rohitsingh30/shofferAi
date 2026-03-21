@@ -212,20 +212,38 @@ function ChatInterfaceInner() {
           description: event.payload.description as string | undefined,
         });
         break;
-      case 'complete':
+      case 'complete': {
+        const summary = event.payload.summary as string | undefined;
+        // Always show the completion summary as a message so users see the result
+        if (summary) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              role: 'assistant',
+              content: summary,
+            },
+          ]);
+        }
         setCurrentSteps([]);
         break;
-      case 'error':
+      }
+      case 'error': {
+        const errorText = event.payload.error as string;
+        const errorCode = event.payload.code as string | undefined;
+        const errorTaskId = event.payload.taskId as string | undefined;
+        const ref = errorTaskId ? ` (${errorCode || 'ERR'}:${errorTaskId.slice(-8)})` : '';
         setMessages((prev) => [
           ...prev,
           {
             id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             role: 'assistant',
-            content: `I ran into an issue: ${event.payload.error}`,
+            content: `Something went wrong: ${errorText}${ref}`,
           },
         ]);
         setCurrentSteps([]);
         break;
+      }
     }
   }, [openL2]);
 

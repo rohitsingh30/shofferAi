@@ -36,25 +36,20 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Collect missing information
-**EXTRACT FIRST**: If the user already mentioned items in their message, use those directly — do NOT ask again.
-Only call `ask_user` for information NOT already in the user's message.
+### Step 0: Collect delivery address
+**EXTRACT FIRST**: Parse the user's message for items AND address. Use whatever they already provided — do NOT re-ask.
 
-- If items ARE in the message but address is NOT → call `ask_user` with `input_type: "layout"` with ONE section: **address** (type: "address", required). Show saved addresses if available.
-- If BOTH items and address are missing → call `ask_user` with `input_type: "layout"` and two sections:
-  1. **address** (type: "address", required): Ask for delivery address. Show saved addresses if available.
-  2. **items** (type: "card_grid", required): Show common items as cards with emoji. Enable quantity steppers and custom item input.
-
-**CRITICAL**: Do NOT open the browser until you have both the delivery address and at least one item. Without a delivery location, BigBasket shows ZERO products and opens a location-select popup immediately.
-
-### 1. Get Delivery Address
-- BEFORE opening the browser, check if user provided an address.
-- If not, use `ask_user` with `input_type: "address"`: "What's your delivery address or area name?" Include saved addresses if available:
+- If address is missing → call `ask_user` with `input_type: "address"`, question: "What's your delivery address or area name?". Show saved addresses if available:
   ```json
   {"input_type": "address", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
   ```
+- If address is already provided → skip directly to `handoff_to_browser_agent`.
+- **Do NOT ask for items** — extract them from the user's message. If truly missing, handoff anyway and let the browser agent figure it out.
+- **Do NOT show product cards, prices, or images** — the cloud LLM has no access to BigBasket's catalog. Only the browser agent can fetch real product data.
 
-### 2. Open BigBasket & Dismiss Location Popup
+**CRITICAL**: Do NOT open the browser until you have the delivery address. Without a delivery location, BigBasket shows ZERO products and opens a location-select popup immediately.
+
+### 1. Open BigBasket & Dismiss Location Popup
 - Open a NEW tab and navigate to `https://www.bigbasket.com`.
 - Take snapshot immediately.
 - **Location popup auto-appears**: BigBasket shows a `menu "Delivery in 10 mins Select Location"` overlay with text "Select a location for delivery" and "Choose your address location to see product availability and delivery options".

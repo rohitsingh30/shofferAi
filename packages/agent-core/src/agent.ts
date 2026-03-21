@@ -827,19 +827,34 @@ export class AgentExecutor {
       }
 
       // ── Image validation for visual widgets ──────────────────────────
-      // Carousel and product_card MUST have real image URLs. If the LLM
-      // used emoji placeholders or omitted images, bounce it back to
-      // extract real URLs from the page before showing the user.
+      // Carousel, card_grid, and product_card MUST have real image URLs.
+      // If the LLM used emoji placeholders or omitted images, bounce it
+      // back to extract real URLs from the page before showing the user.
+      // Also validates card_grids nested inside layout sections.
       const inputType = args.input_type as string;
+      const BOUNCE_MSG_CARDS = '[SYSTEM: Your carousel cards are missing image URLs. Take a browser_snapshot of the current page, extract the real product image URLs (src of <img> elements in each product card), then re-call ask_user with the image field set to the actual https:// URL for each card. Do NOT use emoji or placeholder text — use the real image URL from the page.]';
+      const BOUNCE_MSG_PRODUCT = '[SYSTEM: Your product_card is missing an image URL. Take a browser_snapshot, extract the real product image URL (https://...) from the product page, then re-call ask_user with product.image set to the actual URL.]';
+
+      const cardsLackImages = (cards: Array<{ id: string; image?: string }> | undefined): boolean =>
+        !!(cards && cards.length > 0 && !cards.some(c => c.image?.startsWith('http')));
+
       if (inputType === 'carousel' || inputType === 'card_grid') {
         const cards = args.cards as Array<{ id: string; image?: string }> | undefined;
-        const hasImages = cards?.some(c => c.image?.startsWith('http'));
-        if (cards && cards.length > 0 && !hasImages) {
+        if (cardsLackImages(cards)) {
           logger.warn('ask_user carousel/card_grid missing image URLs — bouncing back to LLM');
-          this.askUserCount--; // don't count this failed attempt
-          return {
-            userResponse: '[SYSTEM: Your carousel cards are missing image URLs. Take a browser_snapshot of the current page, extract the real product image URLs (src of <img> elements in each product card), then re-call ask_user with the image field set to the actual https:// URL for each card. Do NOT use emoji or placeholder text — use the real image URL from the page.]',
-          };
+          this.askUserCount--;
+          return { userResponse: BOUNCE_MSG_CARDS };
+        }
+      }
+      // Validate card_grids/carousels nested inside layout sections
+      if (inputType === 'layout') {
+        const sections = args.sections as Array<{ type?: string; cards?: Array<{ id: string; image?: string }> }> | undefined;
+        for (const section of sections ?? []) {
+          if ((section.type === 'card_grid' || section.type === 'carousel') && cardsLackImages(section.cards)) {
+            logger.warn(`ask_user layout section type=${section.type} missing image URLs — bouncing back to LLM`);
+            this.askUserCount--;
+            return { userResponse: BOUNCE_MSG_CARDS };
+          }
         }
       }
       if (inputType === 'product_card') {
@@ -847,9 +862,7 @@ export class AgentExecutor {
         if (product && !product.image?.startsWith('http')) {
           logger.warn('ask_user product_card missing image URL — bouncing back to LLM');
           this.askUserCount--;
-          return {
-            userResponse: '[SYSTEM: Your product_card is missing an image URL. Take a browser_snapshot, extract the real product image URL (https://...) from the product page, then re-call ask_user with product.image set to the actual URL.]',
-          };
+          return { userResponse: BOUNCE_MSG_PRODUCT };
         }
       }
 

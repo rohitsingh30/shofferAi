@@ -74,6 +74,9 @@ export async function POST(request: Request) {
       const encoder = new TextEncoder();
 
       let streamClosed = false;
+      // Track pending rewriter promises so we can flush before closing the stream.
+      // Without this, async rewriter .then() fires AFTER controller.close() → message lost.
+      const pendingRewrites: Promise<void>[] = [];
 
       function send(type: string, payload: Record<string, unknown>) {
         if (streamClosed) return;
@@ -225,7 +228,7 @@ export async function POST(request: Request) {
         // Accumulate progress messages for InputEnricher context
         const progressMessages: string[] = [];
 
-        const handleTaskEvent = (msg: TaskRelayMessage) => {
+        const handleTaskEvent = async (msg: TaskRelayMessage) => {
           // Only handle events for this task
           if ('taskId' in msg && msg.taskId !== taskId) return;
 
@@ -238,7 +241,7 @@ export async function POST(request: Request) {
                 progressMessages.push(msg.message);
 
                 // Two-tier filter: regex fast path + AI rewrite layer
-                getMessageRewriter().rewrite(msg.message).then(rewritten => {
+                const rewriteP = getMessageRewriter().rewrite(msg.message).then(rewritten => {
                   if (rewritten) {
                     send('message', { content: rewritten });
                     workflowEngine.addMessage(taskId, 'assistant', rewritten)
@@ -249,6 +252,7 @@ export async function POST(request: Request) {
                   // Fallback: send original message if rewriter fails
                   send('message', { content: msg.message });
                 });
+                pendingRewrites.push(rewriteP);
               }
               break;
 
@@ -391,7 +395,11 @@ export async function POST(request: Request) {
 
             case 'task_complete':
               console.log('[execute] taskId=%s TASK_COMPLETE: %s', taskId, msg.summary?.slice(0, 120));
-              send('complete', { summary: msg.summary });
+              // Flush pending rewriter promises so no messages are lost
+              if (pendingRewrites.length > 0) {
+                await Promise.allSettled(pendingRewrites);
+              }
+              send('complete', { summary: msg.summary, taskId });
               workflowEngine.addMessage(taskId, 'assistant', msg.summary, { type: 'task_complete' })
                 .catch(e => console.error('[execute] DB addMessage(task_complete) failed:', e));
               workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB error:', e));
@@ -405,7 +413,11 @@ export async function POST(request: Request) {
 
             case 'task_error':
               console.error('[execute] taskId=%s TASK_ERROR: %s', taskId, msg.error);
-              send('error', { error: msg.error });
+              // Flush pending rewriter promises so no messages are lost
+              if (pendingRewrites.length > 0) {
+                await Promise.allSettled(pendingRewrites);
+              }
+              send('error', { error: msg.error, taskId, code: 'BROWSER_ERROR' });
               workflowEngine.addMessage(taskId, 'assistant', `Error: ${msg.error}`, {
                 type: 'task_error', recoverable: msg.recoverable,
               }).catch(e => console.error('[execute] DB addMessage(task_error) failed:', e));
@@ -430,7 +442,7 @@ export async function POST(request: Request) {
           onMessage(content) {
             console.log('[execute] taskId=%s message: %s', taskId, content?.slice(0, 100));
             // Two-tier filter: regex fast path + AI rewrite layer
-            getMessageRewriter().rewrite(content).then(rewritten => {
+            const rewriteP = getMessageRewriter().rewrite(content).then(rewritten => {
               if (rewritten) {
                 send('message', { content: rewritten });
                 workflowEngine.addMessage(taskId, 'assistant', rewritten).catch(e => console.error('[execute] DB addMessage failed:', e));
@@ -440,6 +452,7 @@ export async function POST(request: Request) {
               // Fallback: send original message if rewriter fails
               send('message', { content });
             });
+            pendingRewrites.push(rewriteP);
           },
           onStepUpdate(step) {
             console.log('[execute] taskId=%s step_update: %o', taskId, step);
@@ -529,7 +542,7 @@ export async function POST(request: Request) {
               return;
             }
             console.log('[execute] taskId=%s COMPLETE: %s', taskId, summary?.slice(0, 120));
-            send('complete', { summary });
+            send('complete', { summary, taskId });
             workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB updateStatus failed:', e));
             taskTimer.end({ success: true, metadata: { skillName: agent.matchedSkill?.name } });
             lat.endPhase('llm_chat');
@@ -537,7 +550,7 @@ export async function POST(request: Request) {
           },
           onError(error) {
             console.error('[execute] taskId=%s ERROR: %s', taskId, error);
-            send('error', { error });
+            send('error', { error, taskId, code: 'AGENT_ERROR' });
             workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB updateStatus failed:', e));
             taskTimer.end({ success: false, metadata: { error } });
             lat.finish(false, { error, completedVia: 'chat' });
@@ -599,7 +612,7 @@ export async function POST(request: Request) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         const stack = error instanceof Error ? error.stack : '';
         console.error('[execute] taskId=%s FATAL ERROR: %s\n%s', taskId, errorMsg, stack);
-        send('error', { error: errorMsg });
+        send('error', { error: errorMsg, taskId, code: 'FATAL_ERROR' });
         await workflowEngine.updateTaskStatus(taskId, 'failed');
         taskTimer.end({ success: false, metadata: { error: errorMsg } });
         lat.finish(false, { error: errorMsg, completedVia: 'fatal_error' });
@@ -609,6 +622,11 @@ export async function POST(request: Request) {
           // task_complete or task_error from the laptop will close the stream.
           console.log('[execute] taskId=%s agent.execute() finished, handoff active — stream stays open (heartbeat running)', taskId);
         } else {
+          // Flush any pending rewriter promises before closing — prevents the race
+          // where async rewriter .then() fires after controller.close()
+          if (pendingRewrites.length > 0) {
+            await Promise.allSettled(pendingRewrites);
+          }
           clearInterval(heartbeatTimer);
           if (taskEventCleanup) taskEventCleanup();
           console.log('[execute] taskId=%s stream closing', taskId);
