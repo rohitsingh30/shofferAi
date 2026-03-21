@@ -12,6 +12,7 @@ import type {
   TaskHandoffMessage,
   TaskInputResponseMessage,
   TaskPaymentResponseMessage,
+  TaskCancelMessage,
 } from '@shofferai/shared';
 import { shouldSuppressMessage } from '@shofferai/shared';
 
@@ -110,6 +111,37 @@ export async function POST(request: Request) {
       // When true, the stream must stay open for laptop events (task_progress,
       // task_complete, task_error) — the finally block must NOT close it.
       let handoffSent = false;
+
+      // ─── SSE disconnect detection ──────────────────────────────────
+      // When the user closes the chat tab or navigates away, request.signal
+      // fires 'abort'. If a handoff is active, send task_cancel to the laptop
+      // so it kills the Copilot CLI + Chrome immediately instead of waiting
+      // for the 10-minute task timeout.
+      request.signal.addEventListener('abort', () => {
+        console.log('[execute] taskId=%s SSE client disconnected (request aborted)', taskId);
+        streamClosed = true;
+
+        if (handoffSent) {
+          try {
+            const cancelMsg: TaskCancelMessage = {
+              id: randomUUID(),
+              type: 'task_cancel',
+              taskId,
+              reason: 'client_disconnected',
+            };
+            remoteMcpHost.sendTaskMessage(cancelMsg);
+            console.log('[execute] taskId=%s sent task_cancel to laptop relay', taskId);
+          } catch (e) {
+            console.warn('[execute] taskId=%s failed to send task_cancel:', taskId, e);
+          }
+        }
+
+        // Clean up SSE resources
+        clearInterval(heartbeatTimer);
+        if (taskEventCleanup) taskEventCleanup();
+        workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
+        try { controller.close(); } catch { /* already closed */ }
+      });
 
       try {
         // Don't eagerly connect relay — chat LLM can ask clarifying questions without it.

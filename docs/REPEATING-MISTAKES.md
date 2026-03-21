@@ -462,4 +462,20 @@ These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitch
 
 ---
 
+## 29. Orphaned Copilot CLI + Chrome After Chat Disconnect
+
+**What happens:** When the user closes the chat tab, navigates away, or the request times out, the Copilot CLI process and Chrome window spawned on the laptop keep running for up to 10 minutes (task timeout). Wastes resources, leaves orphaned Chrome windows.
+
+**Root cause:** The SSE execute route detected client disconnection (`streamClosed = true`) but never sent a `task_cancel` message to the laptop relay. The relay protocol already defined `task_cancel` and the laptop-side handler was wired up — it just never received the signal.
+
+**The fix (2026-03-21):**
+1. Added `request.signal` abort listener in `execute/route.ts`
+2. On abort: sends `task_cancel` to laptop relay if a handoff is active
+3. Laptop relay forwards to `TaskManager.cancelTask()` which kills Copilot CLI + cleans up Chrome
+4. Heartbeat, event listener, and stream are cleaned up immediately
+
+**Rule:** Every task lifecycle MUST have a cleanup path for client disconnection. If the client goes away, the laptop must know immediately. The `task_cancel` relay message is the mechanism — it MUST be sent on SSE disconnect when `handoffSent === true`.
+
+---
+
 *Last updated: 2026-03-21*
