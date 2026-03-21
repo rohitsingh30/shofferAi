@@ -306,6 +306,9 @@ export async function POST(request: Request) {
                 workflowEngine.addMessage(taskId, 'assistant', enriched.question, {
                   type: 'input_required', inputType: enriched.inputType, stepId: msg.stepId,
                   options: enriched.options ?? msg.options, cards: enriched.cards ?? msg.cards,
+                  product: enriched.product ?? msg.product, saved: msg.saved,
+                  counters: msg.counters, sections: msg.sections,
+                  show_quantity: msg.show_quantity, multi_select: msg.multi_select,
                 }).catch(e => console.error('[execute] DB addMessage(task_input_required) failed:', e));
               };
 
@@ -334,6 +337,7 @@ export async function POST(request: Request) {
                 // Persist the user's response
                 workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
                   type: 'input_response', stepId: msg.stepId, inputType: msg.inputType,
+                  shownOptions: msg.options, shownCards: msg.cards, shownProduct: msg.product,
                 }).catch(e => console.error('[execute] DB addMessage(task_input_response) failed:', e));
 
                 const inputMsg: TaskInputResponseMessage = {
@@ -460,8 +464,13 @@ export async function POST(request: Request) {
           },
           async onInputRequired(request) {
             console.log('[execute] taskId=%s INPUT_REQUIRED stepId=%s type=%s q=%s', taskId, request.stepId, request.inputType, request.question?.slice(0, 80));
-            // Save the ask_user prompt as an assistant message
-            workflowEngine.addMessage(taskId, 'assistant', request.question || '[input requested]', { inputType: request.inputType, stepId: request.stepId, options: request.options }).catch(e => console.error('[execute] DB addMessage(ask) failed:', e));
+            // Save the ask_user prompt with full rich UI context for task-analyser
+            workflowEngine.addMessage(taskId, 'assistant', request.question || '[input requested]', {
+              inputType: request.inputType, stepId: request.stepId,
+              options: request.options, cards: request.cards, product: request.product,
+              saved: request.saved, counters: request.counters, sections: request.sections,
+              show_quantity: request.show_quantity, multi_select: request.multi_select,
+            }).catch(e => console.error('[execute] DB addMessage(ask) failed:', e));
             send('input_required', {
               taskId,
               stepId: request.stepId,
@@ -489,8 +498,11 @@ export async function POST(request: Request) {
             const response = await pauseManager.waitForInput({ ...request, taskId });
             lat.endPhase('user_input_wait', { inputType: request.inputType, stepId: request.stepId });
             console.log('[execute] taskId=%s input received for stepId=%s', taskId, request.stepId);
-            // Save user's response
-            workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', { stepId: request.stepId, inputType: request.inputType }).catch(e => console.error('[execute] DB addMessage(input) failed:', e));
+            // Save user's response with context about what was shown
+            workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
+              stepId: request.stepId, inputType: request.inputType,
+              shownOptions: request.options, shownCards: request.cards, shownProduct: request.product,
+            }).catch(e => console.error('[execute] DB addMessage(input) failed:', e));
             return response;
           },
           async onConfirmRequired(details) {
