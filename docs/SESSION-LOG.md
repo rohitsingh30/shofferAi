@@ -4,6 +4,42 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Razorpay Payment Integration + Session Affinity Fix
+
+**Goal**: Configure Razorpay test keys, fix stepId mismatch bug in payment verify flow, and enable Cloud Run session affinity to fix multi-instance pending input loss.
+
+**What was done**:
+- Configured Razorpay test mode keys (`rzp_test_...`) on Cloud Run via `gcloud run services update`
+- Fixed stepId bug: `verify/route.ts` was hardcoding `'payment'` as stepId, but laptop-initiated payments use UUID stepIds. Threaded stepId through: SSE event → L2PaymentData → PaymentPanel → verify endpoint → PauseResumeManager
+- Diagnosed Cloud Run multi-instance bug: SSE stream on instance A, POST `/api/agent/input` hitting instance B with different in-memory `pendingInputs` Map → "No pending input found" 404s
+- Enabled Cloud Run session affinity (`--session-affinity`) to route all requests from same client to same instance
+- Restarted laptop relay after revision deployments
+
+**Verified**:
+- ✅ Payment panel rendered with product details (₹1,499 OPPO Enco Buds3 Pro) in previous test
+- ✅ InputEnricher transforms bare ask_user → card_grid/product_card/carousel (multiple tests)
+- ✅ SIGSTOP/SIGCONT works across multiple rounds
+- ⏳ Full Razorpay checkout (test payment → verify → agent resume) not yet tested E2E due to transient SSE drops and agent behavior variance
+
+**Files changed**:
+- `apps/web/components/chat/L2PaymentContext.tsx` (updated — added `stepId` to L2PaymentData)
+- `apps/web/components/chat/ChatInterface.tsx` (updated — pass stepId from SSE event)
+- `apps/web/components/chat/PaymentPanel.tsx` (updated — send stepId to verify endpoint)
+- `apps/web/app/api/payments/verify/route.ts` (updated — use stepId from request, default 'payment')
+
+**Key decisions**:
+- Session affinity over Redis: simpler for early stage, sufficient for single-user testing
+- maxScale=3 kept (didn't reduce to 1) — session affinity handles routing
+- stepId threaded through frontend rather than stored in Payment DB model (no migration needed)
+
+**Remaining for full E2E payment test**:
+- Agent sometimes completes prematurely (sends `task_complete` after loading Flipkart without searching)
+- SSE streams drop intermittently (task continues on laptop but UI resets to home)
+- These are separate from payment code — payment infrastructure is complete
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Fix fake product cards + always confirm address & phone
 
 **Goal**: Fix BigBasket (and all grocery/food skills) showing hallucinated product cards before browsing, and ensure address is always confirmed even when user provides a partial location.
