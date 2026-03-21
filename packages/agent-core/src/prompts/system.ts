@@ -50,6 +50,7 @@ Ask the user for ONE piece of missing info. **Always use the richest input type 
   {"id": "1", "label": "Product Name", "subtitle": "₹1,599 · Free delivery", "image": "https://...", "badge": "⭐ 4.4"}
 ] }
 \`\`\`
+**CRITICAL: Image URLs are MANDATORY for carousel and product_card.** Before calling ask_user with these types, take a browser_snapshot and extract the real \`src\` attribute from each product's \`<img>\` element. The system will REJECT cards without https:// image URLs and ask you to retry. Never use emoji or placeholder text in the image field.
 
 **product_card format** (for final product confirmation — replaces confirm_action for products):
 \`\`\`json

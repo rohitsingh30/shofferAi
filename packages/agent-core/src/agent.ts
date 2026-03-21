@@ -826,6 +826,33 @@ export class AgentExecutor {
         };
       }
 
+      // ── Image validation for visual widgets ──────────────────────────
+      // Carousel and product_card MUST have real image URLs. If the LLM
+      // used emoji placeholders or omitted images, bounce it back to
+      // extract real URLs from the page before showing the user.
+      const inputType = args.input_type as string;
+      if (inputType === 'carousel' || inputType === 'card_grid') {
+        const cards = args.cards as Array<{ id: string; image?: string }> | undefined;
+        const hasImages = cards?.some(c => c.image?.startsWith('http'));
+        if (cards && cards.length > 0 && !hasImages) {
+          logger.warn('ask_user carousel/card_grid missing image URLs — bouncing back to LLM');
+          this.askUserCount--; // don't count this failed attempt
+          return {
+            userResponse: '[SYSTEM: Your carousel cards are missing image URLs. Take a browser_snapshot of the current page, extract the real product image URLs (src of <img> elements in each product card), then re-call ask_user with the image field set to the actual https:// URL for each card. Do NOT use emoji or placeholder text — use the real image URL from the page.]',
+          };
+        }
+      }
+      if (inputType === 'product_card') {
+        const product = args.product as { image?: string } | undefined;
+        if (product && !product.image?.startsWith('http')) {
+          logger.warn('ask_user product_card missing image URL — bouncing back to LLM');
+          this.askUserCount--;
+          return {
+            userResponse: '[SYSTEM: Your product_card is missing an image URL. Take a browser_snapshot, extract the real product image URL (https://...) from the product page, then re-call ask_user with product.image set to the actual URL.]',
+          };
+        }
+      }
+
       // Do NOT send onStepUpdate here — it renders a TaskProgress card that
       // hides the interactive InputPrompt. Only onInputRequired is needed.
       const inputStart = Date.now();
