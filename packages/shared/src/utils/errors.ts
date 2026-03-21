@@ -50,22 +50,22 @@ export class UserInputTimeoutError extends ShofferAIError {
 
   private static friendlyMessage(inputType?: string, timeoutMs?: number): string {
     const mins = timeoutMs ? Math.round(timeoutMs / 60_000) : undefined;
-    const within = mins ? ` within ${mins} minutes` : '';
+    const limit = mins ? ` after ${mins} minutes` : '';
     switch (inputType) {
       case 'carousel':
       case 'card_grid':
       case 'product_card':
-        return `No product selected${within} — task ended`;
+        return `I didn't hear back on the product selection${limit}, so I've ended this task. Feel free to start a new chat whenever you're ready!`;
       case 'payment':
-        return `Payment not completed${within} — task ended`;
+        return `The payment wasn't completed${limit}, so I've paused this task. Start a new chat to try again!`;
       case 'confirmation':
-        return `Confirmation not received${within} — task ended`;
+        return `I didn't get a confirmation${limit}, so I've ended this task. Just start a new chat when you're ready!`;
       case 'otp':
-        return `OTP not entered${within} — task ended`;
+        return `The OTP wasn't entered${limit}, so I couldn't continue. Start a new chat to try again!`;
       case 'address':
-        return `Address not provided${within} — task ended`;
+        return `I still need your address to continue. The task timed out${limit} — start a new chat when you're ready!`;
       default:
-        return `No response received${within} — task ended`;
+        return `I didn't hear back${limit}, so I've ended this task. Feel free to start a new chat whenever you're ready!`;
     }
   }
 }

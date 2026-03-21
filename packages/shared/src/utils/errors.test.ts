@@ -95,7 +95,8 @@ describe('WorkflowError', () => {
 describe('UserInputTimeoutError', () => {
   it('sets message, statusCode 408, and taskId/stepId context', () => {
     const err = new UserInputTimeoutError('task-1', 'step-2');
-    expect(err.message).toBe('No response received — task ended');
+    expect(err.message).toContain("I didn't hear back");
+    expect(err.message).toContain('start a new chat');
     expect(err.statusCode).toBe(408);
     expect(err.code).toBe('INPUT_TIMEOUT');
     expect(err.context).toEqual({ taskId: 'task-1', stepId: 'step-2', inputType: undefined });
@@ -103,18 +104,21 @@ describe('UserInputTimeoutError', () => {
 
   it('generates friendly message for carousel input type', () => {
     const err = new UserInputTimeoutError('task-1', 'step-2', 'carousel', 600_000);
-    expect(err.message).toBe('No product selected within 10 minutes — task ended');
+    expect(err.message).toContain('product selection');
+    expect(err.message).toContain('after 10 minutes');
     expect(err.timeoutMs).toBe(600_000);
   });
 
   it('generates friendly message for payment input type', () => {
     const err = new UserInputTimeoutError('task-1', 'step-2', 'payment', 600_000);
-    expect(err.message).toBe('Payment not completed within 10 minutes — task ended');
+    expect(err.message).toContain('payment');
+    expect(err.message).toContain('after 10 minutes');
   });
 
   it('generates friendly message for OTP input type', () => {
     const err = new UserInputTimeoutError('task-1', 'step-2', 'otp', 300_000);
-    expect(err.message).toBe('OTP not entered within 5 minutes — task ended');
+    expect(err.message).toContain('OTP');
+    expect(err.message).toContain('after 5 minutes');
   });
 
   it('sets name to UserInputTimeoutError', () => {
