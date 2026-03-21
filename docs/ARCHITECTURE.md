@@ -250,6 +250,7 @@ sequenceDiagram
 2. Every `callTool()` call atomically injects `sessionId` into tool arguments
 3. On the laptop, `ChromePool` maps each `sessionId` to a unique Chrome tab
 4. When task completes, `SessionEndRequest` releases the tab back to the pool
+5. On cancellation (user closes tab / new chat), `TaskManager.cleanupTask()` calls `chromePool.releaseSlot(sessionId)` to immediately free the Chrome slot — no waiting for idle TTL
 
 ---
 

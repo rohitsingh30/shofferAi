@@ -4,6 +4,35 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Fix Chrome zombie windows on task cancellation
+
+**Goal**: When a user presses "New Chat" or closes the tab mid-task, Chrome windows lingered for ~15 min until ChromePool's idle TTL. Fix `cancelTask()` to immediately release the Chrome slot.
+
+**What was done**:
+- Added `sessionId` field to `RunningTask` interface in `task-manager.ts`
+- Capture `sessionId` when bridge registers (`msg.taskId` IS the sessionId used by ChromePool)
+- Added `chromePool` option to `TaskManagerOptions` and stored as private field
+- In `cleanupTask()`, call `chromePool.releaseSlot(sessionId)` after killing CLI process
+- Passed `chromePool` reference from `index.ts` when constructing `TaskManager`
+- Updated ARCHITECTURE.md with cancellation cleanup path (step 5 in tab isolation)
+- Updated REPEATING-MISTAKES.md entry #29 with the Chrome slot release fix
+- Deployed to Cloud Run (build `d184a702`, 5m11s) — HTTP 200 verified
+
+**Files changed**:
+- `apps/playwright/src/task-manager.ts` (updated — sessionId on RunningTask, chromePool in cleanup)
+- `apps/playwright/src/index.ts` (updated — pass chromePool to TaskManager)
+- `docs/ARCHITECTURE.md` (updated — cancellation cleanup in tab isolation section)
+- `docs/REPEATING-MISTAKES.md` (updated — entry #29 with Chrome slot release)
+
+**Key decisions**:
+- `sessionId` is nullable (`string | null`) — only set when bridge registers, not at task creation
+- `releaseSlot()` is fire-and-forget (`.catch()`) — cancellation shouldn't block on Chrome cleanup failure
+- `chromePool` typed as `ChromePool | null` — TaskManager still works without it (tests don't need it)
+- Options type uses `Required<Omit<TaskManagerOptions, 'chromePool'>>` to avoid forcing chromePool as required
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Eliminate vanishing messages (async rewriter race + missing complete display)
 
 **Goal**: Fix agent messages that appear then vanish, and ensure errors always show with trackable codes.

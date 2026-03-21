@@ -492,8 +492,9 @@ These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitch
 2. On abort: sends `task_cancel` to laptop relay if a handoff is active
 3. Laptop relay forwards to `TaskManager.cancelTask()` which kills Copilot CLI + cleans up Chrome
 4. Heartbeat, event listener, and stream are cleaned up immediately
+5. *(2026-03-21 follow-up)* `cancelTask()` → `cleanupTask()` now calls `chromePool.releaseSlot(sessionId)` to immediately free the Chrome slot. Previously the slot lingered for ~15 min until idle TTL.
 
-**Rule:** Every task lifecycle MUST have a cleanup path for client disconnection. If the client goes away, the laptop must know immediately. The `task_cancel` relay message is the mechanism — it MUST be sent on SSE disconnect when `handoffSent === true`.
+**Rule:** Every task lifecycle MUST have a cleanup path for client disconnection. If the client goes away, the laptop must know immediately. The `task_cancel` relay message is the mechanism — it MUST be sent on SSE disconnect when `handoffSent === true`. The Chrome slot MUST be released in `cleanupTask()` — never rely solely on idle TTL.
 
 ---
 
