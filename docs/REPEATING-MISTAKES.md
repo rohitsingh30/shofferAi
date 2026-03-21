@@ -535,4 +535,41 @@ Also added in `agent.ts` (cloud-side): break the tool processing loop after `ask
 
 ---
 
+## 32. Retry/Fallback Logic Using Const — Infinite Loop on Same Value
+
+**What happens:** A retry handler (e.g., `EADDRINUSE` → try next port) references a `const` variable instead of mutating a counter. The retry always attempts the same value, creating an infinite loop that floods logs.
+
+**Example (MCP Log port):**
+```typescript
+// ❌ BUG: MCP_LOG_PORT is const — retry always tries 9402
+const MCP_LOG_PORT = 9401;
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    server.listen(MCP_LOG_PORT + 1);  // always 9402 → infinite loop
+  }
+});
+
+// ✅ FIX: mutable counter + max attempts
+let mcpLogPort = 9401;
+const MCP_LOG_PORT_MAX = mcpLogPort + 10;
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    mcpLogPort++;
+    if (mcpLogPort > MCP_LOG_PORT_MAX) { logger.error('All ports exhausted'); return; }
+    server.listen(mcpLogPort);
+  }
+});
+```
+
+**Root cause:** The Node.js `server.on('error')` handler fires repeatedly — once per failed `.listen()` call. If the retry value never changes, each failure triggers the same retry, forever.
+
+**Rule:** Any retry/fallback logic MUST:
+1. **Mutate** the retry parameter (port, index, delay) — never recompute from a const
+2. **Cap** the number of attempts — always have a max before giving up
+3. **Log the attempt number** — so infinite loops are immediately visible
+
+This applies to: port scanning, reconnect backoff, file path fallbacks, API endpoint failover — anywhere a value should change between retries.
+
+---
+
 *Last updated: 2026-03-21*

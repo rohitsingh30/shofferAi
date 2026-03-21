@@ -133,6 +133,7 @@ These are the top mistakes from `docs/REPEATING-MISTAKES.md`. Breaking any of th
 23. **Credential safety** — never log or expose raw credentials; use CredentialInjector
 24. **Screenshots go to `/tmp/` or session folder** — NEVER save to repo root
 25. **Relay connection must be LAZY** — only connect when `handoff_to_browser_agent` is called
+26. **Retry/fallback logic must mutate state** — never retry with a `const` value; always increment counters, cap max attempts, and give up gracefully
 
 ## Documentation & Session Logging (MANDATORY)
 
