@@ -28,8 +28,16 @@ EXISTING_PIDS=$(ps aux | grep 'tsx.*apps/playwright/src/index' | grep -v grep | 
 if [ -n "$EXISTING_PIDS" ]; then
   echo "⚠️  Killing existing relay processes: $EXISTING_PIDS"
   echo "$EXISTING_PIDS" | xargs kill 2>/dev/null || true
-  sleep 2
+  # Wait until all old processes are fully dead (up to 10s)
+  for i in $(seq 1 20); do
+    REMAINING=$(ps aux | grep 'tsx.*apps/playwright/src/index' | grep -v grep | awk '{print $2}' || true)
+    [ -z "$REMAINING" ] && break
+    sleep 0.5
+  done
 fi
+
+# Clean up stale PID file from previous instance
+rm -f /tmp/shofferai-relay.pid
 
 # Also stop the LaunchAgent daemon if running (it would restart and fight us)
 if launchctl list 2>/dev/null | grep -q 'com.shofferai.relay'; then
