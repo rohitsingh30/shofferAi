@@ -1,8 +1,8 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import { useCart, type CartItemData } from './CartContext';
 import { useL2Cart } from './L2CartContext';
-import { useL2Payment, type L2PaymentData } from './L2PaymentContext';
 
 function formatPrice(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -80,30 +80,103 @@ function CartItemRow({ item, onUpdateQty, onRemove }: {
 export function L2CartPanel() {
   const { items, store, taskId: cartTaskId, total, isEmpty, updateQuantity, removeItem, clearCart } = useCart();
   const { closeCart } = useL2Cart();
-  const { openL2 } = useL2Payment();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleProceedToBuy = () => {
-    // Build summary for payment panel
-    const summary = JSON.stringify({
-      store,
-      items: items.map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: formatPrice(item.price),
-        subtotal: formatPrice(item.price * item.quantity),
-      })),
-      total: formatPrice(total),
-    });
+  const handlePayNow = useCallback(async () => {
+    if (isEmpty) return;
+    setLoading(true);
+    setError(null);
 
-    closeCart();
-    openL2({
-      taskId: cartTaskId || `cart-${Date.now()}`,
-      bookingSummary: summary,
-      amountCents: total * 100,
-      serviceFeeCents: 0,
-      description: `${store} order`,
-    });
-  };
+    try {
+      const taskId = cartTaskId || `cart-${Date.now()}`;
+      const summary = JSON.stringify({
+        store,
+        items: items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: formatPrice(item.price),
+          subtotal: formatPrice(item.price * item.quantity),
+        })),
+        total: formatPrice(total),
+      });
+
+      // Create Razorpay order
+      const orderRes = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId,
+          amountCents: total * 100,
+          serviceFeeCents: 0,
+          bookingSummary: summary,
+        }),
+      });
+
+      if (!orderRes.ok) {
+        const data = await orderRes.json();
+        throw new Error(data.error || 'Failed to create order');
+      }
+
+      const { orderId, amount, currency, key } = await orderRes.json();
+
+      // Load and open Razorpay Checkout
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => {
+        const options = {
+          key,
+          amount,
+          currency,
+          order_id: orderId,
+          name: 'ShofferAI',
+          description: `${store} order`,
+          handler: async (response: {
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+            razorpay_signature: string;
+          }) => {
+            try {
+              const verifyRes = await fetch('/api/payments/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ...response,
+                  taskId,
+                  stepId: 'cart-payment',
+                }),
+              });
+
+              if (!verifyRes.ok) {
+                throw new Error('Payment verification failed');
+              }
+
+              // Success — clear cart and close panel
+              clearCart();
+              closeCart();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Verification failed');
+              setLoading(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setLoading(false);
+            },
+          },
+          theme: { color: '#7c3aed' },
+        };
+
+        // @ts-expect-error Razorpay is loaded via script
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      };
+      document.body.appendChild(script);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Payment failed');
+      setLoading(false);
+    }
+  }, [items, store, total, cartTaskId, isEmpty, clearCart, closeCart]);
 
   if (isEmpty) {
     return (
@@ -161,7 +234,7 @@ export function L2CartPanel() {
         </div>
       </div>
 
-      {/* Price breakdown + Buy button */}
+      {/* Price breakdown + Pay button */}
       <div className="border-t border-border/50 px-5 py-4 space-y-4">
         {/* Breakdown */}
         <div className="space-y-2">
@@ -181,15 +254,26 @@ export function L2CartPanel() {
           </div>
         </div>
 
-        {/* Proceed to Buy */}
+        {error && (
+          <p className="text-sm text-red-400 text-center">{error}</p>
+        )}
+
+        {/* Pay Now */}
         <button
-          onClick={handleProceedToBuy}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98]"
+          onClick={handlePayNow}
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98] disabled:opacity-50"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-          </svg>
-          Proceed to Buy · {formatPrice(total)}
+          {loading ? (
+            'Processing...'
+          ) : (
+            <>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+              Pay Now · {formatPrice(total)}
+            </>
+          )}
         </button>
 
         {/* Trust badge */}
@@ -197,7 +281,7 @@ export function L2CartPanel() {
           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
-          Payment via Razorpay (UPI, Cards, Net Banking)
+          Secured by Razorpay · UPI, Cards, Net Banking
         </div>
       </div>
     </div>

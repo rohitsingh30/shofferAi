@@ -15,7 +15,7 @@ function formatInr(paise: number): string {
 }
 
 export function PaymentPanel() {
-  const { l2Data, setPaymentComplete } = useL2Payment();
+  const { l2Data, setPaymentComplete, closeL2 } = useL2Payment();
   const [selectedTip, setSelectedTip] = useState(10000); // Default Rs 100
   const [customTip, setCustomTip] = useState('');
   const [isCustom, setIsCustom] = useState(false);
@@ -114,11 +114,21 @@ export function PaymentPanel() {
   return (
     <div className="flex h-full flex-col bg-chat-bg">
       {/* Header */}
-      <div className="border-b border-border/50 px-5 py-4">
-        <h2 className="text-lg font-semibold">Complete Payment</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Pay to confirm your booking
-        </p>
+      <div className="flex items-center justify-between border-b border-border/50 px-5 py-4">
+        <div>
+          <h2 className="text-lg font-semibold">Complete Payment</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pay to confirm your booking
+          </p>
+        </div>
+        <button
+          onClick={closeL2}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       {/* Content */}
