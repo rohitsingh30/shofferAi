@@ -115,6 +115,8 @@ CMD ["node", "apps/web/server.js"]  # custom-server.js with WS support
 
 Everything browser-related. **This is where the actual web tasks happen.**
 
+> ⚠️ **CRITICAL: Only ONE relay instance may run at a time.** Running two instances causes WebSocket flapping on Cloud Run — tasks will fail. `start-laptop.sh` auto-kills existing instances, but if you use the LaunchAgent daemon, do NOT also run `start-laptop.sh` manually.
+
 | Component | What It Does | How to Start |
 |-----------|-------------|-------------|
 | **ChromePool** | Launches Chrome instances on demand (lazy) with signed-in Profile 3 | Started by `start-laptop.sh` |
@@ -334,6 +336,10 @@ Cloud Run automatically:
 - No action needed — it just works
 
 ### 💻 Laptop Relay — macOS LaunchAgent
+
+> ⚠️ **WARNING: Only ONE relay instance may run at a time.** Running both the LaunchAgent daemon AND `start-laptop.sh` manually creates two processes that fight over Cloud Run's WebSocket, causing an infinite connect/disconnect flapping loop. Use ONE method:
+> - **Option A (recommended):** `start-laptop.sh` — interactive, visible logs in terminal. It auto-kills existing processes and stops the LaunchAgent.
+> - **Option B:** LaunchAgent — hands-off daemon mode. Do NOT also run `start-laptop.sh`.
 
 The relay uses a **macOS LaunchAgent** to auto-start on login and restart on crash.
 

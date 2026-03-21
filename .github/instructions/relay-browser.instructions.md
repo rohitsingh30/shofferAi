@@ -83,3 +83,5 @@ Launch paths (all must follow above rules):
 - Never curl localhost to health-check — operator manages services
 - Never use `open` command to launch browsers
 - Every `sessionId` → exactly one Chrome instance
+- **Only ONE relay instance may run at a time** — duplicates cause WebSocket flapping on Cloud Run. `start-laptop.sh` handles cleanup automatically.
+- Never start, stop, or restart the relay — the operator manages it manually

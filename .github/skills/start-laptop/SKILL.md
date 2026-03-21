@@ -10,24 +10,17 @@ This skill starts the laptop relay infrastructure. ChromePool is lazy — it lau
 
 **What runs on the laptop:** ChromePool (lazy Chrome management) + Playwright MCP + Relay (connects to Cloud Run or listens locally).
 
+> ⚠️ **CRITICAL: Only ONE relay instance may run at a time.** Running two causes infinite WebSocket flapping on Cloud Run. `start-laptop.sh` auto-kills existing instances and stops the LaunchAgent daemon. If starting manually, ALWAYS use `start-laptop.sh` — never `npx tsx index.ts` directly.
+
 See `docs/DEPLOYMENT.md` for the full Cloud Run vs Laptop architecture.
 
 ---
 
 ## Part 1: Start the Laptop Relay
 
-### Step 1: Kill stale processes
+### Step 1: Start (Production — default)
 
-Check and kill any existing relay processes:
-
-```bash
-# Find and kill stale relay processes
-ps aux | grep 'tsx.*src/index' | grep -v grep | awk '{print $2}' | xargs kill 2>/dev/null || true
-```
-
-### Step 2: Start (Production — default)
-
-The laptop connects OUTBOUND to Cloud Run via WSS. No Cloudflare Tunnel needed.
+`start-laptop.sh` automatically kills existing relay processes, stops the LaunchAgent daemon, and starts fresh. No manual cleanup needed.
 
 ```bash
 ./apps/playwright/scripts/start-laptop.sh
