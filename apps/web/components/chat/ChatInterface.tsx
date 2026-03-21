@@ -6,7 +6,7 @@ import { TaskProgress, type StepInfo } from './TaskProgress';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { InputPrompt } from './InputPrompt';
 import { CartSummary, type CartItem } from './CartSummary';
-import { shouldSuppressMessage } from '@shofferai/shared';
+// shouldSuppressMessage removed from client — server-side two-tier filter (regex + AI rewrite) is authoritative
 import type { ProductCardData } from '@shofferai/shared';
 import { L2PaymentProvider, useL2Payment } from './L2PaymentContext';
 import { L2CartProvider, useL2Cart } from './L2CartContext';
@@ -130,12 +130,12 @@ function ChatInterfaceInner() {
     switch (event.type) {
       case 'message': {
         const content = event.payload.content as string;
-        // Client-side defense-in-depth: suppress any internal reasoning that slipped through server filters
-        if (shouldSuppressMessage(content)) break;
+        // Server-side two-tier filter (regex + AI rewrite) already cleaned this message.
+        // No client-side suppression — that caused false positives and vanishing messages.
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now().toString(),
+            id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             role: 'assistant',
             content,
           },
@@ -219,7 +219,7 @@ function ChatInterfaceInner() {
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now().toString(),
+            id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             role: 'assistant',
             content: `I ran into an issue: ${event.payload.error}`,
           },
@@ -239,7 +239,7 @@ function ChatInterfaceInner() {
     abortRef.current = controller;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       role: 'user',
       content: text.trim(),
     };
@@ -296,7 +296,7 @@ function ChatInterfaceInner() {
       setMessages((prev) => [
         ...prev,
         {
-          id: Date.now().toString(),
+          id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           role: 'assistant',
           content: 'Something went wrong. Please try again.',
         },

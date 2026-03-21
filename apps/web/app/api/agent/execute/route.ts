@@ -240,6 +240,8 @@ export async function POST(request: Request) {
                   }
                 }).catch(err => {
                   console.error('[execute] taskId=%s rewriter error:', taskId, err);
+                  // Fallback: send original message if rewriter fails
+                  send('message', { content: msg.message });
                 });
               }
               break;
@@ -391,6 +393,8 @@ export async function POST(request: Request) {
               }
             }).catch(err => {
               console.error('[execute] taskId=%s rewriter error in onMessage:', taskId, err);
+              // Fallback: send original message if rewriter fails
+              send('message', { content });
             });
           },
           onStepUpdate(step) {
