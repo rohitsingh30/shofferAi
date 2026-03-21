@@ -8,7 +8,8 @@ import { TaskManager } from './task-manager';
 
 const RELAY_PORT = parseInt(process.env.RELAY_PORT || '8765', 10);
 const RELAY_CLOUD_URL = process.env.RELAY_CLOUD_URL; // e.g. wss://shofferai-xxx.run.app/api/relay/ws
-const MCP_LOG_PORT = parseInt(process.env.MCP_LOG_PORT || '9401', 10);
+let mcpLogPort = parseInt(process.env.MCP_LOG_PORT || '9401', 10);
+const MCP_LOG_PORT_MAX = mcpLogPort + 10;
 
 async function main() {
   logger.info('Starting ShofferAI Playwright Runner...');
@@ -136,17 +137,22 @@ async function main() {
 
   logServer.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
-      logger.warn(`MCP Log port ${MCP_LOG_PORT} in use, trying ${MCP_LOG_PORT + 1}`);
-      logServer.listen(MCP_LOG_PORT + 1, '127.0.0.1', () => {
-        logger.info(`MCP Log stream: http://localhost:${MCP_LOG_PORT + 1}/logs/mcp`);
+      mcpLogPort++;
+      if (mcpLogPort > MCP_LOG_PORT_MAX) {
+        logger.error(`All MCP Log ports in range exhausted, giving up`);
+        return;
+      }
+      logger.warn(`MCP Log port ${mcpLogPort - 1} in use, trying ${mcpLogPort}`);
+      logServer.listen(mcpLogPort, '127.0.0.1', () => {
+        logger.info(`MCP Log stream: http://localhost:${mcpLogPort}/logs/mcp`);
       });
     } else {
       logger.error('MCP Log server failed', { error: err.message });
     }
   });
 
-  logServer.listen(MCP_LOG_PORT, '127.0.0.1', () => {
-    logger.info(`MCP Log stream: http://localhost:${MCP_LOG_PORT}/logs/mcp`);
+  logServer.listen(mcpLogPort, '127.0.0.1', () => {
+    logger.info(`MCP Log stream: http://localhost:${mcpLogPort}/logs/mcp`);
   });
 }
 
