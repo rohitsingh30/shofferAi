@@ -4,6 +4,38 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-22 — Cart slide-up + relay auto-heal across deploys
+
+**Goal**: Show CartBar at bottom as soon as user adds an item; fix relay disconnection after every Cloud Run deploy.
+
+**What was done**:
+- CartBar now slides up with `animate-slide-up` when first item is added (no auto-open of L2 panel)
+- L2CartPanel close button made visible on all screen sizes (removed `md:hidden`)
+- Diagnosed critical relay bug: after Cloud Run deploys, laptop WS stays on old instance while HTTP routes to new instance. SIGTERM never fires because WS is treated as "active request"
+- Added `/api/admin/release-relay` endpoint — force-disconnects laptop WS (auth via RELAY_AUTH_TOKEN)
+- Added pre-deploy step in `cloudbuild.yaml` — curls release-relay before deploying new revision
+- Added early WS queue in `custom-server.js` — handles laptop reconnecting before RelayBridge singleton is initialized
+- Added SIGTERM handler in `custom-server.js` — closes WS on graceful shutdown
+- Fixed stale connection detection in `relay-outbound.ts` — tracks app-level messages separately from WS pong; Cloud Run load balancer responds to WS pings even when backend is dead, so WS pongs alone can't detect stale connections. Now auto-terminates after 45s of no app-level messages.
+- E2E verified: Blinkit order through prod, product cards with images, CartBar with slide-up animation
+
+**Files changed**:
+- `apps/web/components/chat/CartBar.tsx` (updated — slide-up animation)
+- `apps/web/components/chat/L2CartPanel.tsx` (updated — close button always visible)
+- `apps/web/custom-server.js` (updated — SIGTERM handler, early WS queue, wireLaptopSocket helper)
+- `apps/web/app/api/admin/release-relay/route.ts` (created — admin endpoint)
+- `cloudbuild.yaml` (updated — pre-deploy relay release step)
+- `apps/playwright/src/relay-outbound.ts` (updated — stale connection detection via app-level heartbeat)
+
+**Key decisions**:
+- Two-layer auto-heal: (1) pre-deploy curl releases WS, (2) laptop detects stale connection in 45s as fallback
+- 45s stale timeout = 3 missed server heartbeats (sent every 15s)
+- Deleted old Cloud Run revisions to unstick initial deployment (chicken-and-egg: first deploy with release-relay couldn't release old instance that lacked the endpoint)
+- RELAY_AUTH_TOKEN hardcoded in cloudbuild.yaml substitution — acceptable for now since it only protects a maintenance endpoint
+
+**What worked / what didn't** *(fill in after review)*:
+- 
+
 ## 2026-03-22 — Fix pending inputs, INT4 overflow, payment FK + full E2E verified
 
 **Goal**: Fix multiple production bugs preventing the full Flipkart shopping E2E flow from working: pending inputs lost across Cloud Run instances, INT4 overflow in stepNumber, payment FK constraint error.
