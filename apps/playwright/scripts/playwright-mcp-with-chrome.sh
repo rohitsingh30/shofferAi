@@ -1,16 +1,17 @@
 #!/bin/bash
 # playwright-mcp-with-chrome.sh — Per-instance Playwright MCP launcher
 #
-# DEDICATED CHROME: Each invocation gets its OWN Chrome instance in an
-# isolated directory (/tmp/shofferai-chrome-<PID>/). This prevents the
-# sharing bug where relay tasks and QA sessions navigate the same window.
+# DEDICATED CHROME keyed by PARENT PID: Copilot CLI spawns this script
+# twice (tool discovery + active use). Both invocations share ONE Chrome
+# keyed on the parent Copilot process. Different Copilot sessions (QA vs
+# relay) get separate Chrome instances because they have different parents.
 #
 # How it works:
-#   1. Copy Chrome-Debug/Profile 3 session data → /tmp/shofferai-chrome-$$/
-#   2. Launch a dedicated Chrome with --remote-debugging-port=0 (OS picks port)
-#   3. Parse CDP port from stderr
-#   4. Start Playwright MCP connected to THIS Chrome via CDP
-#   5. On exit: kill Chrome + clean up temp dir
+#   1. Key instance dir on PPID (parent = Copilot binary), not $$ (script)
+#   2. First invocation: copy profile, launch Chrome, write CDP port to lockfile
+#   3. Second invocation: detect existing Chrome, reuse CDP port
+#   4. Start Playwright MCP connected to the shared Chrome via CDP
+#   5. On exit: last one out kills Chrome + cleans up
 #
 # Chrome is launched manually (not by Playwright MCP) to avoid the
 # --use-mock-keychain flag that prevents macOS Keychain cookie decryption.
@@ -19,12 +20,18 @@
 
 set -euo pipefail
 
-# ─── Per-instance state (PID-namespaced, fully isolated) ─────────────
-INSTANCE_DIR="/tmp/shofferai-chrome-$$"
+# ─── Instance keyed on PARENT PID (Copilot binary) ───────────────────
+# Copilot spawns this script twice from the same process. Using PPID means
+# both share one Chrome. Different Copilot sessions have different PPIDs
+# so they still get isolated Chrome instances.
+PARENT_PID="$PPID"
+INSTANCE_DIR="/tmp/shofferai-chrome-${PARENT_PID}"
 PROFILE_DIR="${INSTANCE_DIR}/profile"
 CONFIG_FILE="${INSTANCE_DIR}/mcp-config.json"
 CDP_STDERR="${INSTANCE_DIR}/chrome-stderr"
+LOCK_FILE="${INSTANCE_DIR}/chrome.lock"
 CHROME_PID=""
+I_OWN_CHROME=false
 
 mkdir -p "$INSTANCE_DIR"
 
@@ -49,14 +56,14 @@ PROFILE="Profile 3"
 BASE_USER_DATA_DIR="$HOME/Library/Application Support/Google/Chrome-Debug"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# ─── Cleanup on exit — always kill OUR Chrome + remove temp dir ───────
+# ─── Cleanup on exit — only kill Chrome if WE launched it ─────────────
 cleanup() {
-  if [ -n "$CHROME_PID" ] && kill -0 "$CHROME_PID" 2>/dev/null; then
+  if [ "$I_OWN_CHROME" = true ] && [ -n "$CHROME_PID" ] && kill -0 "$CHROME_PID" 2>/dev/null; then
     echo "🧹 Killing Chrome (PID $CHROME_PID)" >&2
     kill "$CHROME_PID" 2>/dev/null || true
     wait "$CHROME_PID" 2>/dev/null || true
+    rm -rf "$INSTANCE_DIR"
   fi
-  rm -rf "$INSTANCE_DIR"
 }
 trap cleanup EXIT INT TERM
 
@@ -78,87 +85,109 @@ if [ -d "/tmp/shofferai-chrome-singleton" ]; then
   fi
 fi
 
-# ─── Selective copy of Chrome profile (~26MB, <1s) ───────────────────
-echo "📋 Cloning Chrome session data for instance $$ (~26MB)..." >&2
-mkdir -p "$PROFILE_DIR/$PROFILE"
+# ─── Check if Chrome is already running for this parent (Copilot session) ─
+CDP_PORT=""
+if [ -f "$LOCK_FILE" ]; then
+  EXISTING_CHROME_PID=$(sed -n '1p' "$LOCK_FILE" 2>/dev/null || true)
+  EXISTING_CDP_PORT=$(sed -n '2p' "$LOCK_FILE" 2>/dev/null || true)
+  if [ -n "$EXISTING_CHROME_PID" ] && kill -0 "$EXISTING_CHROME_PID" 2>/dev/null; then
+    echo "♻️  Reusing Chrome from sibling invocation (PID $EXISTING_CHROME_PID, CDP port $EXISTING_CDP_PORT)" >&2
+    CHROME_PID="$EXISTING_CHROME_PID"
+    CDP_PORT="$EXISTING_CDP_PORT"
+    I_OWN_CHROME=false
+  fi
+fi
 
-cp "$BASE_USER_DATA_DIR/Local State" "$PROFILE_DIR/" 2>/dev/null || true
-cp "$BASE_USER_DATA_DIR/First Run" "$PROFILE_DIR/" 2>/dev/null || true
+# ─── Launch Chrome if not already running ─────────────────────────────
+if [ -z "$CDP_PORT" ]; then
+  I_OWN_CHROME=true
 
-rsync -a \
-  --exclude='Service Worker' \
-  --exclude='IndexedDB' \
-  --exclude='GPUCache' \
-  --exclude='DawnWebGPUCache' \
-  --exclude='DawnGraphiteCache' \
-  --exclude='DawnWebGPUBlobCache' \
-  --exclude='Code Cache' \
-  --exclude='Cache' \
-  --exclude='ScriptCache' \
-  --exclude='blob_storage' \
-  "$BASE_USER_DATA_DIR/$PROFILE/" "$PROFILE_DIR/$PROFILE/"
+  # ─── Selective copy of Chrome profile (~26MB, <1s) ───────────────────
+  echo "📋 Cloning Chrome session data for instance (parent $PARENT_PID, ~26MB)..." >&2
+  mkdir -p "$PROFILE_DIR/$PROFILE"
 
-rm -f "$PROFILE_DIR/SingletonLock" \
-      "$PROFILE_DIR/SingletonSocket" \
-      "$PROFILE_DIR/SingletonCookie" 2>/dev/null || true
+  cp "$BASE_USER_DATA_DIR/Local State" "$PROFILE_DIR/" 2>/dev/null || true
+  cp "$BASE_USER_DATA_DIR/First Run" "$PROFILE_DIR/" 2>/dev/null || true
 
-# Mark clean exit — suppresses "Restore pages?" bubble
-PREFS="$PROFILE_DIR/$PROFILE/Preferences"
-if [ -f "$PREFS" ] && command -v python3 &>/dev/null; then
-  python3 -c "
+  rsync -a \
+    --exclude='Service Worker' \
+    --exclude='IndexedDB' \
+    --exclude='GPUCache' \
+    --exclude='DawnWebGPUCache' \
+    --exclude='DawnGraphiteCache' \
+    --exclude='DawnWebGPUBlobCache' \
+    --exclude='Code Cache' \
+    --exclude='Cache' \
+    --exclude='ScriptCache' \
+    --exclude='blob_storage' \
+    "$BASE_USER_DATA_DIR/$PROFILE/" "$PROFILE_DIR/$PROFILE/"
+
+  rm -f "$PROFILE_DIR/SingletonLock" \
+        "$PROFILE_DIR/SingletonSocket" \
+        "$PROFILE_DIR/SingletonCookie" 2>/dev/null || true
+
+  # Mark clean exit — suppresses "Restore pages?" bubble
+  PREFS="$PROFILE_DIR/$PROFILE/Preferences"
+  if [ -f "$PREFS" ] && command -v python3 &>/dev/null; then
+    python3 -c "
 import json
 p = json.load(open('$PREFS'))
 p.setdefault('profile', {})['exit_type'] = 'Normal'
 p.setdefault('profile', {})['exited_cleanly'] = True
 json.dump(p, open('$PREFS', 'w'))
 " 2>/dev/null || true
-fi
-
-# ─── Launch Chrome manually (avoids --use-mock-keychain) ─────────────
-CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-
-"$CHROME_BIN" \
-  --remote-debugging-port=0 \
-  --remote-debugging-address=127.0.0.1 \
-  --user-data-dir="$PROFILE_DIR" \
-  --profile-directory="$PROFILE" \
-  --no-first-run \
-  --no-default-browser-check \
-  --disable-sync \
-  --disable-default-apps \
-  --disable-blink-features=AutomationControlled \
-  --disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching \
-  --disable-infobars \
-  --disable-ipc-flooding-protection \
-  --disable-popup-blocking \
-  --disable-background-timer-throttling \
-  --disable-backgrounding-occluded-windows \
-  --disable-renderer-backgrounding \
-  --noerrdialogs \
-  --disable-gaia-services \
-  --hide-crash-restore-bubble \
-  --disable-session-crashed-bubble \
-  about:blank 2>"$CDP_STDERR" &
-
-CHROME_PID=$!
-
-CDP_PORT=""
-for i in $(seq 1 30); do
-  if [ -f "$CDP_STDERR" ]; then
-    CDP_PORT=$(grep -oE 'ws://127\.0\.0\.1:[0-9]+' "$CDP_STDERR" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true)
-    [ -n "$CDP_PORT" ] && break
   fi
-  sleep 0.3
-done
 
-rm -f "$CDP_STDERR"
+  # ─── Launch Chrome manually (avoids --use-mock-keychain) ─────────────
+  CHROME_BIN="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-if [ -z "$CDP_PORT" ]; then
-  echo "❌ Failed to get CDP port from Chrome (PID $CHROME_PID)" >&2
-  exit 1
-fi
+  "$CHROME_BIN" \
+    --remote-debugging-port=0 \
+    --remote-debugging-address=127.0.0.1 \
+    --user-data-dir="$PROFILE_DIR" \
+    --profile-directory="$PROFILE" \
+    --no-first-run \
+    --no-default-browser-check \
+    --disable-sync \
+    --disable-default-apps \
+    --disable-blink-features=AutomationControlled \
+    --disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching \
+    --disable-infobars \
+    --disable-ipc-flooding-protection \
+    --disable-popup-blocking \
+    --disable-background-timer-throttling \
+    --disable-backgrounding-occluded-windows \
+    --disable-renderer-backgrounding \
+    --noerrdialogs \
+    --disable-gaia-services \
+    --hide-crash-restore-bubble \
+    --disable-session-crashed-bubble \
+    about:blank 2>"$CDP_STDERR" &
 
-echo "🌐 Chrome instance $$ launched (PID $CHROME_PID, CDP port $CDP_PORT, Profile 3)" >&2
+  CHROME_PID=$!
+
+  CDP_PORT=""
+  for i in $(seq 1 30); do
+    if [ -f "$CDP_STDERR" ]; then
+      CDP_PORT=$(grep -oE 'ws://127\.0\.0\.1:[0-9]+' "$CDP_STDERR" 2>/dev/null | head -1 | grep -oE '[0-9]+$' || true)
+      [ -n "$CDP_PORT" ] && break
+    fi
+    sleep 0.3
+  done
+
+  rm -f "$CDP_STDERR"
+
+  if [ -z "$CDP_PORT" ]; then
+    echo "❌ Failed to get CDP port from Chrome (PID $CHROME_PID)" >&2
+    exit 1
+  fi
+
+  # Write lockfile so sibling invocations can reuse this Chrome
+  printf '%s\n%s\n' "$CHROME_PID" "$CDP_PORT" > "$LOCK_FILE"
+
+  echo "🌐 Chrome launched (PID $CHROME_PID, CDP port $CDP_PORT, parent $PARENT_PID, Profile 3)" >&2
+
+fi  # end of "Launch Chrome if not already running"
 
 # ─── Playwright MCP config (connect to OUR dedicated Chrome via CDP) ──
 cat > "$CONFIG_FILE" <<JSONEOF
@@ -170,7 +199,7 @@ cat > "$CONFIG_FILE" <<JSONEOF
 }
 JSONEOF
 
-echo "⏳ Playwright MCP → Chrome CDP port $CDP_PORT (instance $$)" >&2
+echo "⏳ Playwright MCP → Chrome CDP port $CDP_PORT (parent $PARENT_PID)" >&2
 
 # ─── Start Playwright MCP (foreground so EXIT trap fires on exit) ─────
 "$PLAYWRIGHT_MCP" \

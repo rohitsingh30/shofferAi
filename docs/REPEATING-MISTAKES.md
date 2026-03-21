@@ -441,24 +441,24 @@ These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitch
 
 ---
 
-## 28. Duplicate MCP Configs Launch Multiple Empty Chrome Windows
+## 28. Duplicate Chrome Windows on Copilot Launch
 
-**What happens:** Launching Copilot CLI (or VS Code Copilot agent) opens 2 empty Chrome windows instead of 1. The user sees two `about:blank` Chrome instances consuming ~1GB RAM total, with no obvious reason.
+**What happens:** Launching Copilot CLI opens 2 (or more) empty Chrome `about:blank` windows.
 
-**Root cause:** Two separate MCP configurations both defined a `"playwright"` server:
+**Two root causes found:**
 
-| File | Scope | Command | Problem |
-|------|-------|---------|---------|
-| `~/.copilot/mcp-config.json` | Global (all repos) | `npx @playwright/mcp@latest` | Anti-pattern: uses `npx` instead of global binary; lets Playwright auto-launch Chrome (adds `--use-mock-keychain` → cookies unreadable) |
-| `.mcp.json` (repo root) | Project (ShofferAI) | `playwright-mcp-with-chrome.sh` | Correct: manually launches Chrome, copies Profile 3, parses CDP port |
+1. **Global + project MCP config overlap:** `~/.copilot/mcp-config.json` AND `.mcp.json` both defined `"playwright"` MCP server. Both ran instead of project overriding global. The global config also used the anti-pattern `npx @playwright/mcp@latest`.
 
-Both had the key `"playwright"`, but instead of the project config overriding the global one, **both ran** — each spawning its own Chrome.
+2. **Copilot spawns the MCP server twice:** Even with one config, Copilot CLI spawns `playwright-mcp-with-chrome.sh` twice from the same parent process (tool discovery + active use). With the old `$$`-keyed instance dirs, each spawn got its own Chrome.
 
 **The fix (2026-03-21):**
-1. Cleared `~/.copilot/mcp-config.json` — global config should NOT define `playwright`
-2. Project `.mcp.json` is the single source of truth for Playwright MCP
+1. Cleared `~/.copilot/mcp-config.json` — project `.mcp.json` is the single source of truth
+2. Changed `playwright-mcp-with-chrome.sh` to key on `$PPID` (parent PID) instead of `$$` (script PID)
+3. First invocation launches Chrome and writes a lockfile with PID + CDP port
+4. Second invocation detects the lockfile, verifies Chrome is alive, reuses it
+5. Different Copilot sessions (different parents) still get isolated Chrome instances
 
-**Rule:** NEVER put `playwright` MCP server in `~/.copilot/mcp-config.json` (global scope). The project `.mcp.json` already configures it correctly with `playwright-mcp-with-chrome.sh`. Also: NEVER use `npx @playwright/mcp@latest` — always use the globally-installed `playwright-mcp` binary.
+**Rule:** Instance dirs MUST be keyed on `$PPID` (parent Copilot binary), not `$$` (script). NEVER put `playwright` in `~/.copilot/mcp-config.json`. NEVER use `npx @playwright/mcp@latest`.
 
 ---
 

@@ -1,6 +1,6 @@
 # Playwright MCP — Chrome Instance Management
 
-> **TL;DR:** Every Playwright MCP invocation gets its OWN Chrome. Never share.
+> **TL;DR:** Chrome instances are keyed by PARENT PID. Copilot's two MCP spawns share one Chrome; different Copilot sessions get isolated Chrome instances.
 
 ## The Problem
 
@@ -12,63 +12,51 @@ ShofferAI uses Playwright MCP in multiple contexts simultaneously:
 | **Relay Task** | TaskManager-spawned Copilot CLI | Execute agent browser actions (Blinkit, Swiggy, etc.) |
 | **Dev Loop** | Copilot CLI skill | Test skills E2E through prod chat |
 
-Previously, `playwright-mcp-with-chrome.sh` used a **singleton Chrome** — one Chrome instance in `/tmp/shofferai-chrome-singleton/` shared by ALL Copilot CLI processes via reference counting.
+### Problem 1: Singleton sharing (fixed 2026-03-20)
 
-### What went wrong
+Previously, `playwright-mcp-with-chrome.sh` used a **singleton Chrome** shared by ALL Copilot CLI processes. A relay task would hijack the QA browser.
 
-When a QA session and a relay task ran simultaneously:
+### Problem 2: Copilot double-spawn (fixed 2026-03-21)
 
-```
-QA Session (Copilot CLI)       Relay Task (spawned CLI)
-         │                              │
-         └──────────┬───────────────────┘
-                    │
-          SINGLETON CHROME (one window)
-          CDP port shared by both
-                    │
-    ┌───────────────┼───────────────────┐
-    │               │                   │
-  Tab 1           Tab 2              Tab 3
-  ShofferAI       Blinkit.com        about:blank
-  (QA viewing)    (agent navigated)
-```
+After switching to per-PID Chrome, Copilot CLI was spawning `playwright-mcp-with-chrome.sh` **twice** from the same process (tool discovery + active use). With per-`$$` keying, this created 2 Chrome windows per session. Combined with a stale global `~/.copilot/mcp-config.json` that also defined `playwright`, users saw up to 4 Chrome windows.
 
-The relay task navigated to Blinkit in the **same Chrome** the QA session was viewing. The QA browser got hijacked.
+## The Solution: Parent-PID Keyed Chrome
 
-## The Solution: Per-Instance Chrome
-
-Each `playwright-mcp-with-chrome.sh` invocation now creates a **dedicated Chrome** in `/tmp/shofferai-chrome-<PID>/`:
+Each `playwright-mcp-with-chrome.sh` invocation keys on `$PPID` (parent Copilot process), not `$$` (script PID):
 
 ```
-QA Session (PID 1234)          Relay Task (PID 5678)
-         │                              │
-  /tmp/shofferai-chrome-1234/   /tmp/shofferai-chrome-5678/
-         │                              │
-    Chrome A                       Chrome B
-    CDP port 59001                 CDP port 59002
-         │                              │
-    ShofferAI UI                   Blinkit.com
-    (QA, undisturbed)              (agent task)
+Copilot Session A (PID 1000)       Copilot Session B (PID 2000)
+  ├─ script (PID 1001) ─┐           ├─ script (PID 2001) ─┐
+  └─ script (PID 1002) ─┤           └─ script (PID 2002) ─┤
+                         │                                  │
+              /tmp/shofferai-chrome-1000/       /tmp/shofferai-chrome-2000/
+                         │                                  │
+                    Chrome A                           Chrome B
+                    CDP port 59001                     CDP port 59002
 ```
+
+- Both scripts from Session A share **one Chrome** (keyed on parent PID 1000)
+- Session B gets its **own Chrome** (keyed on parent PID 2000)
+- First invocation: copies profile, launches Chrome, writes lockfile
+- Second invocation: reads lockfile, reuses existing Chrome
 
 ### How it works
 
-1. **Launch**: Each invocation copies `Chrome-Debug/Profile 3` → `/tmp/shofferai-chrome-$$/profile/`
-2. **Chrome**: Launches with `--remote-debugging-port=0` (OS picks port), parses port from stderr
-3. **Connect**: Playwright MCP connects via CDP to THIS Chrome only
-4. **Cleanup**: On exit (EXIT/INT/TERM trap), kills Chrome + removes temp dir
-5. **Stale cleanup**: Finds `/tmp/shofferai-chrome-*` dirs older than 2 hours with dead PIDs
+1. **Key**: Instance dir keyed on `$PPID` (parent Copilot binary PID)
+2. **First invocation**: Copies `Chrome-Debug/Profile 3` → `/tmp/shofferai-chrome-$PPID/profile/`, launches Chrome, writes CDP port to lockfile
+3. **Second invocation**: Reads lockfile, verifies Chrome is alive, reuses CDP port (no new Chrome)
+4. **Connect**: Both Playwright MCP instances connect via CDP to the same Chrome
+5. **Cleanup**: Only the invocation that launched Chrome kills it on exit
 
-### Why per-instance (not singleton)
+### Why parent-PID keyed (not per-PID or singleton)
 
-| | Singleton (OLD) | Per-Instance (NEW) |
-|---|---|---|
-| **Isolation** | ❌ All sessions share one Chrome | ✅ Each session has its own |
-| **Navigation conflicts** | ❌ Agent task hijacks QA browser | ✅ Impossible — different processes |
-| **Cleanup** | Complex reference counting | Simple: kill own Chrome on exit |
-| **Memory** | ~500MB shared | ~500MB per instance |
-| **Profile** | One copy, shared | One copy per instance (~26MB, <1s) |
-| **Failure blast radius** | Chrome crash kills ALL sessions | Chrome crash only affects one |
+| | Singleton (v1) | Per-PID (v2) | Parent-PID (v3, current) |
+|---|---|---|---|
+| **Cross-session isolation** | ❌ All share | ✅ Fully isolated | ✅ Fully isolated |
+| **Same-session dedup** | ✅ One Chrome | ❌ 2 Chrome windows | ✅ One Chrome |
+| **Navigation conflicts** | ❌ QA hijacked | ✅ Impossible | ✅ Impossible |
+| **Memory** | ~500MB | ~1GB (2×500MB) | ~500MB |
+| **Cleanup** | Complex refcount | Simple per-PID | Lockfile-based |
 
 ### Memory consideration
 
