@@ -18,7 +18,7 @@ async function main() {
   await chromePool.initialize();
 
   // Initialize TaskManager (for Copilot CLI task execution)
-  const taskManager = new TaskManager();
+  const taskManager = new TaskManager({ chromePool });
   await taskManager.initialize();
 
   const poolStatus = chromePool.getStatus();

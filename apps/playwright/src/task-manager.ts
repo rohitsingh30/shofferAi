@@ -6,7 +6,7 @@ import { createInterface } from 'readline';
 import { randomUUID } from 'crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createServer, type Server as HttpServer } from 'http';
-import { mcpToolEvents } from './chrome-pool';
+import { mcpToolEvents, ChromePool } from './chrome-pool';
 import {
   logger,
   shouldSuppressMessage,
@@ -33,6 +33,8 @@ interface RunningTask {
   bridgeWs: WebSocket | null;
   startedAt: number;
   status: 'starting' | 'running' | 'complete' | 'error';
+  /** ChromePool sessionId — set when bridge registers (taskId IS the sessionId) */
+  sessionId: string | null;
 }
 
 export interface TaskManagerOptions {
@@ -48,6 +50,8 @@ export interface TaskManagerOptions {
   taskTimeoutMs?: number;
   /** Max concurrent tasks */
   maxConcurrent?: number;
+  /** ChromePool reference for releasing slots on cancellation */
+  chromePool?: ChromePool;
 }
 
 type RelaySendFn = (msg: TaskRelayMessage) => void;
@@ -85,10 +89,12 @@ export class TaskManager {
   private bridgeHttpServer: HttpServer | null = null;
   private bridgePort = 0;
   private relaySend: RelaySendFn | null = null;
-  private options: Required<TaskManagerOptions>;
+  private options: Required<Omit<TaskManagerOptions, 'chromePool'>>;
+  private chromePool: ChromePool | null = null;
   private taskTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(options: TaskManagerOptions = {}) {
+    this.chromePool = options.chromePool || null;
     this.options = {
       bridgePortRange: options.bridgePortRange || [9400, 9499],
       copilotBin: options.copilotBin || process.env.COPILOT_BIN || 'gh',
@@ -172,6 +178,7 @@ export class TaskManager {
         bridgeWs: null,
         startedAt: Date.now(),
         status: 'starting',
+        sessionId: null,
       };
       this.tasks.set(taskId, task);
 
@@ -641,6 +648,7 @@ export class TaskManager {
       if (task) {
         task.bridgeWs = ws;
         task.status = 'running';
+        task.sessionId = msg.taskId; // taskId IS the sessionId used by ChromePool
         ws.send(JSON.stringify({ type: 'bridge_registered', taskId: msg.taskId }));
         logger.info(`TaskManager: bridge registered for task ${msg.taskId}`);
       } else {
@@ -813,6 +821,13 @@ export class TaskManager {
     // Close bridge WS
     if (task.bridgeWs && task.bridgeWs.readyState === WebSocket.OPEN) {
       task.bridgeWs.close();
+    }
+
+    // Release Chrome slot so the window closes immediately
+    if (this.chromePool && task.sessionId) {
+      this.chromePool.releaseSlot(task.sessionId).catch((err) => {
+        logger.warn(`TaskManager: failed to release Chrome slot for ${taskId}`, { error: String(err) });
+      });
     }
 
     this.tasks.delete(taskId);
