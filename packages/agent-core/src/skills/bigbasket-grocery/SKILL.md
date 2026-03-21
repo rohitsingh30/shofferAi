@@ -36,18 +36,18 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Collect delivery address
-**EXTRACT FIRST**: Parse the user's message for items AND address. Use whatever they already provided — do NOT re-ask.
+### Step 0: Confirm delivery address & phone
+**ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode, phone). The user must pick a saved address or enter a full one. The address widget collects flat/building, street, city, pincode, AND contact phone — all critical for delivery.
 
-- If address is missing → call `ask_user` with `input_type: "address"`, question: "What's your delivery address or area name?". Show saved addresses if available:
+- Call `ask_user` with `input_type: "address"`. Show saved addresses. If the user mentioned an area, pre-fill it in the question:
   ```json
-  {"input_type": "address", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
+  {"input_type": "address", "question": "Confirm your delivery address and phone for BigBasket:", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
   ```
-- If address is already provided → skip directly to `handoff_to_browser_agent`.
+- **Only skip** if the user provided a FULL address with building/flat, street, city, pincode, AND phone number.
 - **Do NOT ask for items** — extract them from the user's message. If truly missing, handoff anyway and let the browser agent figure it out.
 - **Do NOT show product cards, prices, or images** — the cloud LLM has no access to BigBasket's catalog. Only the browser agent can fetch real product data.
 
-**CRITICAL**: Do NOT open the browser until you have the delivery address. Without a delivery location, BigBasket shows ZERO products and opens a location-select popup immediately.
+**CRITICAL**: Do NOT open the browser until you have a complete delivery address with phone. Without a delivery location, BigBasket shows ZERO products and opens a location-select popup immediately.
 
 ### 1. Open BigBasket & Dismiss Location Popup
 - Open a NEW tab and navigate to `https://www.bigbasket.com`.

@@ -30,14 +30,24 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 
 ### Step 0: Collect search preferences
-Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
-1. **product** (type: "text", required): What product to search for
-2. **budget** (type: "slider", collapsed): Budget range, min 100, max 50000, presets [500, 1000, 2000, 5000]
+Extract from the user's ORIGINAL message:
+- **product**: e.g. "wireless earbuds", "iPhone 16", "running shoes"
+- **budget**: e.g. "under 2000", "budget 5k", "max 20000"
+
+If **product** is ALREADY in the user's message → do NOT ask for it again.
+If **budget** is ALREADY in the user's message (e.g. "under 2000") → do NOT show a budget slider.
+
+Only call `ask_user` for parameters that are TRULY MISSING. Use `input_type: "layout"` with sections:
+1. **product** (type: "text", required) — ONLY if not already provided
+2. **budget** (type: "slider", collapsed, min 100, max 50000, presets [500, 1000, 2000, 5000]) — ONLY if not already provided
+
+If ALL parameters are already known, SKIP ask_user entirely and go straight to Step 2.
 
 **CRITICAL**: Do NOT open the browser without knowing what product to search for.
-### 1. Clarify Requirements
-- Confirm what the user wants to buy. If vague, use `ask_user` to clarify (brand preference, size, color, budget).
-- Note any specific requirements (storage, RAM, size, color, etc.).
+### 1. Clarify Requirements (only if needed)
+- If the user's request is specific enough to search (e.g. "wireless earbuds under 2000"), go straight to Step 2.
+- Only use `ask_user` if genuinely ambiguous (e.g. "buy me a phone" with no other context — ask brand/budget).
+- Note any specific requirements already mentioned (storage, RAM, size, color, etc.).
 
 ### 2. Open Flipkart & Verify Login
 - Open a NEW tab and navigate to `https://www.flipkart.com`.

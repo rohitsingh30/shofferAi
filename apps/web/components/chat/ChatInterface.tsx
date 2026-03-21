@@ -69,7 +69,9 @@ function ChatInterfaceInner() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const { openL2 } = useL2Payment();
+  const { openL2, closeL2 } = useL2Payment();
+  const { closeCart } = useL2Cart();
+  const { clearCart } = useCart();
 
   // Pick suggestions on client mount only — avoids hydration mismatch
   const [suggestions, setSuggestions] = useState(ALL_SUGGESTIONS.slice(0, 4));
@@ -95,10 +97,14 @@ function ChatInterfaceInner() {
     setCartItems([]);
     setCartTotal('');
     setCartStore('');
+    // Close L2 panels and clear cart context
+    closeL2();
+    closeCart();
+    clearCart();
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
     }
-  }, []);
+  }, [closeL2, closeCart, clearCart]);
 
   useEffect(() => {
     const handler = () => resetChat();

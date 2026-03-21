@@ -183,10 +183,13 @@ export function buildSystemPrompt(
     if (activeSkill.params?.length) {
       skillSection += `\n### Skill Parameters (OVERRIDE any conflicting instructions below)\n`;
       skillSection += `RULE: Extract parameter values from the user's ORIGINAL message. Do NOT ask for values already provided.\n`;
-      skillSection += `If the user said "order milk and bread" → items=["milk","bread"] is ALREADY KNOWN. Do NOT show an items input.\n`;
-      skillSection += `If the user said "fruits and veggies" → items=["fruits","veggies"] is ALREADY KNOWN. Do NOT show an items input.\n`;
+      skillSection += `Examples:\n`;
+      skillSection += `- "order milk and bread" → items=["milk","bread"] ALREADY KNOWN. Do NOT show an items input.\n`;
+      skillSection += `- "wireless earbuds under 2000" → product="wireless earbuds", budget=2000 ALREADY KNOWN. Do NOT show product text or budget slider.\n`;
+      skillSection += `- "book hotel in Mumbai for 2 nights" → destination="Mumbai", nights=2 ALREADY KNOWN.\n`;
       skillSection += `Only call ask_user for parameters that are TRULY MISSING from the user's message.\n`;
-      skillSection += `If Step 0 below says "ask for items" but items are already in the message, SKIP the items section — only ask for what's missing (usually just the address).\n\n`;
+      skillSection += `If Step 0 says "ask for X" but X is already in the message, SKIP that section entirely — only ask for what's genuinely missing.\n`;
+      skillSection += `If ALL params are already known, SKIP ask_user completely and proceed to the next step.\n\n`;
       for (const param of activeSkill.params) {
         const tag = param.required ? 'REQUIRED' : 'optional';
         skillSection += `- **${param.name}** (${tag}): ${param.hint}\n`;

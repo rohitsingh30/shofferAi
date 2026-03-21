@@ -30,18 +30,18 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Confirm delivery address
-**ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode). The user must pick a saved address or enter a full one.
+### Step 0: Confirm delivery address & phone
+**ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode, phone). The user must pick a saved address or enter a full one. The address widget collects flat/building, street, city, pincode, AND contact phone — all critical for delivery.
 
 - Call `ask_user` with `input_type: "address"`. Show saved addresses. If the user mentioned an area, pre-fill it in the question:
   ```json
   {"input_type": "address", "question": "Confirm your delivery address for JioMart:", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
   ```
-- **Only skip** if the user provided a FULL address with building/flat, street, city, and pincode (e.g. "E111, Ridgewood Estate, DLF Garden City, Pune 411032").
+- **Only skip** if the user provided a FULL address with building/flat, street, city, pincode, AND phone number (e.g. "E111, Ridgewood Estate, DLF Garden City, Pune 411032").
 - **Do NOT ask for items** — extract them from the user's message. If truly missing, handoff anyway and let the browser agent figure it out.
 - **Do NOT show product cards, prices, or images** — the cloud LLM has no access to the site's catalog. Only the browser agent can fetch real product data.
 
-**CRITICAL**: Do NOT open the browser until you have a complete delivery address. Without a delivery location, JioMart shows ZERO products.
+**CRITICAL**: Do NOT open the browser until you have a complete delivery address with phone. Without a delivery location, JioMart shows ZERO products.
 
 ### 1. Open JioMart & Set Location
 - Open a NEW tab and navigate to `https://www.jiomart.com`.
