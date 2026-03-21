@@ -128,3 +128,67 @@ ps aux | grep "shofferai-chrome-" | grep -v grep
 # Clean up ALL instances (nuclear option)
 rm -rf /tmp/shofferai-chrome-*
 ```
+
+## CDP Fiber Traversal — Testing React State Without `page.evaluate()`
+
+Playwright MCP doesn't expose `page.evaluate()` and Chrome blocks `javascript:` URLs. To inject or inspect React state from outside the page, connect directly to Chrome's CDP endpoint.
+
+### When to Use
+- Testing UI state transitions (L2 panel open/close, cart state) when relay is unavailable
+- Injecting mock data (cart items, payment state) for visual QA
+- Verifying React context values after user interactions
+
+### Steps
+
+```bash
+# 1. Find Chrome's CDP port from mcp-config.json
+cat /tmp/shofferai-chrome-*/mcp-config.json
+# → {"browser":{"cdpEndpoint":"http://127.0.0.1:<PORT>"}}
+
+# 2. List pages via CDP HTTP API
+curl http://127.0.0.1:<PORT>/json
+
+# 3. Connect via WebSocket and evaluate JS
+node -e "
+const WebSocket = require('ws');
+const ws = new WebSocket('ws://127.0.0.1:<PORT>/devtools/page/<PAGE_ID>');
+ws.on('open', () => {
+  ws.send(JSON.stringify({
+    id: 1,
+    method: 'Runtime.evaluate',
+    params: { expression: 'document.title', returnByValue: true }
+  }));
+});
+ws.on('message', (data) => {
+  const msg = JSON.parse(data.toString());
+  if (msg.id === 1) { console.log(msg.result); ws.close(); process.exit(0); }
+});
+"
+```
+
+### React Fiber Traversal Pattern
+
+To access React context values (CartContext, L2CartContext, etc.), walk the fiber tree from the root:
+
+```javascript
+// Find React fiber root on <html> element
+const html = document.documentElement;
+const fiberKey = Object.keys(html).find(k => k.startsWith('__reactFiber'));
+let fiber = html[fiberKey];
+
+// Walk tree to find context providers
+function walk(f, depth) {
+  if (!f || depth > 100) return;
+  if (f.memoizedProps?.value) {
+    const v = f.memoizedProps.value;
+    // CartContext: has addItem, clearCart, items
+    // L2CartContext: has openCart, closeCart, l2CartState
+    // L2PaymentContext: has openL2, closeL2, l2State
+  }
+  walk(f.child, depth + 1);
+  walk(f.sibling, depth + 1);
+}
+walk(fiber, 0);
+```
+
+**Typical depths:** CartContext ~48, L2CartContext ~52 (may vary with component tree changes).

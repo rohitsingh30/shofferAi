@@ -54,6 +54,16 @@ interface AgentCallbacks {
 - L2 panel collects Razorpay payment (UPI, cards, net banking, wallets)
 - Payment events: `payment_required` SSE → frontend shows payment UI → user pays → agent resumes
 
+## Cart & L2 Split View
+
+- **CartContext** (`CartContext.tsx`) — client-side cart (items, store, add/remove/clear). Single-store enforcement — adding from different store clears previous items
+- **L2CartContext** (`L2CartContext.tsx`) — cart panel state machine: `CLOSED → OPENING (300ms) → OPEN → CLOSING (300ms) → CLOSED`
+- **L2PaymentContext** (`L2PaymentContext.tsx`) — payment panel state (same state machine)
+- **L2SplitView** — 60% chat / 40% panel. Payment panel takes priority over cart panel
+- **CartBar** — floating bar above input when cart is non-empty; click summary area to open L2CartPanel, click "Continue →" to submit to agent
+- **ProductCardInput** — rich product card with "Add to Cart" → `CartContext.addItem()`
+- **"New Chat" reset** — `resetChat()` calls `closeL2()` + `closeCart()` + `clearCart()` — always clears all L2 state
+
 ## Credential Vault
 
 - AES-256-GCM encrypted at rest

@@ -254,7 +254,27 @@ sequenceDiagram
 
 ---
 
-## 5. Payment Flow — L2 Split View + Razorpay
+## 5. L2 Split View — Cart + Payment Panels
+
+The L2 split view is a 60/40 layout that slides in from the right for cart review and payment collection. Two mutually exclusive panels share the slot (payment takes priority over cart).
+
+### Cart Flow (Grocery/Shopping)
+
+```
+User clicks "ADD" on ProductCardInput → CartContext.addItem(product) → CartBar appears
+User clicks CartBar summary → L2CartContext.openCart() → L2CartPanel slides in (40%)
+User reviews items, adjusts quantities → clicks "Proceed to Buy"
+L2CartPanel → closeCart() → openL2(paymentData) → PaymentPanel slides in
+```
+
+**Components:**
+- `CartContext.tsx` — Cart items state (add/remove/update/clear), single-store enforcement
+- `L2CartContext.tsx` — Cart panel open/close state machine (`CLOSED → OPENING → OPEN → CLOSING`)
+- `CartBar.tsx` — Floating bar showing item count + total; click opens L2CartPanel
+- `L2CartPanel.tsx` — Full cart view with quantity ±, price breakdown, "Proceed to Buy"
+- `ProductCardInput.tsx` — Rich product card widget with "Add to Cart" button
+
+### Payment Flow (Razorpay)
 
 Agent pauses for payment collection, then resumes:
 
@@ -311,11 +331,32 @@ CLOSED → OPENING (300ms slide-in) → OPEN (user pays) → CLOSING (300ms slid
 ```
 
 **Components:**
-- `L2SplitView.tsx` — Split-view container with animations
-- `L2PaymentContext.tsx` — React context for L2 state management
+- `L2SplitView.tsx` — Split-view container with animations (payment panel > cart panel priority)
+- `L2PaymentContext.tsx` — React context for payment L2 state management
+- `L2CartContext.tsx` — React context for cart L2 state management
+- `CartContext.tsx` — Cart items, store, totals
 - `PaymentPanel.tsx` — Razorpay checkout + booking summary + tip selector
 - `BookingSummaryCard.tsx` — Hotel/booking details display
 - `InputPrompt.tsx` — OTP and confirmation prompts
+
+### "New Chat" Reset Behavior
+
+Clicking "New Chat" in the sidebar dispatches a `window` event that triggers `resetChat()` in `ChatInterface.tsx`. This clears **all** UI state:
+
+```
+Sidebar "New Chat" click
+  → window.dispatchEvent(new Event('newchat'))
+  → ChatInterface.resetChat()
+     → closeL2()     — closes payment panel
+     → closeCart()    — closes cart panel
+     → clearCart()    — wipes cart items from CartContext
+     → setMessages([])
+     → setPendingInput(null)
+     → setCartItems([]), setCartTotal(''), setCartStore('')
+  → Chat returns to welcome screen (100% width, suggestion cards)
+```
+
+**Key invariant:** After "New Chat", there must be zero stale L2 state — no open panels, no cart items, no pending inputs.
 
 ---
 
