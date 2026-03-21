@@ -4,7 +4,33 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
-## 2026-03-21 — InputEnricher + SIGSTOP/SIGCONT E2E verification
+## 2026-03-21 — Eliminate vanishing messages (async rewriter race + missing complete display)
+
+**Goal**: Fix agent messages that appear then vanish, and ensure errors always show with trackable codes.
+
+**What was done**:
+- **Bug 1 (prior fix)**: Removed client-side `shouldSuppressMessage()` double-filter that false-positived on rewritten messages
+- **Bug 2 (prior fix)**: Replaced `Date.now().toString()` message IDs with unique `msg-{ts}-{random}` to prevent React key collisions
+- **Bug 3 (this fix)**: Fixed async rewriter race condition — `onMessage()` fired async rewriter `.then()` but `onComplete()`/`finally` closed the stream before rewriter finished → `send()` wrote to dead stream
+- **Bug 4 (this fix)**: Frontend `case 'complete'` only did `setCurrentSteps([])` — never showed the summary text to the user
+- Added `pendingRewrites[]` tracking — all rewrite promises flushed with `Promise.allSettled()` before `controller.close()` in all 3 close paths (finally, task_complete, task_error)
+- Frontend `complete` event now displays summary as assistant message
+- Frontend `error` event shows error code + taskId suffix for task-analyser lookup (e.g. `AGENT_ERROR:g636xk38`)
+- All SSE error/complete events include `taskId` and `code` field
+- Added rewriter error fallback — sends original message if LLM fails
+
+**Files changed**:
+- `apps/web/app/api/agent/execute/route.ts` (updated — pendingRewrites flush, error codes, taskId in events)
+- `apps/web/components/chat/ChatInterface.tsx` (updated — complete shows summary, error shows code+taskId)
+
+**Key decisions**:
+- Error codes: `AGENT_ERROR` (LLM), `BROWSER_ERROR` (relay), `FATAL_ERROR` (crash)
+- TaskId last 8 chars in error display — enough for task-analyser lookup
+- `Promise.allSettled` (not `Promise.all`) — one failed rewrite shouldn't block others
+- Server-side two-tier filter remains authoritative — no client-side double-check
+
+**What worked / what didn't** *(fill in after review)*:
+-
 
 **Goal**: Build an LLM-powered InputEnricher to transform bare text `ask_user` calls from the laptop CLI into structured UI widgets (card_grid, product_card, carousel), and verify the full SIGSTOP/SIGCONT freeze/resume cycle works end-to-end on prod.
 
