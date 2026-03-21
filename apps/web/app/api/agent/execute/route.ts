@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { AgentExecutor, type AgentCallbacks, matchSkill, getMessageRewriter } from '@shofferai/agent-core';
+import { AgentExecutor, type AgentCallbacks, matchSkill, getMessageRewriter, getInputEnricher } from '@shofferai/agent-core';
 import { CredentialInjector } from '@/lib/credential-vault';
 import { remoteMcpHost, workflowEngine, vault, skills } from '@/lib/singletons';
 import { track, trackTimed } from '@/lib/telemetry';
@@ -222,6 +222,9 @@ export async function POST(request: Request) {
         // forward them as SSE events to the frontend.
         const pauseManager = workflowEngine.getPauseManager();
 
+        // Accumulate progress messages for InputEnricher context
+        const progressMessages: string[] = [];
+
         const handleTaskEvent = (msg: TaskRelayMessage) => {
           // Only handle events for this task
           if ('taskId' in msg && msg.taskId !== taskId) return;
@@ -231,6 +234,9 @@ export async function POST(request: Request) {
               // Only forward LLM text messages (no step field) as chat bubbles.
               // Tool call progress (has step field) goes only to MCP logs, not to the user.
               if (!msg.step) {
+                // Accumulate raw messages for InputEnricher context
+                progressMessages.push(msg.message);
+
                 // Two-tier filter: regex fast path + AI rewrite layer
                 getMessageRewriter().rewrite(msg.message).then(rewritten => {
                   if (rewritten) {
@@ -246,35 +252,72 @@ export async function POST(request: Request) {
               }
               break;
 
-            case 'task_input_required':
+            case 'task_input_required': {
               console.log('[execute] taskId=%s TASK_INPUT_REQUIRED stepId=%s q=%s', taskId, msg.stepId, msg.question?.slice(0, 80));
-              send('input_required', {
-                taskId,
-                stepId: msg.stepId,
-                question: msg.question,
-                inputType: msg.inputType,
-                options: msg.options,
-                cards: msg.cards,
-                show_quantity: msg.show_quantity,
-                allow_custom: msg.allow_custom,
-                multi_select: msg.multi_select,
-                saved: msg.saved,
-                mode: msg.mode,
-                shortcuts: msg.shortcuts,
-                counters: msg.counters,
-                min: msg.min,
-                max: msg.max,
-                step: msg.step,
-                presets: msg.presets,
-                placeholder: msg.placeholder,
-                format_hint: msg.format_hint,
-                sections: msg.sections,
-                product: msg.product,
+
+              // Enrich bare text inputs into structured types (product_card, carousel)
+              // using accumulated progress messages as context. Fast path for
+              // already-structured inputs (~0ms); LLM enrichment for bare text (~300ms).
+              const sendEnrichedInput = async () => {
+                const enriched = await getInputEnricher().enrich(
+                  {
+                    question: msg.question,
+                    inputType: msg.inputType,
+                    options: msg.options,
+                    cards: msg.cards,
+                    product: msg.product,
+                  },
+                  {
+                    skillName: matchedSkill?.name,
+                    progressMessages,
+                  },
+                );
+                if (enriched.enriched) {
+                  console.log('[execute] taskId=%s input enriched: %s → %s', taskId, msg.inputType, enriched.inputType);
+                }
+
+                send('input_required', {
+                  taskId,
+                  stepId: msg.stepId,
+                  question: enriched.question,
+                  inputType: enriched.inputType,
+                  options: enriched.options ?? msg.options,
+                  cards: enriched.cards ?? msg.cards,
+                  show_quantity: msg.show_quantity,
+                  allow_custom: msg.allow_custom,
+                  multi_select: msg.multi_select,
+                  saved: msg.saved,
+                  mode: msg.mode,
+                  shortcuts: msg.shortcuts,
+                  counters: msg.counters,
+                  min: msg.min,
+                  max: msg.max,
+                  step: msg.step,
+                  presets: msg.presets,
+                  placeholder: msg.placeholder,
+                  format_hint: msg.format_hint,
+                  sections: msg.sections,
+                  product: enriched.product ?? msg.product,
+                });
+                workflowEngine.addMessage(taskId, 'assistant', enriched.question, {
+                  type: 'input_required', inputType: enriched.inputType, stepId: msg.stepId,
+                  options: enriched.options ?? msg.options, cards: enriched.cards ?? msg.cards,
+                }).catch(e => console.error('[execute] DB addMessage(task_input_required) failed:', e));
+              };
+
+              sendEnrichedInput().catch(err => {
+                console.error('[execute] taskId=%s enricher error, sending original:', taskId, err);
+                send('input_required', {
+                  taskId, stepId: msg.stepId, question: msg.question,
+                  inputType: msg.inputType, options: msg.options, cards: msg.cards,
+                  show_quantity: msg.show_quantity, allow_custom: msg.allow_custom,
+                  multi_select: msg.multi_select, saved: msg.saved, mode: msg.mode,
+                  shortcuts: msg.shortcuts, counters: msg.counters,
+                  min: msg.min, max: msg.max, step: msg.step,
+                  presets: msg.presets, placeholder: msg.placeholder,
+                  format_hint: msg.format_hint, sections: msg.sections, product: msg.product,
+                });
               });
-              workflowEngine.addMessage(taskId, 'assistant', msg.question, {
-                type: 'input_required', inputType: msg.inputType, stepId: msg.stepId,
-                options: msg.options, cards: msg.cards,
-              }).catch(e => console.error('[execute] DB addMessage(task_input_required) failed:', e));
 
               // Wait for user input then send back to laptop
               pauseManager.waitForInput({
@@ -301,6 +344,7 @@ export async function POST(request: Request) {
                 console.error('[execute] taskId=%s input error:', taskId, err);
               });
               break;
+            }
 
             case 'task_payment_required':
               console.log('[execute] taskId=%s TASK_PAYMENT_REQUIRED amount=%d', taskId, msg.amount);

@@ -9,3 +9,4 @@ export type { SkillMetadata, SkillParam } from './skills/types';
 export { ScriptRecorder, ScriptPlayer, ScriptStore } from './scripts';
 export type { RecordedAction, SkillScript } from './scripts';
 export { MessageRewriter, getMessageRewriter } from './message-rewriter';
+export { InputEnricher, getInputEnricher } from './input-enricher';
