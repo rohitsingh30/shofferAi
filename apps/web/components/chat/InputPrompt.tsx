@@ -13,6 +13,8 @@ import { TextInput as RichTextInput } from './inputs/TextInput';
 import { LayoutInput } from './inputs/LayoutInput';
 import { ProductCardInput } from './inputs/ProductCardInput';
 import type { ProductCardData } from '@shofferai/shared';
+import { useCart, type CartItemData } from './CartContext';
+import { useL2Cart } from './L2CartContext';
 
 interface InputPromptProps {
   question: string;
@@ -62,6 +64,7 @@ interface InputPromptProps {
 export function InputPrompt({ question, inputType, options, onSubmit, ...richProps }: InputPromptProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const { isEmpty: cartIsEmpty } = useCart();
 
   useEffect(() => {
     if (inputType !== 'choice' && inputType !== 'confirmation' && !isRichType(inputType)) {
@@ -78,9 +81,14 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
   };
 
   // Strip bullet/number prefixes from question when showing options separately
-  const cleanQuestion = options?.length
+  let cleanQuestion = options?.length
     ? question.split('\n').filter(l => !/^\s*(?:[•\-*]|\d+[.)]\s)/.test(l)).join('\n').trim()
     : question;
+
+  // When confirmation has cart items, strip empty cart sections from agent text
+  if (inputType === 'confirmation' && !cartIsEmpty) {
+    cleanQuestion = cleanConfirmationText(cleanQuestion);
+  }
 
   // Pick icon based on type
   const icon = inputType === 'otp' ? (
@@ -269,20 +277,23 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
               </form>
             </div>
           ) : inputType === 'confirmation' ? (
-            /* Confirmation: Yes / Cancel */
-            <div className="flex gap-2.5">
-              <button
-                onClick={() => onSubmit('yes')}
-                className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
-              >
-                ✓ Yes, proceed
-              </button>
-              <button
-                onClick={() => onSubmit('no')}
-                className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-zinc-200"
-              >
-                Cancel
-              </button>
+            /* Confirmation: rich cart summary + Yes / Cancel */
+            <div className="space-y-3">
+              <CartConfirmItems />
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => onSubmit('yes')}
+                  className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
+                >
+                  ✓ Yes, proceed
+                </button>
+                <button
+                  onClick={() => onSubmit('no')}
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-zinc-200"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : inputType === 'otp' ? (
             /* OTP: monospace 6-digit input */
@@ -335,4 +346,73 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
 const RICH_TYPES = new Set(['card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'text', 'layout', 'product_card']);
 function isRichType(type: string): boolean {
   return RICH_TYPES.has(type);
+}
+
+/** Strip empty cart/bill sections from agent confirmation text when we show rich cart inline */
+function cleanConfirmationText(text: string): string {
+  return text
+    .replace(/🛒[^\n]*/g, '')          // "🛒 Your Blinkit Cart"
+    .replace(/📦\s*Items:\s*/g, '')     // "📦 Items:" (empty)
+    .replace(/💰\s*Bill Details:\s*/g, '') // "💰 Bill Details:" (empty)
+    .replace(/Details:\s*(?=\n|$)/g, '') // standalone "Details:"
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function formatInr(amount: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+/** Rich cart summary shown inside confirmation prompts when CartContext has items */
+function CartConfirmItems() {
+  const { items, store, total, isEmpty, itemCount } = useCart();
+  const { openCart } = useL2Cart();
+
+  if (isEmpty) return null;
+
+  return (
+    <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-3.5 space-y-2.5">
+      {/* Header: store + item count + View Cart CTA */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-emerald-400">🛒 {store || 'Your Cart'}</span>
+          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">
+            {itemCount} {itemCount === 1 ? 'item' : 'items'}
+          </span>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); openCart(); }}
+          className="flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
+          View Cart
+          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Item list */}
+      <div className="space-y-1.5">
+        {items.map((item: CartItemData) => (
+          <div key={item.id} className="flex items-center justify-between text-sm">
+            <span className="text-zinc-300">
+              <span className="text-zinc-500">{item.quantity}×</span> {item.name}
+            </span>
+            <span className="text-zinc-400">{formatInr(item.price * item.quantity)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Total */}
+      <div className="border-t border-white/[0.06] pt-2 flex items-center justify-between">
+        <span className="text-sm font-medium text-white">Total</span>
+        <span className="text-sm font-bold text-emerald-400">{formatInr(total)}</span>
+      </div>
+    </div>
+  );
 }
