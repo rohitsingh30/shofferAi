@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useCart } from './CartContext';
 import { useL2Cart } from './L2CartContext';
 
@@ -16,15 +15,6 @@ function formatPrice(amount: number): string {
 export function CartBar() {
   const { items, store, itemCount, total, isEmpty } = useCart();
   const { openCart } = useL2Cart();
-  const prevIsEmptyRef = useRef(true);
-
-  // Auto-open cart panel when first item is added
-  useEffect(() => {
-    if (prevIsEmptyRef.current && !isEmpty) {
-      openCart();
-    }
-    prevIsEmptyRef.current = isEmpty;
-  }, [isEmpty, openCart]);
 
   if (isEmpty) return null;
 
