@@ -15,9 +15,25 @@ npx prisma migrate deploy    # Apply migrations in prod (Cloud Run)
 
 ## Schema
 
-- PostgreSQL 16 (Cloud SQL in prod, local in dev)
-- 10 models — see `prisma/schema.prisma`
+- PostgreSQL 15 on Cloud SQL (`shofferai-db`, db-f1-micro, asia-south1)
+- PostgreSQL 16 locally via Docker Compose
+- 13 models — see `prisma/schema.prisma`
 - `DATABASE_URL` in `.env` — connection string
+- Cloud Run uses Unix socket: `?host=/cloudsql/docx-healthcare:asia-south1:shofferai-db`
+
+## Applying Migrations to Production
+
+```bash
+# Option 1: Temporary authorized network (preferred)
+MY_IP=$(curl -4 -s ifconfig.me)
+gcloud sql instances patch shofferai-db --authorized-networks="${MY_IP}/32" --quiet
+DATABASE_URL="postgresql://postgres:<password>@34.180.24.248/shofferai" npx prisma migrate deploy
+gcloud sql instances patch shofferai-db --clear-authorized-networks --quiet
+
+# Option 2: Via cloud-sql-proxy
+cloud-sql-proxy docx-healthcare:asia-south1:shofferai-db --port=5433 &
+DATABASE_URL="postgresql://postgres:<password>@127.0.0.1:5433/shofferai" npx prisma migrate deploy
+```
 
 ## Conventions
 

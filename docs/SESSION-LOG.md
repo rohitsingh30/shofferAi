@@ -4,6 +4,38 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Cloud SQL Verification & Migration + Address Picker DB Fallback
+
+**Goal**: Verify Cloud SQL production database, apply pending migrations, add AddressInput DB fallback for saved addresses, update documentation.
+
+**What was done**:
+- Discovered existing Cloud SQL instance `shofferai-db` (PostgreSQL 15, db-f1-micro, asia-south1) — already connected to Cloud Run via Unix socket
+- Applied pending migration `20260321173519_add_pending_input` — now 13 tables in prod (was 12)
+- Temporarily authorized laptop IP for direct access, then removed it after migration
+- AddressInput.tsx: Added `useEffect` fallback — fetches saved addresses from `/api/profile` when LLM doesn't pass them in the `saved` prop
+- system.ts: Strengthened saved address injection — now passes full JSON array with explicit "include ALL" instruction
+- Removed hardcoded example addresses from 24 grocery/food SKILL.md files (were biasing LLM to use fake addresses instead of real ones)
+- Updated DEPLOYMENT.md with Cloud SQL instance details, connection info, and migration instructions
+- Updated ARCHITECTURE.md model count (10 → 13)
+- Updated prisma-db instructions with prod migration workflow
+
+**Files changed**:
+- `apps/web/components/chat/inputs/AddressInput.tsx` (updated — DB fallback via /api/profile)
+- `packages/agent-core/src/prompts/system.ts` (updated — full JSON saved address injection)
+- 24 `SKILL.md` files (updated — removed hardcoded address examples)
+- `docs/DEPLOYMENT.md` (updated — Cloud SQL section, env var details)
+- `docs/ARCHITECTURE.md` (updated — model count, last updated date)
+- `.github/instructions/prisma-db.instructions.md` (updated — prod migration workflow)
+
+**Key decisions**:
+- Cloud SQL already existed and was connected — no new provisioning needed
+- Used temporary authorized network for migration (not cloud-sql-proxy, since ADC wasn't configured)
+- Always clear authorized networks after direct access (security)
+- SKILL.md address examples replaced with `<use the saved addresses from the system prompt>` to stop LLM hallucination
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Razorpay Payment Integration + Session Affinity Fix
 
 **Goal**: Configure Razorpay test keys, fix stepId mismatch bug in payment verify flow, and enable Cloud Run session affinity to fix multi-instance pending input loss.

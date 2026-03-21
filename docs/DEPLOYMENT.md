@@ -1,6 +1,6 @@
 # ShofferAI — Deployment Guide: Cloud vs Laptop
 
-> **Last Updated**: March 19, 2026
+> **Last Updated**: March 21, 2026
 
 This document explains exactly what runs where, what you need to start on your laptop, and how the two environments connect.
 
@@ -57,6 +57,46 @@ Everything in the Docker container. **No browser, no Playwright.**
 | **CredentialVault** | AES-256-GCM encrypted credential storage | `apps/web/lib/credential-vault/` |
 | **Prisma Client** | Database access | `prisma/` |
 | **Cloud SQL** | PostgreSQL 16 (managed) | GCP Console |
+
+#### Cloud SQL Instance Details
+
+| Property | Value |
+|----------|-------|
+| **Instance name** | `shofferai-db` |
+| **Version** | PostgreSQL 15 |
+| **Tier** | `db-f1-micro` (shared CPU, 614 MB RAM) |
+| **Region** | `asia-south1` (same as Cloud Run) |
+| **Disk** | 10 GB SSD |
+| **Connection name** | `docx-healthcare:asia-south1:shofferai-db` |
+| **Database** | `shofferai` |
+| **User** | `postgres` |
+| **Public IP** | Enabled (no authorized networks — access via Cloud SQL connector only) |
+| **SSL** | Allow unencrypted (Cloud Run uses Unix socket, not TCP) |
+
+**Cloud Run connects via Unix socket** (`/cloudsql/docx-healthcare:asia-south1:shofferai-db`) — no public IP access needed. The `cloudsql-instances` annotation on the Cloud Run service enables this automatically.
+
+**Tables (13):** User, Account, Session, VerificationToken, Profile, Credential, Task, TaskStep, Message, Payment, SkillLesson, TelemetryEvent, PendingInput
+
+**Migrations:**
+```bash
+# Apply pending migrations to prod (from laptop with cloud-sql-proxy or authorized network)
+DATABASE_URL="postgresql://postgres:<password>@34.180.24.248/shofferai" npx prisma migrate deploy
+
+# Or via Cloud Run container startup (automatic — see Dockerfile CMD)
+```
+
+**Temporary direct access (for debugging):**
+```bash
+# 1. Authorize your IP
+MY_IP=$(curl -4 -s ifconfig.me)
+gcloud sql instances patch shofferai-db --authorized-networks="${MY_IP}/32" --quiet
+
+# 2. Connect
+DATABASE_URL="postgresql://postgres:<password>@34.180.24.248/shofferai" npx prisma studio
+
+# 3. ALWAYS remove access after
+gcloud sql instances patch shofferai-db --clear-authorized-networks --quiet
+```
 
 **Dockerfile highlights:**
 ```dockerfile
@@ -192,7 +232,7 @@ cd apps/web && npx next dev
 |----------|----------|-------------|
 | `RELAY_MODE` | ✅ | **`cloud`** — uses RelayBridge (accepts laptop WS) |
 | `RELAY_AUTH_TOKEN` | ✅ | Shared secret — **must match laptop** |
-| `DATABASE_URL` | ✅ | Cloud SQL connection string |
+| `DATABASE_URL` | ✅ | Cloud SQL via Unix socket: `postgresql://postgres:<pw>@localhost/shofferai?host=/cloudsql/docx-healthcare:asia-south1:shofferai-db` |
 | `AZURE_OPENAI_ENDPOINT` | ✅ | Azure OpenAI resource URL |
 | `AZURE_OPENAI_API_KEY` | ✅ | Azure OpenAI API key |
 | `LLM_MODEL` | ✅ | Azure deployment name (e.g. `gpt-4o-mini`) |

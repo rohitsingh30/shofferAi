@@ -1,7 +1,7 @@
 # ShofferAI — System Architecture
 
 > **Version**: 3.0 — Full Architecture with Diagrams
-> **Last Updated**: March 19, 2026
+> **Last Updated**: March 21, 2026
 
 ---
 
@@ -725,7 +725,7 @@ ChromePool launches Chrome lazily per task:
 | **500+ Compiled Scripts** | ✅ Bundled | In `packages/agent-core/src/scripts/compiled/` |
 | **ScriptPlayer** | ✅ Live | Instant replay mode for cached skills |
 | **Razorpay Payments** | ✅ Integrated | Test mode (switch to Live for production) |
-| **PostgreSQL (Cloud SQL)** | ✅ Live | 10 Prisma models |
+| **PostgreSQL (Cloud SQL)** | ✅ Live | 13 Prisma models, `shofferai-db` instance (db-f1-micro, asia-south1) |
 | **SSE Streaming** | ✅ Live | Real-time agent progress to frontend |
 | **L2 Payment Panel** | ✅ Built | Split-view Razorpay checkout |
 | **Credential Vault** | ✅ Built | AES-256-GCM encrypted storage |
