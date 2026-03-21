@@ -217,8 +217,8 @@ export class TaskManager {
     // read the Bridge MCP result. See SIGSTOP in handleBridgeMessage().
     if (task.agentProcess?.pid) {
       try {
-        process.kill(task.agentProcess.pid, 'SIGCONT');
-        logger.info(`TaskManager: SIGCONT sent to CLI (PID ${task.agentProcess.pid}) — user responded`);
+        process.kill(-task.agentProcess.pid, 'SIGCONT');
+        logger.info(`TaskManager: SIGCONT sent to CLI process group (PGID ${task.agentProcess.pid}) — user responded`);
       } catch (e) {
         logger.warn(`TaskManager: failed to SIGCONT CLI for task ${taskId}`);
       }
@@ -243,8 +243,8 @@ export class TaskManager {
     // Resume CLI (see SIGSTOP in handleBridgeMessage for isBridgeRequestPayment)
     if (task.agentProcess?.pid) {
       try {
-        process.kill(task.agentProcess.pid, 'SIGCONT');
-        logger.info(`TaskManager: SIGCONT sent to CLI (PID ${task.agentProcess.pid}) — payment responded`);
+        process.kill(-task.agentProcess.pid, 'SIGCONT');
+        logger.info(`TaskManager: SIGCONT sent to CLI process group (PGID ${task.agentProcess.pid}) — payment responded`);
       } catch (e) {
         logger.warn(`TaskManager: failed to SIGCONT CLI for task ${taskId}`);
       }
@@ -267,7 +267,7 @@ export class TaskManager {
     // Resume CLI first in case it's SIGSTOP'd (waiting for user input/payment).
     // A stopped process can't receive SIGTERM cleanly.
     if (task.agentProcess?.pid) {
-      try { process.kill(task.agentProcess.pid, 'SIGCONT'); } catch { /* */ }
+      try { process.kill(-task.agentProcess.pid, 'SIGCONT'); } catch { /* */ }
     }
 
     // Notify Bridge MCP
@@ -427,6 +427,7 @@ export class TaskManager {
     });
 
     const proc = spawn(this.options.copilotBin, args, {
+      detached: true,  // Own process group — allows SIGSTOP/SIGCONT on entire tree
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
@@ -434,6 +435,9 @@ export class TaskManager {
         BRIDGE_TASK_ID: taskId,
       },
     });
+
+    // Don't let the detached child keep the parent alive
+    proc.unref();
 
     return proc;
   }
@@ -655,8 +659,8 @@ export class TaskManager {
       const task = this.tasks.get(msg.taskId);
       if (task?.agentProcess?.pid) {
         try {
-          process.kill(task.agentProcess.pid, 'SIGSTOP');
-          logger.info(`TaskManager: SIGSTOP sent to CLI (PID ${task.agentProcess.pid}) — waiting for user input`);
+          process.kill(-task.agentProcess.pid, 'SIGSTOP');
+          logger.info(`TaskManager: SIGSTOP sent to CLI process group (PGID ${task.agentProcess.pid}) — waiting for user input`);
         } catch (e) {
           logger.warn(`TaskManager: failed to SIGSTOP CLI for task ${msg.taskId}`);
         }
@@ -694,8 +698,8 @@ export class TaskManager {
       const task = this.tasks.get(msg.taskId);
       if (task?.agentProcess?.pid) {
         try {
-          process.kill(task.agentProcess.pid, 'SIGSTOP');
-          logger.info(`TaskManager: SIGSTOP sent to CLI (PID ${task.agentProcess.pid}) — waiting for payment`);
+          process.kill(-task.agentProcess.pid, 'SIGSTOP');
+          logger.info(`TaskManager: SIGSTOP sent to CLI process group (PGID ${task.agentProcess.pid}) — waiting for payment`);
         } catch (e) {
           logger.warn(`TaskManager: failed to SIGSTOP CLI for task ${msg.taskId}`);
         }
@@ -791,12 +795,16 @@ export class TaskManager {
       this.taskTimeouts.delete(taskId);
     }
 
-    // Kill agent process
+    // Kill agent process group (detached: true makes PID = PGID)
     try {
-      if (!task.agentProcess.killed) {
-        task.agentProcess.kill('SIGTERM');
+      if (!task.agentProcess.killed && task.agentProcess.pid) {
+        process.kill(-task.agentProcess.pid, 'SIGTERM');
         setTimeout(() => {
-          try { if (!task.agentProcess.killed) task.agentProcess.kill('SIGKILL'); } catch { /* */ }
+          try {
+            if (!task.agentProcess.killed && task.agentProcess.pid) {
+              process.kill(-task.agentProcess.pid, 'SIGKILL');
+            }
+          } catch { /* already dead */ }
         }, 3000);
       }
     } catch { /* already dead */ }
