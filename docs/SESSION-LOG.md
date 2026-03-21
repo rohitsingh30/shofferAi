@@ -4,6 +4,38 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — InputEnricher + SIGSTOP/SIGCONT E2E verification
+
+**Goal**: Build an LLM-powered InputEnricher to transform bare text `ask_user` calls from the laptop CLI into structured UI widgets (card_grid, product_card, carousel), and verify the full SIGSTOP/SIGCONT freeze/resume cycle works end-to-end on prod.
+
+**What was done**:
+- Verified SIGSTOP/SIGCONT works: all ~20 processes in the spawned process group (copilot, Chrome, bridge MCP, esbuild) freeze on `ask_user` and resume on user response
+- Diagnosed bare `ask_user` issue: laptop CLI sends plain text instead of structured `product_card`/`carousel` types despite SKILL.md instructions
+- Built `InputEnricher` — cloud-side LLM layer that intercepts `task_input_required` events and enriches bare text into structured types using accumulated progress messages as context
+- Wired enricher into `route.ts` at the `task_input_required` handler with async IIFE + fallback
+- Deployed to prod and verified full E2E flow:
+  1. Sent "search for wireless earbuds under 2000 on flipkart"
+  2. Agent browsed Flipkart, found products, called bare `ask_user`
+  3. **InputEnricher** transformed it into `card_grid` with 5 product cards (images, ratings, prices)
+  4. SIGSTOP froze process group while user picked a product
+  5. Selected OPPO Enco Buds3 Pro → SIGCONT resumed agent
+  6. Agent navigated to product, extracted details, triggered payment panel (₹1,499)
+
+**Files changed**:
+- `packages/agent-core/src/input-enricher.ts` (created — LLM enrichment module)
+- `packages/agent-core/src/index.ts` (updated — added InputEnricher export)
+- `apps/web/app/api/agent/execute/route.ts` (updated — progress accumulator + enrichment logic)
+
+**Key decisions**:
+- InputEnricher is cloud-side only — no changes to laptop CLI or bridge MCP
+- Fast path: already-structured inputs pass through with zero overhead
+- Only activates for shopping skills (flipkart, myntra, amazon, blinkit, zepto, swiggy)
+- Uses accumulated `task_progress` messages as context for the LLM to extract product data
+- Async IIFE wrapper in route.ts because `handleTaskEvent` is synchronous — enrichment runs async with fallback to original on error
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Fix vanishing agent messages (double-filter + ID collisions)
 
 **Goal**: Diagnose and fix agent messages that "appear and then vanish" from chat UI.
