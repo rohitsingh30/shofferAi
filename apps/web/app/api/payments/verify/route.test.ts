@@ -100,7 +100,7 @@ describe('POST /api/payments/verify', () => {
   it('updates payment record and resumes agent on valid signature', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: 'u1' } } as any);
     vi.mocked(prisma.payment.update).mockResolvedValue({} as any);
-    mockProvideInput.mockReturnValue(true);
+    mockProvideInput.mockResolvedValue(true);
 
     const sig = makeSignature('order_abc', 'pay_xyz');
     const res = await POST(makeRequest({
@@ -125,7 +125,7 @@ describe('POST /api/payments/verify', () => {
   it('calls pauseManager.provideInput with correct taskId', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: 'u1' } } as any);
     vi.mocked(prisma.payment.update).mockResolvedValue({} as any);
-    mockProvideInput.mockReturnValue(true);
+    mockProvideInput.mockResolvedValue(true);
 
     const sig = makeSignature('order_abc', 'pay_xyz');
     await POST(makeRequest({

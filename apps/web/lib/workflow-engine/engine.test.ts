@@ -12,6 +12,11 @@ vi.mock('@shofferai/shared', async () => {
   };
 });
 
+// PauseResumeManager now imports prisma at module level
+vi.mock('@/lib/prisma', () => ({
+  prisma: { pendingInput: {} },
+}));
+
 describe('WorkflowEngine', () => {
   let prisma: ReturnType<typeof mockDeep<PrismaClient>>;
   let engine: WorkflowEngine;

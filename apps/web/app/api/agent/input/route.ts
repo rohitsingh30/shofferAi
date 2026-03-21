@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   const pauseManager = workflowEngine.getPauseManager();
-  const success = pauseManager.provideInput(taskId, stepId, value);
+  const success = await pauseManager.provideInput(taskId, stepId, value);
 
   if (!success) {
     console.warn('[input] taskId=%s no pending input request found', taskId);

@@ -59,7 +59,7 @@ describe('POST /api/agent/input', () => {
   it('returns 404 when no pending input', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: 'u1' } } as any);
     vi.mocked(prisma.task.findFirst).mockResolvedValue({ id: 't1' } as any);
-    mockProvideInput.mockReturnValue(false);
+    mockProvideInput.mockResolvedValue(false);
 
     const res = await POST(makeRequest({ taskId: 't1', stepId: 's1', value: 'v' }));
     expect(res.status).toBe(404);
@@ -68,7 +68,7 @@ describe('POST /api/agent/input', () => {
   it('returns success when input provided', async () => {
     vi.mocked(auth).mockResolvedValue({ user: { id: 'u1' } } as any);
     vi.mocked(prisma.task.findFirst).mockResolvedValue({ id: 't1' } as any);
-    mockProvideInput.mockReturnValue(true);
+    mockProvideInput.mockResolvedValue(true);
 
     const res = await POST(makeRequest({ taskId: 't1', stepId: 's1', value: '123456' }));
     const body = await res.json();
