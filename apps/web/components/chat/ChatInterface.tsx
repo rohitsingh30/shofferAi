@@ -419,15 +419,16 @@ function ChatInterfaceInner() {
         }
 
         if (selectedIds.length > 0) {
-          const agentItems = selectedIds.map((sel) => {
+          for (const sel of selectedIds) {
             const card = pendingInput.cards?.find((c) => c.id === sel.id);
-            return {
+            const price = card?.subtitle ? parsePrice(card.subtitle) : 0;
+            addItem({
+              id: `input-${sel.id}-${Date.now()}`,
               name: card?.label || sel.id,
-              quantity: sel.qty,
-              price: card?.subtitle ? `₹${parsePrice(card.subtitle)}` : '₹0',
-            };
-          });
-          syncFromAgent(agentItems, store, '');
+              price,
+              store,
+            });
+          }
         }
       } catch {
         // parse error — ignore
