@@ -561,7 +561,8 @@ shofferai/
 │       │   ├── task-manager.ts           ← TaskManager (bridge WS on dynamic port 9400-9499, isInternalToolLabel filter)
 │       │   └── chrome-pool.ts            ← ChromePool + mcpToolEvents (tool log stream on dynamic port)
 │       └── scripts/
-│           ├── playwright-mcp-with-chrome.sh ← Lazy MCP launcher (.mcp.json entry)
+│           ├── lazy-playwright-proxy.mjs     ← MCP proxy: defers Chrome until first tool call (.mcp.json entry)
+│           ├── playwright-mcp-with-chrome.sh ← Chrome launcher (spawned by proxy on demand)
 │           ├── stealth-init.js              ← Anti-bot init script for --init-script
 │           ├── start-laptop.sh              ← Primary relay launcher
 │           ├── start-relay-daemon.sh        ← LaunchAgent daemon entry
@@ -648,16 +649,19 @@ shofferai/
 
 Chrome launched by the script uses real macOS Keychain (not Playwright's mock keychain). Playwright MCP connects via CDP.
 
-**Copilot CLI / Claude Desktop path** (`.mcp.json` → `playwright-mcp-with-chrome.sh`):
+**Copilot CLI / Claude Desktop path** (`.mcp.json` → `lazy-playwright-proxy.mjs` → `playwright-mcp-with-chrome.sh`):
 ```
-.mcp.json invokes playwright-mcp-with-chrome.sh:
-  1. Selective copy of Chrome-Debug/Profile 3 session data (~26MB)
-  2. Remove Chrome's internal lock files (SingletonLock, SingletonSocket, SingletonCookie) from clone
-  3. Launch Chrome ourselves with --remote-debugging-port=0 (NO Playwright launch)
-  4. Parse CDP port from Chrome stderr (DevTools listening on ws://127.0.0.1:PORT)
-  5. Generate config with cdpEndpoint → Playwright MCP CONNECTS to our Chrome
-  6. Start Playwright MCP with --config + --init-script stealth-init.js
-  7. Cleanup: kill Chrome + remove cloned dir on exit
+.mcp.json invokes lazy-playwright-proxy.mjs (Node.js):
+  1. Responds to initialize + tools/list INSTANTLY (static tool defs, no Chrome)
+  2. On first tools/call: spawns playwright-mcp-with-chrome.sh as child
+  3. Child: selective copy of Chrome-Debug/Profile 3 session data (~26MB)
+  4. Child: remove Chrome's internal lock files from clone
+  5. Child: launch Chrome with --remote-debugging-port=0 (NO Playwright launch)
+  6. Child: parse CDP port from Chrome stderr
+  7. Child: start Playwright MCP with --config + --init-script stealth-init.js
+  8. Proxy: forward tool call to child, return result
+  9. All subsequent calls proxied to child via NDJSON over stdio
+  10. Cleanup: proxy kills child → child kills Chrome + removes cloned dir
 ```
 WHY we launch Chrome ourselves: Playwright adds `--use-mock-keychain` and `--password-store=basic`
 which blocks macOS Keychain access. Chrome cookies are Keychain-encrypted → mock keychain = logged out.

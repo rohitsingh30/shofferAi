@@ -86,6 +86,8 @@ Everything browser-related. **This is where the actual web tasks happen.**
 > **No manual Chrome launch needed.** ChromePool handles everything — it clones the Chrome-Debug profile, launches Chrome with an OS-assigned port, and connects Playwright MCP automatically.
 >
 > **⚠️ IMPORTANT:** Chrome MUST be launched without Playwright's default `--use-mock-keychain` flag. This flag blocks macOS Keychain access, making all encrypted cookies unreadable (every site appears logged out). Both ChromePool and `playwright-mcp-with-chrome.sh` launch Chrome directly (not via Playwright) to avoid this.
+>
+> **⚠️ Lazy launch:** For Copilot CLI, `.mcp.json` uses `lazy-playwright-proxy.mjs` which defers Chrome until the first browser tool call. This means `gh copilot` starts instantly without Chrome. The proxy spawns `playwright-mcp-with-chrome.sh` on demand.
 
 ---
 

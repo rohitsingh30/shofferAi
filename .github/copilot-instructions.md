@@ -111,6 +111,7 @@ These are the top mistakes from `docs/REPEATING-MISTAKES.md`. Breaking any of th
 9. **Always use SessionMCPHost** with unique `sessionId` for tab isolation
 10. **Every Playwright MCP launch MUST include `--output-dir /tmp/playwright-mcp-output`**
 11. **Each Playwright MCP gets its OWN Chrome** — `playwright-mcp-with-chrome.sh` creates per-instance Chrome in `/tmp/shofferai-chrome-<PID>/`. Never share Chrome between sessions.
+12. **Chrome is lazy** — `.mcp.json` uses `lazy-playwright-proxy.mjs` which defers Chrome launch until first browser tool call. Never point `.mcp.json` directly at `playwright-mcp-with-chrome.sh`.
 
 ### User Experience
 11. **NEVER show tool calls to users** — only show: questions, choices, results, errors, confirmations

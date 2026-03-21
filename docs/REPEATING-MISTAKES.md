@@ -457,8 +457,9 @@ These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitch
 3. First invocation launches Chrome and writes a lockfile with PID + CDP port
 4. Second invocation detects the lockfile, verifies Chrome is alive, reuses it
 5. Different Copilot sessions (different parents) still get isolated Chrome instances
+6. Added `lazy-playwright-proxy.mjs` — `.mcp.json` now points to a proxy that defers Chrome entirely until first browser tool call
 
-**Rule:** Instance dirs MUST be keyed on `$PPID` (parent Copilot binary), not `$$` (script). NEVER put `playwright` in `~/.copilot/mcp-config.json`. NEVER use `npx @playwright/mcp@latest`.
+**Rule:** Instance dirs MUST be keyed on `$PPID` (parent Copilot binary), not `$$` (script). NEVER put `playwright` in `~/.copilot/mcp-config.json`. NEVER use `npx @playwright/mcp@latest`. NEVER point `.mcp.json` directly at `playwright-mcp-with-chrome.sh` — always use `lazy-playwright-proxy.mjs`.
 
 ---
 

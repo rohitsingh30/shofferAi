@@ -16,7 +16,10 @@
 # Chrome is launched manually (not by Playwright MCP) to avoid the
 # --use-mock-keychain flag that prevents macOS Keychain cookie decryption.
 #
-# Called by .mcp.json — no manual Chrome launch needed.
+# Called by lazy-playwright-proxy.mjs (which is the .mcp.json entry point).
+# The proxy defers spawning this script until the first browser tool call,
+# so Chrome only launches when actually needed.
+# Also called directly by task-manager.ts for relay tasks.
 
 set -euo pipefail
 

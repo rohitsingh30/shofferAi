@@ -1,10 +1,23 @@
 ---
-applyTo: "apps/playwright/scripts/playwright-mcp-with-chrome.sh,.mcp.json,**/mcp-host*,**/chrome-pool*,**/task-manager*"
+applyTo: "apps/playwright/scripts/playwright-mcp-with-chrome.sh,apps/playwright/scripts/lazy-playwright-proxy.mjs,.mcp.json,**/mcp-host*,**/chrome-pool*,**/task-manager*"
 ---
 
 # Playwright MCP — Chrome Instance Rules
 
 > Read `docs/PLAYWRIGHT-MCP-CHROME.md` for full architecture details.
+
+## Lazy Proxy Architecture
+
+`.mcp.json` points to `lazy-playwright-proxy.mjs` (NOT directly to `playwright-mcp-with-chrome.sh`):
+
+```
+gh copilot → .mcp.json → lazy-playwright-proxy.mjs
+  → initialize/tools/list: instant response (static tool defs, no Chrome)
+  → first tools/call: spawns playwright-mcp-with-chrome.sh → Chrome launches
+  → subsequent calls: proxied to child via NDJSON
+```
+
+Transport: both Copilot CLI and playwright-mcp use **NDJSON** (newline-delimited JSON) over stdio.
 
 ## Critical Rule: Per-Instance Chrome
 

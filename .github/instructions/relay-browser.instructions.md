@@ -35,7 +35,7 @@ Launch paths (all must follow above rules):
 - `mcp-host.ts` — ChromePool relay
 - `claude-agent-spawner.ts` — Copilot CLI spawner
 - `shofferai-agent.sh` — standalone agent
-- `playwright-mcp-with-chrome.sh` — local Copilot/Claude Desktop
+- `lazy-playwright-proxy.mjs` → `playwright-mcp-with-chrome.sh` — Copilot CLI (via lazy proxy)
 
 ## Relay Modes
 
