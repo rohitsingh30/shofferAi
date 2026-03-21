@@ -14,7 +14,7 @@ RESPOND WITH EXACTLY ONE OF:
 2. A clean 1-2 sentence rewrite — if the message has genuinely useful info for the user
 
 Rules:
-- Internal = "I can see...", "Let me click...", "The page shows...", "Navigating to...", step references, selector names, any browser mechanics
+- Internal = "I can see...", "Let me click...", "The page shows...", "Navigating to...", "I can get/fetch/provide those...", step references, selector names, any browser mechanics, capability offers about internal data
 - Useful = search results, prices, availability, order status, confirmation, errors that affect the user
 - Write as the AI assistant ("I found..." not "The agent found...")
 - Never mention browser, tabs, clicking, navigating, selectors, or internal tools

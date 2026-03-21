@@ -73,9 +73,9 @@ function isSentenceNarration(lower: string): boolean {
   // --- Action narration ("Let me click...", "I'll navigate to...") ---
   const actionVerbs = 'navigate|go to|go back|open|click|search|type|browse|check|look|read|scroll|select|visit|head to|dismiss|refresh|fill|submit|wait|load|close|handle|verify|proceed|update|change|set|switch|enter|tap|press|pick|choose|try|find|locate|expand|collapse|clear|modify|adjust|move|sort|filter|apply|toggle|add|remove|bookmark|compare|take|copy|paste|drag|drop';
   const action = [
-    new RegExp(`^(let me|i'll|i will|i'm going to|now i'll|now let me|i'm now|i need to|i'm about to|first,? i'll|next,? i'll)\\s+(${actionVerbs})\\b`),
+    new RegExp(`^(let me|i'll|i will|i can|i'm going to|now i'll|now let me|i'm now|i need to|i'm about to|first,? i'll|next,? i'll)\\s+(${actionVerbs})\\b`),
     new RegExp(`^(navigating|going|opening|clicking|searching|typing|browsing|checking|looking|reading|scrolling|loading|heading|dismissing|refreshing|filling|submitting|waiting|closing|handling|verifying|proceeding|updating|changing|setting|switching|entering|tapping|pressing)\\s+(to|for|at|on|the|through|a |an )`),
-    new RegExp(`^(now |first |next )?(i('ll| will| need to| am going to|'m going to) )?(${actionVerbs})\\b`),
+    new RegExp(`^(now |first |next )?(i('ll| will| can| need to| am going to|'m going to) )?(${actionVerbs})\\b`),
     /^(searching|looking) for (hotels|flights|products|items|rooms|options|dal|milk|grocery|groceries|results)/,
     /^open a new tab/,
     /^navigate to https?:\/\//,
@@ -124,6 +124,8 @@ function isSentenceNarration(lower: string): boolean {
   const selfDirected = [
     /^(could you|can you|would you|please |kindly )?(provide|show|give|send|fetch|get|list|display|include|extract|retrieve)\s+(me |us )?(the |a |an |all |any |more |some |those |these )?(image url|image urls|ratings?|review scores?|selectors?|xpaths?|data-testid|api |endpoints?|html |css |json |raw |technical |internal )/i,
     /^(provide|show|give|fetch|get|list|display|include|extract|retrieve)\s+(the |a |an |all |any |more |some |those |these )?(image url|image urls|ratings?|review scores?|selectors?|xpaths?|data-testid|api |endpoints?|html |css |json |raw |technical |internal )/i,
+    // First-person capability statements: "I can get those image URLs", "I'll fetch the details"
+    /^i (can |could |will |'ll |'d )?(get|fetch|retrieve|provide|pull|send|extract|grab|obtain)\s+(those |the |some |these |that |all )?(image url|image urls|url|urls|details?|data|info|information|prices?|ratings?|selectors?|html|json|raw )/i,
   ];
 
   // --- Internal reasoning / chain-of-thought (LLM thinking out loud) ---
