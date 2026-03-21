@@ -57,14 +57,26 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Take snapshot of results page.
 - Apply filters if relevant: price range (budget), brand, size, color, rating, discount.
 - Extract top 3-5 options with: brand, name, price (MRP vs discounted), rating, discount %.
-- Use `ask_user` (input_type "choice") to present options. Format: "Brand Name — ₹X,XXX (XX% off) — ⭐ Rating"
+- Use `ask_user` with `input_type: "carousel"` to present options. Extract the REAL image URL from each product's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Brand Name", "subtitle": "₹X,XXX · MRP ₹Y,YYY", "image": "https://assets.myntassets.com/h_720,q_90,w_540/real-image...", "badge": "XX% off"}
+    ]
+  }
+  ```
 - If user wants to see more, scroll or refine search.
 
 ### 4. View Product & Select Size
 - Click selected product.
 - Take snapshot of product page.
 - Extract: brand, full name, price, MRP, discount, available sizes, delivery date, return policy.
-- If size not provided by user, present available sizes via `ask_user` (input_type "choice").
+- If size not provided by user, present available sizes via `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["XS", "S", "M", "L", "XL", "XXL"]}
+  ```
+  Only include sizes that are actually in stock on the product page.
 - Check if selected size is available. If not, suggest closest alternative.
 - Select the size by clicking on the size chip.
 

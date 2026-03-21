@@ -76,8 +76,15 @@ For EACH item in the shopping list:
 
 **b) Present options to user:**
 - From the search results, extract the top 5-7 product options with: product name, brand, size/quantity, price.
-- Use `ask_user` (input_type "choice") to let user pick. Format: "Brand Name Size — ₹Price"
-- Example: "Amul Taaza Milk 1 Ltr — ₹54"
+- Use `ask_user` with `input_type: "carousel"` to let user pick. Extract the REAL image URL from each product's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Amul Taaza Milk", "subtitle": "₹54 · 1 Ltr", "image": "https://instamart-media-assets.swiggy.com/real-image...", "badge": "10 mins"}
+    ]
+  }
+  ```
 
 **c) Add selected item to cart:**
 - Click the "Add" or "ADD" button on the chosen product card.

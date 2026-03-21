@@ -43,7 +43,10 @@ Only call `ask_user` for information NOT already in the user's message.
 
 ### 1. Get Delivery Address
 - BEFORE opening the browser, check if user provided an address.
-- If not, use `ask_user` (input_type "freetext"): "What's your delivery address or pincode for Amazon Fresh?"
+- If not, use `ask_user` with `input_type: "address"`: "What's your delivery address or pincode for Amazon Fresh?" Include saved addresses if available:
+  ```json
+  {"input_type": "address", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
+  ```
 
 ### 2. Open Amazon Fresh & Set Location
 - Open a NEW tab and navigate to `https://www.amazon.in/fresh`.
@@ -60,7 +63,15 @@ For each item the user requested:
 - Take snapshot of results.
 - Filter for "Amazon Fresh" items only (look for the green Fresh badge).
 - Find the closest match. Check brand, size/weight, price, and Prime eligibility.
-- If multiple variants (brands, sizes, organic vs regular), use `ask_user` (input_type "choice") with prices.
+- If multiple variants (brands, sizes, organic vs regular), use `ask_user` with `input_type: "carousel"`. Extract the REAL image URL from each product's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Brand Name Item", "subtitle": "₹XX · 1 kg", "image": "https://m.media-amazon.com/images/I/real-image...", "badge": "Fresh"}
+    ]
+  }
+  ```
 - Click "Add to Cart" to add. Adjust quantity if needed.
 - If out of stock, inform user and suggest alternatives.
 - Repeat for all items. Dismiss any popups or "Frequently bought together" suggestions.

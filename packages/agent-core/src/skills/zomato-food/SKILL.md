@@ -53,10 +53,21 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 ### 3. Find Restaurant & Dishes
 - If user named a specific restaurant, search for it in the search bar at the top.
 - If user named a dish/cuisine, search for it and present top 3-5 restaurant options.
-- Use `ask_user` (input_type "choice") to let user pick a restaurant.
+- Use `ask_user` with `input_type: "carousel"` to let user pick a restaurant. Extract the REAL image URL from each restaurant's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Restaurant Name", "subtitle": "₹350 for two · Biryani, North Indian", "image": "https://b.zmtcdn.com/real-image...", "badge": "⭐ 4.2"}
+    ]
+  }
+  ```
 - Open the restaurant page ("Order Online" section), take snapshot.
 - Browse the menu. Scroll through categories to find requested dish(es).
-- If multiple variants/sizes, use `ask_user` (input_type "choice").
+- If multiple variants/sizes, use `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["Half — ₹160", "Full — ₹290", "Regular — ₹210"]}
+  ```
 - Click "Add" for each item. Handle customization popups by asking user preferences.
 - If item is "Bestseller" tagged, mention it to user.
 

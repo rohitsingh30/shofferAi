@@ -59,10 +59,21 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 ### 3. Find Restaurant & Dishes
 - If user named a specific restaurant, search for it in the search bar.
 - If user named a dish/cuisine, search for it and present top 3-5 restaurant options.
-- Use `ask_user` (input_type "choice") to let user pick a restaurant.
+- Use `ask_user` with `input_type: "carousel"` to let user pick a restaurant. Extract the REAL image URL from each restaurant's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Restaurant Name", "subtitle": "₹300 for two · North Indian, Mughlai", "image": "https://media-assets.swiggy.com/real-image...", "badge": "⭐ 4.3"}
+    ]
+  }
+  ```
 - Open the restaurant page, take snapshot.
 - Browse the menu. Find the requested dish(es).
-- If multiple variants/sizes, use `ask_user` (input_type "choice").
+- If multiple variants/sizes, use `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["Half — ₹180", "Full — ₹320", "Family Pack — ₹550"]}
+  ```
 - Click "Add" for each item. Handle customization popups (size, toppings, spice level) by asking user.
 
 ### 4. Review Cart

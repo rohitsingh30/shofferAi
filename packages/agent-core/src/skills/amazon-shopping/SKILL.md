@@ -59,14 +59,26 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Apply filters if budget specified: price range in left sidebar.
 - Apply "Prime" filter if user has Prime (faster delivery).
 - Extract top 3-5 options with: name, price (MRP vs deal price), rating (stars + count), Prime badge, delivery date.
-- Use `ask_user` (input_type "choice") to present options. Format: "Product Name — ₹X,XXX — ⭐ X.X (Y reviews) — Delivery by [date]"
+- Use `ask_user` with `input_type: "carousel"` to present options. Extract the REAL image URL from each product's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Product Name", "subtitle": "₹X,XXX · Delivery by [date]", "image": "https://m.media-amazon.com/images/I/real-image...", "badge": "⭐ 4.4 (Y reviews)"}
+    ]
+  }
+  ```
 - If user wants to see more, scroll or go to next page.
 
 ### 4. View Product Details
 - Click selected product. **Amazon opens product pages in new tabs** — switch to it.
 - Take snapshot of product page.
 - Extract: full title, price, MRP, discount %, bank offers, coupon offers, delivery date, seller, warranty, return policy.
-- If product has variants (color, size, storage, config), present them via `ask_user` (input_type "choice").
+- If product has variants (color, size, storage, config), present them via `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["Black", "Silver", "Blue"]}
+  ```
+  Use separate chip_bar calls for each variant type (e.g., one for color, one for storage).
 - Mention any active deals: "Save ₹X with coupon", "10% off with HDFC card", "No-cost EMI available".
 - Confirm with user: "Add [product] at ₹X,XXX to cart?"
 

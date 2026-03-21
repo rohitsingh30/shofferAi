@@ -83,21 +83,29 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Sort by "Best" (default), "Cheapest", or "Fastest" based on user priority.
 - Extract top 4-5 flight options with: airline(s), departure time, arrival time, duration, stops (direct/1 stop/2 stops), layover details, price per person, total price.
 - Check for Genius discount badge on any flights.
-- Use `ask_user` (input_type "choice") to present options. Format:
-  "IndiGo — 06:30-09:10 (2h 40m) Direct — ₹4,500/person"
-  "Air India — 08:00-13:30 (5h 30m) 1 stop DEL (2h layover) — ₹3,800/person — Genius discount"
-  "Emirates — 22:15+1 06:40 (8h 25m) Direct — ₹28,000/person — Business available"
-- Add "Show more results" as last option.
+- Use `ask_user` with `input_type: "card_grid"` to present options. Format each flight as a card with airline, times, duration, stops, and price:
+  ```json
+  {
+    "input_type": "card_grid",
+    "cards": [
+      {"id": "1", "label": "IndiGo · 06:30–09:10", "subtitle": "₹4,500/person · Direct · 2h 40m", "badge": "Cheapest"},
+      {"id": "2", "label": "Air India · 08:00–13:30", "subtitle": "₹3,800/person · 1 stop DEL (2h) · 5h 30m", "badge": "Genius discount"},
+      {"id": "3", "label": "Emirates · 22:15–06:40+1", "subtitle": "₹28,000/person · Direct · 8h 25m", "badge": "Business available"}
+    ]
+  }
+  ```
+- Add a "Show more results" card as the last item.
 
 ### 5. Select Flight & Review Details
 - Click selected flight to expand details. Take snapshot.
 - Extract full itinerary: flight number, aircraft type, baggage allowance (cabin + check-in), seat pitch, in-flight amenities.
 - If round-trip, show both outbound and return legs clearly.
 - For connecting flights, show layover airport and duration.
-- If multiple fare options exist (Basic, Standard, Flexible), present via `ask_user` (input_type "choice"):
-  "Basic — ₹4,500 — No checked bag, no changes"
-  "Standard — ₹5,200 — 1 checked bag (23kg), changes for fee"
-  "Flexible — ₹6,800 — 2 checked bags, free changes/cancellation"
+- If multiple fare options exist (Basic, Standard, Flexible), present via `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["Basic — ₹4,500", "Standard — ₹5,200", "Flexible — ₹6,800"]}
+  ```
+  Describe each fare's inclusions (baggage, changes) in the question text above the chips.
 - Click "Select" on chosen fare.
 
 ### 6. Fill Passenger Details

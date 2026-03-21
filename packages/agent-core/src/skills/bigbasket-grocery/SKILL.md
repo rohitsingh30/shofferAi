@@ -49,7 +49,10 @@ Only call `ask_user` for information NOT already in the user's message.
 
 ### 1. Get Delivery Address
 - BEFORE opening the browser, check if user provided an address.
-- If not, use `ask_user` (input_type "freetext"): "What's your delivery address or area name?"
+- If not, use `ask_user` with `input_type: "address"`: "What's your delivery address or area name?" Include saved addresses if available:
+  ```json
+  {"input_type": "address", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
+  ```
 
 ### 2. Open BigBasket & Dismiss Location Popup
 - Open a NEW tab and navigate to `https://www.bigbasket.com`.
@@ -85,7 +88,15 @@ For each item the user requested:
   - Discount badge: `generic` with text like "Har Din Sasta!"
   - Action: `button "Add"` to add to cart
 - Product URLs follow pattern: `/pd/{id}/{slug}/`
-- If multiple variants (brands, sizes), use `ask_user` (input_type "choice") showing brand, weight, sale price, and MRP.
+- If multiple variants (brands, sizes), use `ask_user` with `input_type: "carousel"`. Extract the REAL image URL from each product's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Brand Name Product", "subtitle": "₹XX · 1 kg · MRP ₹YY", "image": "https://www.bigbasket.com/media/uploads/real-image...", "badge": "10 mins"}
+    ]
+  }
+  ```
 - Click `button "Add"` to add the item to cart. If user wants more than 1, click the "+" quantity button after adding.
 - If out of stock, inform user and suggest alternatives.
 - **After adding, clear search and search for next item.**

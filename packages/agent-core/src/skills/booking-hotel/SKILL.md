@@ -86,14 +86,25 @@ Only call ask_user if destination OR dates are truly missing (not inferable).
 
 ### 5. Present Top Options
 - Extract 3-5 best hotels with: name (`data-testid="title"`), price (`data-testid="price-and-discounted-price"`), review score, location, free cancellation, Genius discount.
-- Use `ask_user` (input_type "choice") to present options. Format: "Hotel Name — ₹X,XXX/night — Rating — Location"
-- Add "Show more results" as last option.
+- Use `ask_user` with `input_type: "carousel"` to present options as scrollable cards. Extract the REAL image URL from each hotel's `<img>` tag on the page and include it in the `image` field. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Hotel Name", "subtitle": "₹X,XXX/night · Location · Free cancellation", "image": "https://cf.bstatic.com/real-hotel-image...", "badge": "⭐ 8.5"}
+    ]
+  }
+  ```
+- Add a "Show more results" card as the last item.
 
 ### 6. View Hotel Details
 - Click selected hotel's "See availability" link.
 - Handle new tab if opened. Dismiss popups.
 - Extract room options: type, bed config, price, inclusions, cancellation policy.
-- Use `ask_user` (input_type "choice") for room selection.
+- Use `ask_user` with `input_type: "card_grid"` for room selection. Format each room as a card with room type, bed config, price, and inclusions:
+  ```json
+  {"input_type": "card_grid", "cards": [{"id": "1", "label": "Deluxe Double Room", "subtitle": "₹4,500/night · King bed · Breakfast included", "badge": "Free cancellation"}]}
+  ```
 
 ### 7. Start Booking
 - Click "I'll reserve" button for the selected room.

@@ -58,7 +58,15 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Apply filters: brand, price range, rating, features (for TVs: resolution, smart TV; for laptops: RAM, SSD, processor).
 - Check for Croma-exclusive offers or bundles.
 - Extract top 3-5 options with: brand, name, price (MRP vs offer price), key specs, rating, EMI option.
-- Use `ask_user` (input_type "choice") to present options. Format: "Brand Model — ₹XX,XXX (XX% off) — Key Spec — ⭐ Rating — EMI ₹X,XXX/mo"
+- Use `ask_user` with `input_type: "carousel"` to present options. Extract the REAL image URL from each product's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Brand Model", "subtitle": "₹XX,XXX · EMI ₹X,XXX/mo · Key Spec", "image": "https://media-ik.croma.com/prod/real-image...", "badge": "⭐ 4.3"}
+    ]
+  }
+  ```
 - If user wants to compare, present a side-by-side comparison of shortlisted products.
 
 ### 4. View Product & Compare
@@ -67,7 +75,11 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Extract: brand, model, full specs, price, MRP, discount, bank offers, EMI options, warranty, delivery date, installation details.
 - For appliances: note energy rating (BEE stars), capacity, inverter/non-inverter, installation charges.
 - For electronics: note processor, RAM, storage, display, battery.
-- If product has variants (color, storage, capacity), present via `ask_user` (input_type "choice").
+- If product has variants (color, storage, capacity), present via `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["128 GB", "256 GB", "512 GB"]}
+  ```
+  Use separate chip_bar calls for each variant type (e.g., one for color, one for storage).
 - Check if extended warranty is available — inform user of options and pricing.
 - Confirm with user: "Add [product] at ₹XX,XXX to cart?"
 

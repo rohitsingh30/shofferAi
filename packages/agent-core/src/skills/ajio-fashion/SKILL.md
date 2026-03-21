@@ -61,15 +61,30 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Apply filters: brand, price range, size, color, discount %, rating, occasion.
 - AJIO is known for heavy discounts — sort by discount or look for "AJIO Exclusive" deals.
 - Extract top 3-5 options with: brand, name, price (MRP vs discounted), discount %, rating.
-- Use `ask_user` (input_type "choice") to present options. Format: "Brand Name — ₹X,XXX (XX% off) — ⭐ Rating"
+- Use `ask_user` with `input_type: "carousel"` to present options. Extract the REAL image URL from each product's `<img>` tag on the page. Format:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "Brand Name", "subtitle": "₹X,XXX · MRP ₹Y,YYY", "image": "https://assets.ajio.com/medias/real-image...", "badge": "XX% off"}
+    ]
+  }
+  ```
 - If user wants to see more, scroll or refine filters.
 
 ### 4. View Product & Select Variants
 - Click selected product.
 - Take snapshot of product page.
 - Extract: brand, full name, price, MRP, discount, available sizes, colors, material, fit type, delivery date, return policy.
-- If product has color variants, present via `ask_user` (input_type "choice").
-- If size not provided, present available sizes via `ask_user` (input_type "choice").
+- If product has color variants, present via `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["Black", "Navy Blue", "Olive Green", "White"]}
+  ```
+- If size not provided, present available sizes via `ask_user` with `input_type: "chip_bar"`:
+  ```json
+  {"input_type": "chip_bar", "options": ["XS", "S", "M", "L", "XL", "XXL"]}
+  ```
+  Only include sizes that are actually in stock on the product page.
 - Check for additional coupon codes visible on product page (AJIO often shows "Extra XX% off with code").
 - Confirm with user: "Add [product] at ₹X,XXX to bag?"
 
