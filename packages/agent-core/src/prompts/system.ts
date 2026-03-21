@@ -150,8 +150,9 @@ export function buildSystemPrompt(
   }
 
   if (userContext.savedAddresses?.length) {
+    const addrJson = JSON.stringify(userContext.savedAddresses.map(a => ({ label: a.label, address: a.address })));
     parts.push(`Saved addresses:\n${userContext.savedAddresses.map(a => `- ${a.label}: ${a.address}`).join('\n')}`);
-    parts.push('When using ask_user with input_type "address" or "layout" with an address section, ALWAYS pass the saved addresses in the "saved" parameter so the user can quickly pick one.');
+    parts.push(`When using ask_user with input_type "address", ALWAYS pass "saved": ${addrJson} so the user can pick one. Include ALL saved addresses — never omit any.`);
   } else if (userContext.addressLabels?.length) {
     parts.push(`Saved addresses: ${userContext.addressLabels.join(', ')}`);
   }

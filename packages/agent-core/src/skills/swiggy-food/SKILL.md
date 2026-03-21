@@ -39,7 +39,7 @@ Chrome profile: rsinghtomar3011@gmail.com.
 Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
 1. **address** (type: "address", required): Confirm delivery address. Show saved addresses. If the user mentioned an area, pre-fill it:
    ```json
-   {"saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
+   {"saved": <use the saved addresses from the system prompt>}
    ```
 2. **cuisine** (type: "carousel", required): Show cuisine options as scrollable cards (🥘 Biryani, 🍕 Pizza, 🍔 Burger, 🍱 Thali, 🥡 Chinese, 🥞 South Indian, 🌯 Rolls, 🍰 Dessert). Allow typing specific restaurant/dish.
 3. **dietary** (type: "chip_bar", collapsed): Dietary preferences — 🟢 Veg only, 🔴 Non-veg OK, Jain, No onion, No garlic.

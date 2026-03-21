@@ -35,7 +35,7 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 - If address is missing → call `ask_user` with `input_type: "address"`, question: "What's your delivery address or pincode for Amazon Fresh?". Show saved addresses if available:
   ```json
-  {"input_type": "address", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
+  {"input_type": "address", "saved": <use the saved addresses from the system prompt>}
   ```
 - **Only skip** if the user provided a FULL address with building/flat, street, city, pincode, AND phone number.
 - **Do NOT ask for items** — extract them from the user's message. If truly missing, handoff anyway and let the browser agent figure it out.
