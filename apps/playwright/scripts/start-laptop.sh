@@ -23,6 +23,20 @@ echo ""
 echo "=== ShofferAI Laptop Relay ==="
 echo ""
 
+# ─── Kill any existing relay instances (prevents duplicate-process flapping) ───
+EXISTING_PIDS=$(ps aux | grep 'tsx.*apps/playwright/src/index' | grep -v grep | awk '{print $2}' || true)
+if [ -n "$EXISTING_PIDS" ]; then
+  echo "⚠️  Killing existing relay processes: $EXISTING_PIDS"
+  echo "$EXISTING_PIDS" | xargs kill 2>/dev/null || true
+  sleep 2
+fi
+
+# Also stop the LaunchAgent daemon if running (it would restart and fight us)
+if launchctl list 2>/dev/null | grep -q 'com.shofferai.relay'; then
+  echo "⚠️  Stopping LaunchAgent relay daemon (manual mode takes priority)"
+  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.shofferai.relay.plist 2>/dev/null || true
+fi
+
 # Check prerequisites
 if ! command -v npx &> /dev/null; then
   echo "ERROR: npx not found. Install Node.js 20+"

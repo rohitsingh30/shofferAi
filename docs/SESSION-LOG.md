@@ -4,6 +4,35 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Fixed relay WebSocket flapping + duplicate instance prevention
+
+**Goal**: Diagnose why relay kept disconnecting and tasks failed with "laptop not connected."
+
+**What was done**:
+- Diagnosed three cascading issues: (1) Cloud Run cold-start timing mismatch, (2) race condition in `setLaptopSocket` where old socket's close handler clobbered new socket's state, (3) two relay processes fighting over one Cloud Run WebSocket
+- Fixed `setLaptopSocket` race: `removeAllListeners()` on old socket + guard `if (this.laptopSocket !== ws) return` in close handler
+- Fixed reconnection timing: laptop health check 20s→10s, dead timeout 45s→20s, Cloud Run connect wait 30s→60s
+- Added duplicate-instance guard to `index.ts` (checks for existing relay processes on startup, exits if found)
+- Added `start-laptop.sh` kill-existing + LaunchAgent stop before starting
+- Added anti-pattern #33 to REPEATING-MISTAKES.md
+- Added rule #6: never start/stop relay (operator-managed)
+
+**Files changed**:
+- `apps/web/lib/relay-bridge.ts` (updated — race condition fix + timing)
+- `apps/playwright/src/relay-outbound.ts` (updated — faster health check)
+- `apps/playwright/src/index.ts` (updated — duplicate instance check)
+- `apps/playwright/scripts/start-laptop.sh` (updated — kill existing + stop LaunchAgent)
+- `docs/REPEATING-MISTAKES.md` (updated — anti-pattern #33)
+- `.github/copilot-instructions.md` (updated — rule #6)
+
+**Key decisions**:
+- Root cause was LaunchAgent + manual start creating two relay processes
+- Each relay connected to Cloud Run, each kicked the other out → infinite flapping loop
+- `start-laptop.sh` now kills existing processes and stops LaunchAgent daemon before starting
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Fixed Playwright MCP disconnects (Copilot CLI timeout workaround)
 
 **Goal**: Diagnose and fix frequent Playwright MCP server disconnections during Copilot CLI sessions.

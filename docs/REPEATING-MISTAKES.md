@@ -595,4 +595,31 @@ This applies to: port scanning, reconnect backoff, file path fallbacks, API endp
 
 ---
 
+## 33. Running Multiple Laptop Relay Instances (WebSocket Flapping)
+
+**What happens:** Two (or more) relay processes connect to the same Cloud Run WebSocket endpoint simultaneously. Each connection triggers `setLaptopSocket()` which closes the previous socket. The displaced process detects the disconnect and reconnects, kicking out the other process. This creates an infinite flapping loop — connect/disconnect every 1-2 seconds — making the relay completely unusable.
+
+**Common causes:**
+- LaunchAgent daemon (`com.shofferai.relay.plist`) is running AND the operator manually starts `start-laptop.sh` in a terminal
+- Operator opens two terminal tabs and runs `start-laptop.sh` in both
+- Copilot agent starts the relay programmatically while operator's relay is already running
+
+**Symptoms:**
+- Laptop logs: "Connected to Cloud Run relay" / "Disconnected from Cloud Run relay" repeating every 1-2 seconds
+- Cloud Run logs: "Laptop WebSocket connected" every 1-2 seconds with no stable connection
+- Tasks fail with "Laptop not connected to relay bridge (waited 30/60s)"
+
+**How to diagnose:**
+```bash
+# Count relay processes — should be exactly 1 (plus its parent npm/tsx wrappers)
+ps aux | grep 'tsx.*apps/playwright/src/index' | grep -v grep
+
+# Check if LaunchAgent is also running
+launchctl list | grep shofferai
+```
+
+**Rule:** NEVER run more than one relay instance. `start-laptop.sh` now automatically kills existing instances and stops the LaunchAgent daemon before starting. If starting manually, always check for existing processes first.
+
+---
+
 *Last updated: 2026-03-21*

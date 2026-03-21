@@ -1,5 +1,6 @@
 import { logger } from '@shofferai/shared';
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
+import { execSync } from 'child_process';
 import { ChromePool } from './chrome-pool';
 import { mcpToolEvents, type McpToolEvent } from './chrome-pool';
 import { RelayServer } from './relay-server';
@@ -11,7 +12,27 @@ const RELAY_CLOUD_URL = process.env.RELAY_CLOUD_URL; // e.g. wss://shofferai-xxx
 let mcpLogPort = parseInt(process.env.MCP_LOG_PORT || '9401', 10);
 const MCP_LOG_PORT_MAX = mcpLogPort + 10;
 
+/** Abort if another relay instance is already running (prevents WebSocket flapping on Cloud Run) */
+function checkDuplicateInstance(): void {
+  try {
+    const myPid = process.pid;
+    const out = execSync(
+      `ps aux | grep 'tsx.*apps/playwright/src/index' | grep -v grep | awk '{print $2}'`,
+      { encoding: 'utf-8', timeout: 3000 },
+    ).trim();
+    const pids = out.split('\n').map(Number).filter((p) => p && p !== myPid);
+    if (pids.length > 0) {
+      logger.error(`Another relay instance is already running (PIDs: ${pids.join(', ')}). Only ONE relay may run at a time.`);
+      logger.error('Kill it first: kill ' + pids.join(' '));
+      process.exit(1);
+    }
+  } catch {
+    // ps failed — not critical, continue
+  }
+}
+
 async function main() {
+  checkDuplicateInstance();
   logger.info('Starting ShofferAI Playwright Runner...');
 
   // Initialize Chrome Pool (lazy — only 1 bootstrap Chrome, rest launch on demand)
