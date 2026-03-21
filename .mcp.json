@@ -2,8 +2,8 @@
   "mcpServers": {
     "playwright": {
       "type": "stdio",
-      "command": "bash",
-      "args": ["apps/playwright/scripts/playwright-mcp-with-chrome.sh"]
+      "command": "node",
+      "args": ["apps/playwright/scripts/lazy-playwright-proxy.mjs"]
     }
   }
 }
