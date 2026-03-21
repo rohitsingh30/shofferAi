@@ -4,6 +4,31 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Fix fake product cards in grocery skills + layout validation bypass
+
+**Goal**: BigBasket (and other grocery skills) were showing hallucinated product cards with fake prices/images before the browser agent ever visited the website. The intermediate image validation layer had a bypass hole for `layout` sections.
+
+**What was done**:
+- Diagnosed root cause: SKILL.md Step 0 instructed LLM to show `card_grid` with fake data; `agent.ts` validation only checked top-level `input_type`, missing `card_grid` nested inside `layout` sections
+- Fixed `agent.ts` image validation to also inspect `layout.sections[]` for card_grids/carousels without real image URLs
+- Rewrote BigBasket SKILL.md Step 0: address-only, no item collection, no fake product cards
+- Batch-fixed 17 other grocery SKILL.md files with the same pattern (amazon-fresh, zepto, swiggy-instamart, dmart, flipkart-grocery, etc.)
+- Deployed to prod, verified via Playwright MCP: agent correctly asks only for address, extracts items from message, hands off to browser immediately
+
+**Files changed**:
+- `packages/agent-core/src/agent.ts` (updated — layout section validation for card_grid/carousel image URLs)
+- `packages/agent-core/src/skills/bigbasket-grocery/SKILL.md` (updated — Step 0 address-only, merged Step 1)
+- 17 other grocery SKILL.md files (updated — same Step 0 fix)
+- `docs/REPEATING-MISTAKES.md` (updated — added anti-pattern #31)
+
+**Key decisions**:
+- Step 0 should ONLY collect delivery address — items extracted from user's message, real product data only from browser agent
+- `agent.ts` validation is the systemic safety net; SKILL.md changes are the per-skill fix
+- Removed `card_grid` entirely from Step 0 rather than keeping it with emoji-only (user chose cleanest option)
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Fix Chrome zombie windows on task cancellation
 
 **Goal**: When a user presses "New Chat" or closes the tab mid-task, Chrome windows lingered for ~15 min until ChromePool's idle TTL. Fix `cancelTask()` to immediately release the Chrome slot.

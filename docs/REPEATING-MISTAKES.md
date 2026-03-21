@@ -518,4 +518,21 @@ Also added in `agent.ts` (cloud-side): break the tool processing loop after `ask
 
 ---
 
+## 31. Skills Showing Fake Product Cards Before Browsing
+
+**What happens:** Grocery skills (BigBasket, Zepto, Swiggy Instamart, etc.) instruct the cloud LLM in Step 0 to show a `card_grid` with product items — complete with emoji icons and sometimes hallucinated prices — BEFORE the browser agent ever visits the website. The cloud LLM has no access to the site's catalog, so all data is fabricated.
+
+**Root cause (two bugs):**
+1. SKILL.md Step 0 explicitly said: "Show common items as cards with emoji. Enable quantity steppers." — This told the LLM to present a `card_grid` it had no data for.
+2. The image URL validation layer in `agent.ts` only checked top-level `input_type === 'card_grid'`, but these skills used `input_type: "layout"` with a `card_grid` nested inside `sections[]` — completely bypassing the validation gate.
+
+**The fix (2026-03-21):**
+1. Extended `agent.ts` image validation to also inspect `layout` sections — card_grids/carousels nested inside layouts are now validated for real `https://` image URLs
+2. Removed `card_grid` from Step 0 in 18 grocery SKILL.md files — Step 0 now only collects the delivery address
+3. Items are extracted from the user's message; real product data only comes from the browser agent after visiting the site
+
+**Rule:** The cloud LLM MUST NEVER show product cards with prices or images unless the data came from an actual browser visit. Step 0 should only collect genuinely missing info (address). The `agent.ts` validation layer is the safety net — it rejects visual widgets without real `https://` image URLs, including those nested inside `layout` sections.
+
+---
+
 *Last updated: 2026-03-21*
