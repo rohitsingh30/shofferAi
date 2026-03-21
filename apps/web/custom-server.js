@@ -196,8 +196,8 @@ httpServer.on('upgrade', (request, socket, head) => {
 process.on('SIGTERM', () => {
   console.log('[server] SIGTERM received — closing relay WS to force laptop reconnect');
   const bridge = globalThis.__relayBridge;
-  if (bridge && typeof bridge.disconnect === 'function') {
-    bridge.disconnect().catch(() => {}); // Best effort
+  if (bridge && typeof bridge.gracefulClose === 'function') {
+    bridge.gracefulClose('Cloud Run deploying new revision');
   }
   httpServer.close(() => {
     console.log('[server] HTTP server closed');

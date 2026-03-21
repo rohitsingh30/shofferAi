@@ -116,6 +116,11 @@ export class RelayOutbound {
         logger.info('Disconnected from Cloud Run relay', { code, reason: reason?.toString() || '' });
         this.stopHealthCheck();
         this.stopStatusBroadcast();
+        // Server sent 1001 ("Going Away") — deploy or intentional shutdown.
+        // Reset delay so we reconnect to the new instance ASAP.
+        if (code === 1001) {
+          this.reconnectDelay = 1000;
+        }
         if (this.shouldReconnect) {
           this.scheduleReconnect();
         }
