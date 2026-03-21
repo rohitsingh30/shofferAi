@@ -71,11 +71,11 @@ function isSentenceNarration(lower: string): boolean {
   ];
 
   // --- Action narration ("Let me click...", "I'll navigate to...") ---
-  const actionVerbs = 'navigate|go to|go back|open|click|search|type|browse|check|look|read|scroll|select|visit|head to|dismiss|refresh|fill|submit|wait|load|close|handle|verify|proceed|update|change|set|switch|enter|tap|press|pick|choose|try|find|locate|expand|collapse|clear|modify|adjust|move|sort|filter|apply|toggle|add|remove|bookmark|compare|take|copy|paste|drag|drop';
+  const actionVerbs = 'navigate|go to|go back|open|click|search|type|browse|check|look|read|scroll|select|visit|head to|dismiss|refresh|fill|submit|wait|load|close|handle|verify|proceed|update|change|set|switch|enter|tap|press|pick|choose|try|find|locate|expand|collapse|clear|modify|adjust|move|sort|filter|apply|toggle|add|remove|bookmark|compare|take|copy|paste|drag|drop|get|fetch|retrieve|grab';
   const action = [
-    new RegExp(`^(let me|i'll|i will|i can|i'm going to|now i'll|now let me|i'm now|i need to|i'm about to|first,? i'll|next,? i'll)\\s+(${actionVerbs})\\b`),
+    new RegExp(`^(let me|i'll|i will|i can|i should|i'm going to|now i'll|now let me|i'm now|i need to|i'm about to|first,? i'll|next,? i'll)\\s+(${actionVerbs})\\b`),
     new RegExp(`^(navigating|going|opening|clicking|searching|typing|browsing|checking|looking|reading|scrolling|loading|heading|dismissing|refreshing|filling|submitting|waiting|closing|handling|verifying|proceeding|updating|changing|setting|switching|entering|tapping|pressing)\\s+(to|for|at|on|the|through|a |an )`),
-    new RegExp(`^(now |first |next )?(i('ll| will| can| need to| am going to|'m going to) )?(${actionVerbs})\\b`),
+    new RegExp(`^(now |first |next )?(i('ll| will| need to| am going to|'m going to) )?(${actionVerbs})\\b`),
     /^(searching|looking) for (hotels|flights|products|items|rooms|options|dal|milk|grocery|groceries|results)/,
     /^open a new tab/,
     /^navigate to https?:\/\//,
@@ -116,6 +116,8 @@ function isSentenceNarration(lower: string): boolean {
     /\bdelivery (time|slot|estimate|eta)\b.*\b\d+\s*min/,
     /\b(data-testid|aria-label|selector|xpath|locator)\b/,
     /\bsearch (bar|box|field|input) (is |appears?|shows?)/,
+    // "image URL(s)" is NEVER user-facing terminology — always internal
+    /\bimage urls?\b/,
   ];
 
   // --- Self-directed questions about internal/technical data (NOT user-facing questions) ---
@@ -124,8 +126,8 @@ function isSentenceNarration(lower: string): boolean {
   const selfDirected = [
     /^(could you|can you|would you|please |kindly )?(provide|show|give|send|fetch|get|list|display|include|extract|retrieve)\s+(me |us )?(the |a |an |all |any |more |some |those |these )?(image url|image urls|ratings?|review scores?|selectors?|xpaths?|data-testid|api |endpoints?|html |css |json |raw |technical |internal )/i,
     /^(provide|show|give|fetch|get|list|display|include|extract|retrieve)\s+(the |a |an |all |any |more |some |those |these )?(image url|image urls|ratings?|review scores?|selectors?|xpaths?|data-testid|api |endpoints?|html |css |json |raw |technical |internal )/i,
-    // First-person capability statements: "I can get those image URLs", "I'll fetch the details"
-    /^i (can |could |will |'ll |'d )?(get|fetch|retrieve|provide|pull|send|extract|grab|obtain)\s+(those |the |some |these |that |all )?(image url|image urls|url|urls|details?|data|info|information|prices?|ratings?|selectors?|html|json|raw )/i,
+    // "Would you like me to / Shall I / Do you want me to" + internal action
+    /^(would you like me to|shall i|do you want me to|should i)\s+(get|fetch|retrieve|extract|grab|pull|check|find|look up)\s+(the |those |these |some )?(image|selector|xpath|html|css|json|raw|api |rating|review score|specification|detail)/i,
   ];
 
   // --- Internal reasoning / chain-of-thought (LLM thinking out loud) ---
@@ -135,9 +137,11 @@ function isSentenceNarration(lower: string): boolean {
     /^(so|thus|therefore|hence)[, ]/,
     /\bproceed (to |with )?handoff/,
     /\bproceed to (step|the|calling|search|open|handoff)\b/,
-    /^(but|however|since|because|although)\s+(the |if |we |it |user|product|budget|items?|they|this)/,
-    /^let'?s\s+(handoff|proceed|skip|ask|move|continue|call|use|go|start|check|extract|parse)/,
+    /^(but|however|since|because|although),?\s+(the |if |we |it |user|product|budget|items?|they|this)/,
+    /^let('?s| us)\s+(handoff|proceed|skip|ask|move|continue|call|use|go|start|check|extract|parse)/,
     /\binstructions?\s+(say|require|mention|state|tell|specify|ask)/,
+    /^(according to|per) (the )?(skill|instructions?|steps?|workflow|guide|script|procedure)\b/,
+    /\bthe skill (says?|requires?|tells?|instructs?|specifies?|mentions?|states?|needs?)\b/,
     /\bskill\.?md\b/i,
     /\b(product|budget|items?|address|destination|dates?|params?|required info)\s+(is |are |was )?(already |now )?(known|provided|given|specified|mentioned|set|available|clear|extracted)/,
     /\b(skip|skipping)\s+(step|this|the|asking|product|items?)/,
@@ -146,6 +150,14 @@ function isSentenceNarration(lower: string): boolean {
     /^(additionally|furthermore|moreover|in that case|in this case|given that|note that|considering)\b/,
     /\b(extracted?|extract(ing|s)?)\s+(from|the |all |param|value|info)/,
     /^(the |this )?(user|customer|person) (wants?|needs?|is (looking|asking|trying)|requested?|said)\b.*\.\s*(so|let|but|step|we|i|now|proceed|since)/i,
+    // System bounce-back responses: agent leaking internal system messages
+    /\bthe system (says?|rejected|wants?|asked|told|requires?|needs?|instructed|returned|bounced)\b/,
+    /\b(been told|was told|instructed) to (proceed|hand ?off|stop|use|move|continue)\b/,
+    /\b(question|ask|input|query) limit\b/,
+    /\bcannot ask (more|any more|further|additional) questions?\b/,
+    /\bproceed with (what|whatever|available|the) (i have|info|we have|data|information)\b/,
+    /\b(my previous|the previous) attempt (was |)(rejected|failed|bounced|didn't work)\b/,
+    /\buse defaults?\s+(for|because|since|as)\b/,
   ];
 
   const allPatterns = [...observational, ...action, ...status, ...thirdPerson, ...browserInternals, ...selfDirected, ...reasoning];

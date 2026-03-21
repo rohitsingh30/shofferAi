@@ -406,7 +406,7 @@ function genAction(): TestVector[] {
 
   // "Let me / I'll / I will / I need to..."
   const starters = [
-    'Let me', "I'll", 'I will', "I'm going to", "Now I'll",
+    'Let me', "I'll", 'I will', 'I can', "I'm going to", "Now I'll",
     'Now let me', "I'm now", 'I need to', "I'm about to",
     "First, I'll", "Next, I'll",
   ];
@@ -466,6 +466,16 @@ function genAction(): TestVector[] {
     vecs.push([`Looking for ${item} matching the criteria`, true, 'action']);
   }
 
+  // "I can [verb]..." — agent narration about what it CAN do
+  const iCanVerbs = ['get', 'navigate to', 'search', 'find', 'check', 'look at', 'open', 'load', 'read', 'verify'];
+  for (const v of iCanVerbs) {
+    vecs.push([`I can ${v} ${sPick(TARGETS)}`, true, 'action']);
+  }
+  // Exact regression: image URL narration leaking through
+  vecs.push(['I can get those image URLs for you — which product are you referring to?', true, 'action']);
+  vecs.push(['I can get the image URLs from the product cards', true, 'action']);
+  vecs.push(['I can find the product images for you', true, 'action']);
+
   return vecs;
 }
 
@@ -520,7 +530,7 @@ function genStatus(): TestVector[] {
   vecs.push(['Now I need to search for the product', true, 'status']);
   vecs.push(['Now the page shows dal options', true, 'status']);
   vecs.push(['Now let me check the cart', true, 'status']);
-  vecs.push(['Now I can proceed to checkout', false, 'status']);
+  vecs.push(['Now I can proceed to checkout', true, 'status']);
   vecs.push(['Now the cart is ready', true, 'status']);
 
   return vecs;
@@ -593,7 +603,7 @@ function genSelfDirectedInternal(): TestVector[] {
     'Please provide', 'Please show', 'Provide', 'Show',
     'Fetch', 'Get', 'Display', 'Extract', 'Retrieve', 'List',
   ];
-  const browserInternalData = new Set(['selector', 'xpath', 'data-testid']);
+  const browserInternalData = new Set(['selector', 'xpath', 'data-testid', 'image URL', 'image URLs']);
   const articles = ['the ', 'all ', 'any ', 'some ', 'more ', 'these ', 'those '];
   for (const s of matchingStarters) {
     for (const d of INTERNAL_DATA) {
@@ -606,7 +616,7 @@ function genSelfDirectedInternal(): TestVector[] {
     }
   }
   // Specific full sentences
-  vecs.push(['Could you provide the ratings and image URLs for the products?', false, 'self-directed']);
+  vecs.push(['Could you provide the ratings and image URLs for the products?', true, 'self-directed']);
   vecs.push(['Get the raw JSON response from the API', true, 'self-directed']);
   vecs.push(['Display the CSS class names for debugging', true, 'self-directed']);
   return vecs;
@@ -1572,6 +1582,51 @@ function genSpecMessages(): TestVector[] {
   return vecs;
 }
 
+// ─── SUPPRESS: System bounce-back responses ─────────────────────────────────
+// LLM responses to [SYSTEM: ...] bounce-back messages about image URLs,
+// question limits, and internal validation. These are ALWAYS internal.
+function genSystemBounceResponses(): TestVector[] {
+  return [
+    // Image URL bounce responses
+    ['I can get those image URLs for you — which product are you referring to?', true, 'system-bounce'],
+    ['I can get the image URLs from the product cards.', true, 'system-bounce'],
+    ['The cards are missing image URLs, let me fix that.', true, 'system-bounce'],
+    ['I should get the image src attributes from each product card.', true, 'system-bounce'],
+    ['The system rejected my cards because they lack image URLs.', true, 'system-bounce'],
+    ['My previous attempt was rejected because the images were missing.', true, 'system-bounce'],
+    ['The system says I need real image URLs, so let me get those.', true, 'system-bounce'],
+    ['I can provide the ratings and image URLs.', true, 'system-bounce'],
+    ['Would you like me to get the image URLs for these products?', true, 'system-bounce'],
+    ['Found the products. I need to extract the image URLs now.', true, 'system-bounce'],
+    // Question limit bounce responses
+    ['The system says I have asked too many questions, so I will proceed with what I have.', true, 'system-bounce'],
+    ['I have been told to proceed without asking more questions.', true, 'system-bounce'],
+    ['OK, the system wants me to hand off now.', true, 'system-bounce'],
+    ['Since I cannot ask more questions, I will use defaults.', true, 'system-bounce'],
+    ['I have reached the question limit. Proceeding with available info.', true, 'system-bounce'],
+    // Skill/instruction reference responses
+    ['According to the skill, I should set the location first.', true, 'system-bounce'],
+    ['The skill says I need to login before searching.', true, 'system-bounce'],
+    ['Per the instructions, I need to check availability.', true, 'system-bounce'],
+    // "I can" action narration
+    ['I can search for wireless earbuds on Flipkart.', true, 'system-bounce'],
+    ['I can navigate to the product page.', true, 'system-bounce'],
+    ['I can fetch the latest prices.', true, 'system-bounce'],
+    ['I can retrieve the product details.', true, 'system-bounce'],
+    ['I can grab the specifications.', true, 'system-bounce'],
+    ['I can get the delivery estimates.', true, 'system-bounce'],
+    // "However/But" reasoning with comma
+    ['However, the price seems higher than the budget.', true, 'system-bounce'],
+    ['But, the user specified under ₹2000.', true, 'system-bounce'],
+    // "Let us" variant
+    ['Let us proceed with the search.', true, 'system-bounce'],
+    ['Let us check the availability.', true, 'system-bounce'],
+    // "Shall I / Do you want me to" + internal fetch
+    ['Shall I fetch the detailed product specifications?', true, 'system-bounce'],
+    ['Do you want me to get the ratings for each product?', true, 'system-bounce'],
+  ];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ASSEMBLE ALL VECTORS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1599,6 +1654,7 @@ export function generateAllVectors(): TestVector[] {
     ...genComplexMultiSentence(),
     ...genIveExpanded(),
     ...genItVerbExpanded(),
+    ...genSystemBounceResponses(),
     // ALLOW (user-facing)
     ...genUserResults(),
     ...genUserQuestions(),

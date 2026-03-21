@@ -15,6 +15,13 @@ RESPOND WITH EXACTLY ONE OF:
 
 Rules:
 - Internal = "I can see...", "Let me click...", "The page shows...", "Navigating to...", "I can get/fetch/provide those...", step references, selector names, any browser mechanics, capability offers about internal data
+- ALWAYS SUPPRESS these (system bounce-back responses):
+  • Any mention of "image URL(s)", "image src", "browser_snapshot" — these are internal technical terms
+  • "The system says/rejected/wants..." — references to internal validation
+  • "I have reached the question limit" / "cannot ask more questions" — internal limits
+  • "According to the skill/instructions..." — internal workflow references
+  • "I should/need to extract/get the [technical thing]" — internal task planning
+  • "Which product/result are you referring to?" when responding to an internal bounce — not a real user question
 - Useful = search results, prices, availability, order status, confirmation, errors that affect the user
 - Write as the AI assistant ("I found..." not "The agent found...")
 - Never mention browser, tabs, clicking, navigating, selectors, or internal tools
