@@ -44,11 +44,18 @@ export class RelayOutbound {
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   private statusInterval: ReturnType<typeof setInterval> | null = null;
   private lastDataAt = Date.now();
+  /** Last time we received an APPLICATION-LEVEL message (not just WS pong).
+   *  Cloud Run's load balancer responds to WS pings even when the backend
+   *  instance is dead, so WS pongs alone can't detect stale connections. */
+  private lastAppMessageAt = Date.now();
 
   /** Ping every 10s to keep connection alive and detect dead sockets */
   private static readonly HEALTH_CHECK_INTERVAL_MS = 10_000;
   /** If no data received for 20s, consider the connection dead (must be < Cloud Run's connect wait) */
   private static readonly DEAD_CONNECTION_TIMEOUT_MS = 20_000;
+  /** If no application-level message for 45s, backend is dead.
+   *  Server sends heartbeat pings every 15s, so 3 missed = dead. */
+  private static readonly STALE_CONNECTION_TIMEOUT_MS = 45_000;
 
   constructor(chromePool: ChromePool, cloudUrl: string, options: RelayOutboundOptions = {}) {
     this.chromePool = chromePool;
@@ -86,6 +93,7 @@ export class RelayOutbound {
       this.ws.on('open', () => {
         this.reconnectDelay = 1000;
         this.lastDataAt = Date.now();
+        this.lastAppMessageAt = Date.now();
         logger.info('Connected to Cloud Run relay', { url: this.cloudUrl });
         this.startHealthCheck();
         this.startStatusBroadcast();
@@ -95,6 +103,7 @@ export class RelayOutbound {
 
       this.ws.on('message', async (data: Buffer) => {
         this.lastDataAt = Date.now();
+        this.lastAppMessageAt = Date.now(); // Application-level message from real backend
         try {
           const msg: RelayMessage = JSON.parse(data.toString());
           if (msg.type !== 'ping') {
@@ -269,6 +278,7 @@ export class RelayOutbound {
   private startHealthCheck(): void {
     this.stopHealthCheck();
     this.lastDataAt = Date.now();
+    this.lastAppMessageAt = Date.now();
     this.healthCheckInterval = setInterval(() => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
@@ -278,6 +288,18 @@ export class RelayOutbound {
           silentMs,
         });
         this.ws.terminate(); // Hard close — faster than ws.close() which waits for handshake
+        return;
+      }
+
+      // Stale connection detection: Cloud Run's load balancer responds to WS
+      // pings even when the backend instance is dead (e.g., after deploy).
+      // Only application-level messages prove the backend is alive.
+      const staleSinceMs = Date.now() - this.lastAppMessageAt;
+      if (staleSinceMs > RelayOutbound.STALE_CONNECTION_TIMEOUT_MS) {
+        logger.warn('RelayOutbound: no app-level message for 45s — backend likely dead after deploy, reconnecting', {
+          staleSinceMs,
+        });
+        this.ws.terminate();
         return;
       }
 
