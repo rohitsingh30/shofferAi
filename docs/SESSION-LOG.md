@@ -4,6 +4,31 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Fix vanishing agent messages (double-filter + ID collisions)
+
+**Goal**: Diagnose and fix agent messages that "appear and then vanish" from chat UI.
+
+**What was done**:
+- Traced message lifecycle: SSE event → server rewriter → client filter → React state
+- Found two bugs working together:
+  1. Client-side `shouldSuppressMessage()` re-filtered messages already cleaned by server AI rewriter — regex false positives silently dropped valid messages
+  2. `Date.now().toString()` for message IDs — rapid messages got same ID, React deduped
+- Removed client-side suppression entirely (server two-tier filter is authoritative)
+- Replaced all `Date.now().toString()` IDs with `msg-{timestamp}-{random}` for uniqueness
+- Added error fallback in rewriter `.catch()` — sends original message instead of silent drop
+
+**Files changed**:
+- `apps/web/components/chat/ChatInterface.tsx` (updated — removed client-side filter, unique IDs)
+- `apps/web/app/api/agent/execute/route.ts` (updated — rewriter error fallback)
+
+**Key decisions**:
+- Server-side two-tier filter (regex + AI rewrite) is the single source of truth for message filtering
+- Client should trust what the server sends — no second-guessing with redundant regex
+- Random suffix in IDs prevents React key collisions without needing uuid dependency
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Cart UX: ProductCard widget + L2 cart panel + CartBar
 
 **Goal**: Replace the text + "Yes, proceed / Cancel" product confirmation with a proper shopping cart UX — rich product widget, persistent cart bar, L2 cart panel.
