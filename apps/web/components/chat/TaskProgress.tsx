@@ -4,18 +4,7 @@ export interface StepInfo {
 }
 
 export function TaskProgress({ steps }: { steps: StepInfo[] }) {
-  const allDone = steps.length > 0 && steps.every(s => s.status === 'completed');
-  const latestRunning = [...steps].reverse().find(s => s.status === 'running');
   const hasRunning = steps.some(s => s.status === 'running');
-  const isPaused = steps.some(s => s.status === 'paused_for_input');
-
-  const statusLabel = isPaused
-    ? 'Waiting for your input'
-    : latestRunning
-    ? latestRunning.action
-    : allDone
-    ? 'All done!'
-    : 'Working...';
 
   return (
     <div className="flex items-start gap-3.5">
@@ -32,15 +21,8 @@ export function TaskProgress({ steps }: { steps: StepInfo[] }) {
       </div>
 
       <div className="flex-1 rounded-2xl rounded-tl-md bg-white/[0.03] ring-1 ring-white/[0.06] overflow-hidden">
-        {/* Status header */}
-        <div className="px-4 pt-3.5 pb-3">
-          <span className="text-[13px] font-medium text-zinc-200 truncate">
-            {statusLabel}
-          </span>
-        </div>
-
         {/* Steps timeline */}
-        <div className="border-t border-white/[0.04] px-4 py-2.5">
+        <div className="px-4 py-2.5">
           <div className="space-y-0.5">
             {steps.map((step, i) => (
               <div
