@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     razorpay_payment_id,
     razorpay_signature,
     taskId,
+    stepId = 'payment',
   } = await request.json();
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !taskId) {
@@ -58,8 +59,8 @@ export async function POST(request: Request) {
 
     // Resume the agent — it's been waiting for payment confirmation
     const pauseManager = workflowEngine.getPauseManager();
-    pauseManager.provideInput(taskId, 'payment', 'confirmed');
-    console.log('[payment/verify] taskId=%s agent resumed', taskId);
+    pauseManager.provideInput(taskId, stepId, 'confirmed');
+    console.log('[payment/verify] taskId=%s stepId=%s agent resumed', taskId, stepId);
 
     track({ event: 'payment_verified', category: 'payment', userId: authUser.userId, taskId, metadata: { razorpayPaymentId: razorpay_payment_id } });
     return NextResponse.json({ success: true });

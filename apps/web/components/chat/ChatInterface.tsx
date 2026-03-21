@@ -206,6 +206,7 @@ function ChatInterfaceInner() {
       case 'payment_required':
         openL2({
           taskId: event.payload.taskId as string,
+          stepId: (event.payload.stepId as string | undefined) || 'payment',
           bookingSummary: event.payload.bookingSummary as string,
           amountCents: event.payload.amountCents as number,
           serviceFeeCents: event.payload.serviceFeeCents as number,

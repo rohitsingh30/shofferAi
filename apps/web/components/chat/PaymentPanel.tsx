@@ -74,6 +74,7 @@ export function PaymentPanel() {
                 body: JSON.stringify({
                   ...response,
                   taskId: l2Data.taskId,
+                  stepId: l2Data.stepId || 'payment',
                 }),
               });
 

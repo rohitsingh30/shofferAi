@@ -6,6 +6,7 @@ export type L2State = 'CLOSED' | 'OPENING' | 'OPEN' | 'CLOSING';
 
 export interface L2PaymentData {
   taskId: string;
+  stepId?: string;
   bookingSummary: string;
   amountCents: number;
   serviceFeeCents: number;
