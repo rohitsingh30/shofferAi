@@ -90,6 +90,23 @@ Each Chrome instance uses ~300-500MB RAM. With 3 concurrent sessions, that's ~1.
 3. **NEVER let Playwright launch Chrome** — always launch manually to avoid `--use-mock-keychain`
 4. **ALWAYS use Profile 3** — `rsinghtomar3011@gmail.com`, pre-authenticated on all sites
 5. **ALWAYS include `--output-dir /tmp/playwright-mcp-output`** in Playwright MCP launch
+6. **NEVER put `playwright` in `~/.copilot/mcp-config.json`** — project `.mcp.json` is the only source; duplicates cause 2 Chrome windows
+
+## Gotcha: Duplicate MCP Configs = Multiple Chrome Windows
+
+If you see **2 empty Chrome windows** when Copilot starts, check for duplicate MCP configs:
+
+```bash
+# Project config (correct — should be the ONLY source of playwright MCP)
+cat .mcp.json
+
+# Global config (should NOT contain "playwright")
+cat ~/.copilot/mcp-config.json
+```
+
+The project `.mcp.json` is the single source of truth. If `~/.copilot/mcp-config.json` also defines `"playwright"`, both run and you get two Chrome instances. The global config may also use the anti-pattern `npx @playwright/mcp@latest` which lets Playwright auto-launch Chrome with `--use-mock-keychain` (breaks cookie sessions).
+
+**Fix:** Remove `"playwright"` from `~/.copilot/mcp-config.json`.
 
 ## Debugging
 

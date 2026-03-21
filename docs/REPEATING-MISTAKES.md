@@ -441,4 +441,25 @@ These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitch
 
 ---
 
-*Last updated: 2026-03-20*
+## 28. Duplicate MCP Configs Launch Multiple Empty Chrome Windows
+
+**What happens:** Launching Copilot CLI (or VS Code Copilot agent) opens 2 empty Chrome windows instead of 1. The user sees two `about:blank` Chrome instances consuming ~1GB RAM total, with no obvious reason.
+
+**Root cause:** Two separate MCP configurations both defined a `"playwright"` server:
+
+| File | Scope | Command | Problem |
+|------|-------|---------|---------|
+| `~/.copilot/mcp-config.json` | Global (all repos) | `npx @playwright/mcp@latest` | Anti-pattern: uses `npx` instead of global binary; lets Playwright auto-launch Chrome (adds `--use-mock-keychain` → cookies unreadable) |
+| `.mcp.json` (repo root) | Project (ShofferAI) | `playwright-mcp-with-chrome.sh` | Correct: manually launches Chrome, copies Profile 3, parses CDP port |
+
+Both had the key `"playwright"`, but instead of the project config overriding the global one, **both ran** — each spawning its own Chrome.
+
+**The fix (2026-03-21):**
+1. Cleared `~/.copilot/mcp-config.json` — global config should NOT define `playwright`
+2. Project `.mcp.json` is the single source of truth for Playwright MCP
+
+**Rule:** NEVER put `playwright` MCP server in `~/.copilot/mcp-config.json` (global scope). The project `.mcp.json` already configures it correctly with `playwright-mcp-with-chrome.sh`. Also: NEVER use `npx @playwright/mcp@latest` — always use the globally-installed `playwright-mcp` binary.
+
+---
+
+*Last updated: 2026-03-21*
