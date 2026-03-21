@@ -97,7 +97,23 @@ const httpServer = createServer((req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 
 // RelayBridge is created by the Next.js app (singletons.ts) and stored on globalThis.
-// The custom server just wires up the WebSocket to it.
+// The custom server wires up the WebSocket to it.
+//
+// Race condition fix: the laptop may reconnect (after a deploy) before any
+// Next.js route has been hit, which means singletons.ts hasn't run yet and
+// globalThis.__relayBridge is null. We queue the socket and wire it up
+// once the bridge becomes available.
+let earlyLaptopSocket = null;
+let earlySocketPoll = null;
+
+function wireLaptopSocket(ws) {
+  const bridge = globalThis.__relayBridge;
+  if (bridge && typeof bridge.setLaptopSocket === 'function') {
+    bridge.setLaptopSocket(ws);
+    return true;
+  }
+  return false;
+}
 
 httpServer.on('upgrade', (request, socket, head) => {
   let parsedUrl;
@@ -125,19 +141,70 @@ httpServer.on('upgrade', (request, socket, head) => {
     wss.handleUpgrade(request, socket, head, (ws) => {
       console.log('[relay] Laptop WebSocket connected');
 
-      // Wire to the RelayBridge singleton
-      const bridge = globalThis.__relayBridge;
-      if (bridge && typeof bridge.setLaptopSocket === 'function') {
-        bridge.setLaptopSocket(ws);
-      } else {
-        console.error('[relay] RelayBridge not found on globalThis — laptop connection dropped');
-        ws.close(1011, 'RelayBridge not initialized');
+      if (wireLaptopSocket(ws)) {
+        return; // Wired successfully
       }
+
+      // Bridge not ready yet — queue and poll until it is
+      console.log('[relay] RelayBridge not ready yet, queuing laptop socket (will poll every 500ms for up to 30s)');
+      if (earlyLaptopSocket) {
+        earlyLaptopSocket.close(1000, 'Replaced by newer connection');
+      }
+      if (earlySocketPoll) clearInterval(earlySocketPoll);
+      earlyLaptopSocket = ws;
+
+      let attempts = 0;
+      earlySocketPoll = setInterval(() => {
+        attempts++;
+        if (wireLaptopSocket(earlyLaptopSocket)) {
+          console.log('[relay] Wired queued laptop socket to bridge (after %dms)', attempts * 500);
+          clearInterval(earlySocketPoll);
+          earlySocketPoll = null;
+          earlyLaptopSocket = null;
+        } else if (attempts >= 60) {
+          // 30s without bridge — give up
+          console.error('[relay] RelayBridge not initialized after 30s — dropping queued laptop socket');
+          clearInterval(earlySocketPoll);
+          earlySocketPoll = null;
+          earlyLaptopSocket.close(1011, 'RelayBridge not initialized');
+          earlyLaptopSocket = null;
+        }
+      }, 500);
+
+      // If the queued socket closes before we wire it, clean up
+      ws.on('close', () => {
+        if (earlyLaptopSocket === ws) {
+          console.log('[relay] Queued laptop socket closed before bridge was ready');
+          if (earlySocketPoll) clearInterval(earlySocketPoll);
+          earlySocketPoll = null;
+          earlyLaptopSocket = null;
+        }
+      });
     });
   } else {
     // Not a relay upgrade — destroy (Next.js standalone doesn't use WS for HMR)
     socket.destroy();
   }
+});
+
+// ─── Graceful Shutdown (SIGTERM) ────────────────────────────────
+// Cloud Run sends SIGTERM when deploying a new revision or scaling down.
+// We MUST close the laptop WebSocket so the laptop detects the disconnect
+// and reconnects to the NEW instance. Without this, the laptop stays
+// connected to the draining old instance while new HTTP requests go to
+// the new instance (which has no laptop WS) → relay always fails.
+process.on('SIGTERM', () => {
+  console.log('[server] SIGTERM received — closing relay WS to force laptop reconnect');
+  const bridge = globalThis.__relayBridge;
+  if (bridge && typeof bridge.disconnect === 'function') {
+    bridge.disconnect().catch(() => {}); // Best effort
+  }
+  httpServer.close(() => {
+    console.log('[server] HTTP server closed');
+    process.exit(0);
+  });
+  // Force exit after 8s if server.close hangs (Cloud Run gives 10s)
+  setTimeout(() => process.exit(0), 8000);
 });
 
 // ─── Start ──────────────────────────────────────────────────────
@@ -154,19 +221,3 @@ nextApp.prepare().then(() => {
   });
 });
 
-// ─── Graceful Shutdown ─────────────────────────────────────────
-// Cloud Run sends SIGTERM on deploy/scale-down. Send a proper WebSocket
-// close frame so the laptop relay detects the disconnect immediately
-// instead of waiting for the 20s dead-connection timeout.
-function gracefulShutdown(signal) {
-  console.log(`[relay] ${signal} received — closing relay WebSocket`);
-  const bridge = globalThis.__relayBridge;
-  if (bridge && typeof bridge.gracefulClose === 'function') {
-    bridge.gracefulClose('Server shutting down');
-  }
-  // Give 2s for the close frame to flush, then exit
-  setTimeout(() => process.exit(0), 2000);
-}
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
