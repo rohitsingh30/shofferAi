@@ -652,6 +652,13 @@ export class AgentExecutor {
         }
 
         // Process tool calls
+        // When a user-blocking tool (ask_user, confirm_action, collect_payment)
+        // is encountered, break the loop so the LLM processes the user's response
+        // before executing any remaining tools. Without this, the LLM can batch
+        // ask_user + browser actions in one response, causing the agent to navigate
+        // while the user is still being asked a question.
+        const USER_BLOCKING_TOOLS = new Set(['ask_user', 'confirm_action', 'collect_payment']);
+
         for (const toolCall of toolUseBlocks) {
           const result = await this.handleToolCall(toolCall, callbacks);
 
@@ -665,6 +672,18 @@ export class AgentExecutor {
           }
 
           this.conversation.addToolResult(toolCall.id, JSON.stringify(result));
+
+          if (USER_BLOCKING_TOOLS.has(toolCall.name)) {
+            // Return remaining tool calls as not-executed so LLM can re-evaluate
+            const remaining = toolUseBlocks.slice(toolUseBlocks.indexOf(toolCall) + 1);
+            for (const skipped of remaining) {
+              this.conversation.addToolResult(
+                skipped.id,
+                JSON.stringify({ error: 'Not executed — waiting for user response first' })
+              );
+            }
+            break;
+          }
         }
       }
 

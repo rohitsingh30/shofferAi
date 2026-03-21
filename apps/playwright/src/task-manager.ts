@@ -212,6 +212,18 @@ export class TaskManager {
       logger.warn(`TaskManager: no bridge connection for task ${taskId}`);
       return;
     }
+
+    // Resume the Copilot CLI process BEFORE sending the response so it can
+    // read the Bridge MCP result. See SIGSTOP in handleBridgeMessage().
+    if (task.agentProcess?.pid) {
+      try {
+        process.kill(task.agentProcess.pid, 'SIGCONT');
+        logger.info(`TaskManager: SIGCONT sent to CLI (PID ${task.agentProcess.pid}) — user responded`);
+      } catch (e) {
+        logger.warn(`TaskManager: failed to SIGCONT CLI for task ${taskId}`);
+      }
+    }
+
     task.bridgeWs.send(JSON.stringify({
       type: 'bridge_input_response',
       taskId,
@@ -227,6 +239,17 @@ export class TaskManager {
       logger.warn(`TaskManager: no bridge connection for task ${taskId}`);
       return;
     }
+
+    // Resume CLI (see SIGSTOP in handleBridgeMessage for isBridgeRequestPayment)
+    if (task.agentProcess?.pid) {
+      try {
+        process.kill(task.agentProcess.pid, 'SIGCONT');
+        logger.info(`TaskManager: SIGCONT sent to CLI (PID ${task.agentProcess.pid}) — payment responded`);
+      } catch (e) {
+        logger.warn(`TaskManager: failed to SIGCONT CLI for task ${taskId}`);
+      }
+    }
+
     task.bridgeWs.send(JSON.stringify({
       type: 'bridge_payment_response',
       taskId,
@@ -240,6 +263,12 @@ export class TaskManager {
   cancelTask(taskId: string, reason?: string): void {
     const task = this.tasks.get(taskId);
     if (!task) return;
+
+    // Resume CLI first in case it's SIGSTOP'd (waiting for user input/payment).
+    // A stopped process can't receive SIGTERM cleanly.
+    if (task.agentProcess?.pid) {
+      try { process.kill(task.agentProcess.pid, 'SIGCONT'); } catch { /* */ }
+    }
 
     // Notify Bridge MCP
     if (task.bridgeWs && task.bridgeWs.readyState === WebSocket.OPEN) {
@@ -618,6 +647,21 @@ export class TaskManager {
     }
 
     if (isBridgeAskUser(msg)) {
+      // Freeze the Copilot CLI process while waiting for user input.
+      // Without this, the CLI's internal tool timeout (~3 min) fires and
+      // the agent continues browsing autonomously while the user is still
+      // being asked a question. SIGSTOP pauses the process; SIGCONT in
+      // handleInputResponse() resumes it when the user responds.
+      const task = this.tasks.get(msg.taskId);
+      if (task?.agentProcess?.pid) {
+        try {
+          process.kill(task.agentProcess.pid, 'SIGSTOP');
+          logger.info(`TaskManager: SIGSTOP sent to CLI (PID ${task.agentProcess.pid}) — waiting for user input`);
+        } catch (e) {
+          logger.warn(`TaskManager: failed to SIGSTOP CLI for task ${msg.taskId}`);
+        }
+      }
+
       this.sendToRelay({
         id: randomUUID(),
         type: 'task_input_required',
@@ -646,6 +690,17 @@ export class TaskManager {
     }
 
     if (isBridgeRequestPayment(msg)) {
+      // Freeze CLI while waiting for payment confirmation (same as ask_user)
+      const task = this.tasks.get(msg.taskId);
+      if (task?.agentProcess?.pid) {
+        try {
+          process.kill(task.agentProcess.pid, 'SIGSTOP');
+          logger.info(`TaskManager: SIGSTOP sent to CLI (PID ${task.agentProcess.pid}) — waiting for payment`);
+        } catch (e) {
+          logger.warn(`TaskManager: failed to SIGSTOP CLI for task ${msg.taskId}`);
+        }
+      }
+
       this.sendToRelay({
         id: randomUUID(),
         type: 'task_payment_required',

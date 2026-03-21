@@ -478,4 +478,24 @@ These flags are hardcoded in `playwright-core/lib/server/chromium/chromiumSwitch
 
 ---
 
+## 30. Copilot CLI Continues Browsing While Waiting for User Input
+
+**What happens:** The laptop Copilot CLI agent calls `ask_user` to ask the user a question, but while the user is still reading/responding, the CLI agent continues executing browser actions (navigating to buy page, clicking buttons). The user sees an input prompt while Chrome is already 3 steps ahead.
+
+**Root cause:** The Copilot CLI binary has an internal ~3 minute tool execution timeout. When Bridge MCP's `ask_user` blocks (waiting for user to respond via the relay), the CLI's timeout fires, the tool call returns an error, and the LLM continues autonomously — often re-asking the same question or proceeding without user input.
+
+**Evidence from task `cmn0cwx8d0001s601nmqn1kl8`:** Three `ask_user` calls at 3-minute intervals (13:24:49, 13:27:59, 13:31:09), all asking the same "which earbuds?" question.
+
+**The fix (2026-03-21):**
+1. TaskManager sends `SIGSTOP` to the Copilot CLI process when `bridge_ask_user` or `bridge_request_payment` is received
+2. This freezes the CLI — no more tool calls, no timeout firing
+3. When user responds → TaskManager sends `SIGCONT` → CLI resumes, reads the result, continues
+4. `cancelTask()` sends `SIGCONT` before `SIGTERM` to ensure stopped processes can be killed cleanly
+
+Also added in `agent.ts` (cloud-side): break the tool processing loop after `ask_user`/`confirm_action`/`collect_payment` to prevent the LLM from batching user-blocking tools with browser actions.
+
+**Rule:** User-blocking tools (`ask_user`, `confirm_action`, `collect_payment`) MUST freeze agent execution. On the laptop, this means SIGSTOP/SIGCONT. On the cloud, this means breaking the tool loop. The agent MUST NOT proceed until the user responds.
+
+---
+
 *Last updated: 2026-03-21*
