@@ -804,9 +804,13 @@ export class TaskManager {
       this.taskTimeouts.delete(taskId);
     }
 
-    // Kill agent process group (detached: true makes PID = PGID)
+    // Kill agent process group (detached: true makes PID = PGID).
+    // SIGCONT first — a SIGSTOP'd process silently ignores SIGTERM.
+    // This also kills the per-task Chrome launched by playwright-mcp-with-chrome.sh
+    // since Chrome shares the same process group as the Copilot CLI.
     try {
       if (!task.agentProcess.killed && task.agentProcess.pid) {
+        process.kill(-task.agentProcess.pid, 'SIGCONT');
         process.kill(-task.agentProcess.pid, 'SIGTERM');
         setTimeout(() => {
           try {
@@ -821,13 +825,6 @@ export class TaskManager {
     // Close bridge WS
     if (task.bridgeWs && task.bridgeWs.readyState === WebSocket.OPEN) {
       task.bridgeWs.close();
-    }
-
-    // Release Chrome slot so the window closes immediately
-    if (this.chromePool && task.sessionId) {
-      this.chromePool.releaseSlot(task.sessionId).catch((err) => {
-        logger.warn(`TaskManager: failed to release Chrome slot for ${taskId}`, { error: String(err) });
-      });
     }
 
     this.tasks.delete(taskId);
