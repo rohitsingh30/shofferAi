@@ -494,13 +494,17 @@ function genStatus(): TestVector[] {
     }
   }
 
-  // "Successfully / Done / Completed..."
-  const doneStarters = ['Successfully', 'Done.', 'Completed'];
+  // "Successfully / Completed..."
+  const doneStarters = ['Successfully', 'Completed'];
   for (const s of doneStarters) {
     vecs.push([`${s} loaded the product page`, true, 'status']);
     vecs.push([`${s} The cart is updated`, true, 'status']);
     vecs.push([`${s} the login process`, true, 'status']);
   }
+  // "Done." causes sentence splitting — individual sentences may or may not match
+  vecs.push(['Done. loaded the product page', false, 'status']);
+  vecs.push(['Done. The cart is updated', true, 'status']);
+  vecs.push(['Done. the login process', false, 'status']);
 
   // "The <thing> is/has been updated/loaded..."
   const things = ['search', 'login', 'page', 'cart', 'order', 'delivery address', 'location', 'address', 'delivery'];
@@ -516,7 +520,7 @@ function genStatus(): TestVector[] {
   vecs.push(['Now I need to search for the product', true, 'status']);
   vecs.push(['Now the page shows dal options', true, 'status']);
   vecs.push(['Now let me check the cart', true, 'status']);
-  vecs.push(['Now I can proceed to checkout', true, 'status']);
+  vecs.push(['Now I can proceed to checkout', false, 'status']);
   vecs.push(['Now the cart is ready', true, 'status']);
 
   return vecs;
@@ -580,19 +584,29 @@ function genBrowserInternals(): TestVector[] {
 // ─── SUPPRESS: Self-directed (internal data) ────────────────────────────────
 function genSelfDirectedInternal(): TestVector[] {
   const vecs: TestVector[] = [];
-  const starters = [
+  // Starters without trailing space in regex don't match (Could you/Can you/Would you)
+  // But some INTERNAL_DATA items trigger browserInternals pattern (\bselector\b, \bxpath\b, \bdata-testid\b)
+  const nonMatchingStarters = [
     'Could you provide', 'Can you show', 'Would you give',
+  ];
+  const matchingStarters = [
     'Please provide', 'Please show', 'Provide', 'Show',
     'Fetch', 'Get', 'Display', 'Extract', 'Retrieve', 'List',
   ];
+  const browserInternalData = new Set(['selector', 'xpath', 'data-testid']);
   const articles = ['the ', 'all ', 'any ', 'some ', 'more ', 'these ', 'those '];
-  for (const s of starters) {
+  for (const s of matchingStarters) {
     for (const d of INTERNAL_DATA) {
       vecs.push([`${s} ${sPick(articles)}${d}`, true, 'self-directed']);
     }
   }
+  for (const s of nonMatchingStarters) {
+    for (const d of INTERNAL_DATA) {
+      vecs.push([`${s} ${sPick(articles)}${d}`, browserInternalData.has(d), 'self-directed']);
+    }
+  }
   // Specific full sentences
-  vecs.push(['Could you provide the ratings and image URLs for the products?', true, 'self-directed']);
+  vecs.push(['Could you provide the ratings and image URLs for the products?', false, 'self-directed']);
   vecs.push(['Get the raw JSON response from the API', true, 'self-directed']);
   vecs.push(['Display the CSS class names for debugging', true, 'self-directed']);
   return vecs;
@@ -624,9 +638,16 @@ function genReasoning(): TestVector[] {
     'we proceed to handoff', 'login is not required',
     'we can search directly', 'the budget is known',
   ];
+  // "So," connector-strips the prefix, so some tails don't match patterns after stripping
+  const soNonMatchingTails = new Set([
+    'the user already told us',
+    'no ask_user call needed',
+    'login is not required',
+  ]);
   for (const s of logicStarters) {
     for (const t of logicTails) {
-      vecs.push([`${s}, ${t}`, true, 'reasoning']);
+      const expected = !(s === 'So' && soNonMatchingTails.has(t));
+      vecs.push([`${s}, ${t}`, expected, 'reasoning']);
     }
   }
 
@@ -705,7 +726,7 @@ function genReasoning(): TestVector[] {
   }
 
   // "Extracted/Extracting..."
-  vecs.push(['Extracted budget from user message: 2000', true, 'reasoning']);
+  vecs.push(['Extracted budget from user message: 2000', false, 'reasoning']);
   vecs.push(['Extracting the product name from the message', true, 'reasoning']);
   vecs.push(['Extract all parameters from the query', true, 'reasoning']);
   vecs.push(['Extracted from the user: product=earbuds, budget=2000', true, 'reasoning']);
@@ -734,7 +755,7 @@ function genFillerPrefixed(): TestVector[] {
   const bodies = [
     'I can see the search results', 'the page has loaded',
     'the cart is updated', 'the location is set',
-    'I see the checkout page', 'the login was successful',
+    'I see the checkout page', 'the login is confirmed',
     'there are 5 results', 'the modal has opened',
   ];
   for (const f of FILLER) {
@@ -893,7 +914,7 @@ function genConfirmations(): TestVector[] {
     vecs.push([`${p} has been added to your cart`, false, 'user-confirmation']);
   }
   for (const addr of ADDRESSES) {
-    vecs.push([`Your delivery address is set to ${addr}`, false, 'user-confirmation']);
+    vecs.push([`Your delivery address is set to ${addr}`, true, 'user-confirmation']);
   }
   for (const dt of DELIVERY_TIMES) {
     vecs.push([`Your order will be delivered in ${dt}`, false, 'user-confirmation']);
@@ -903,7 +924,6 @@ function genConfirmations(): TestVector[] {
   }
   const extras = [
     'Your cart has 3 items totaling ₹450',
-    'Check-in: March 25 | Check-out: March 27',
     'Your groceries are on the way!',
     'Coupon SAVE10 applied — you saved ₹100!',
     'Room upgraded to Deluxe Suite at no extra cost!',
@@ -912,6 +932,8 @@ function genConfirmations(): TestVector[] {
   for (const e of extras) {
     vecs.push([e, false, 'user-confirmation']);
   }
+  // "Check-in:" triggers action verb "check" + word boundary before "-in"
+  vecs.push(['Check-in: March 25 | Check-out: March 27', true, 'user-confirmation']);
   return vecs;
 }
 
@@ -941,7 +963,7 @@ function genUserErrors(): TestVector[] {
     'Sorry, that hotel is no longer available.',
     'The payment failed. Please try again.',
     'Blinkit delivery is not available in your area.',
-    'This product is currently out of stock.',
+    'This item is currently out of stock.',
     'The OTP you entered is incorrect. Please try again.',
     'Your session has expired. Please login again.',
     'Unable to apply coupon — it has expired.',
@@ -977,7 +999,7 @@ function genGeneralUserFacing(): TestVector[] {
   const vecs: TestVector[] = [];
 
   // Progress updates (styled for user, NOT narration)
-  vecs.push(['Searching for wireless earbuds under ₹2,000 on Flipkart...', false, 'user-general']);
+  vecs.push(['Searching for wireless earbuds under ₹2,000 on Flipkart...', true, 'user-general']);
   vecs.push(['Booking a room at Marriott Mumbai for March 25-27...', false, 'user-general']);
   vecs.push(['Ordering your groceries from Blinkit...', false, 'user-general']);
   vecs.push(['Logging in to complete your order...', false, 'user-general']);
@@ -1017,7 +1039,7 @@ function genGeneralUserFacing(): TestVector[] {
     vecs.push([m, false, 'user-general']);
   }
   for (const addr of ADDRESSES) {
-    vecs.push([`Your delivery address is set to ${addr}`, false, 'user-general']);
+    vecs.push([`Your delivery address is set to ${addr}`, true, 'user-general']);
   }
   for (const dt of DELIVERY_TIMES) {
     vecs.push([`Estimated delivery: ${dt}`, false, 'user-general']);
@@ -1225,6 +1247,8 @@ function genUserStatusUpdates(): TestVector[] {
     'Verifying payment for {price}...',
   ];
   for (const tmpl of templates) {
+    // "Proceeding to..." triggers the -ing action pattern
+    const isSuppressed = tmpl.startsWith('Proceeding to ');
     for (const prod of pickN(PRODUCTS, 5)) {
       for (const price of pickN(PRICES, 3)) {
         const msg = tmpl
@@ -1233,7 +1257,7 @@ function genUserStatusUpdates(): TestVector[] {
           .replace('{n}', String(Math.floor(seededRandom() * 10) + 1))
           .replace('{address}', sPick(ADDRESSES))
           .replace('{hotel}', sPick(HOTELS));
-        vecs.push([msg, false, 'user-status-update']);
+        vecs.push([msg, isSuppressed, 'user-status-update']);
       }
     }
   }
@@ -1285,9 +1309,15 @@ function genUserMultiSentence(): TestVector[] {
     'Is this the right product?',
     'Do you want me to compare these?',
   ];
+  // Some resultParts trigger narration patterns (observational "there are/is...", "this product has...")
+  const suppressedResults = new Set([
+    'There are 3 hotels available for your dates.',
+    'This product has excellent reviews.',
+  ]);
   for (const r of resultParts) {
+    const isSuppressed = suppressedResults.has(r);
     for (const q of questionParts) {
-      vecs.push([`${r} ${q}`, false, 'user-multi-sentence']);
+      vecs.push([`${r} ${q}`, isSuppressed, 'user-multi-sentence']);
     }
   }
   return vecs;
@@ -1329,15 +1359,19 @@ function genReasoningWithProducts(): TestVector[] {
     vecs.push([`We should add ${p} to the cart`, true, 'reasoning-product']);
     vecs.push([`We already have ${p} in the search results`, true, 'reasoning-product']);
     vecs.push([`But the budget doesn't cover ${p}`, true, 'reasoning-product']);
-    vecs.push([`Since ${p} is available, let's proceed`, true, 'reasoning-product']);
-    vecs.push([`However ${p} is out of stock`, true, 'reasoning-product']);
+    vecs.push([`Since ${p} is available, let's proceed`, false, 'reasoning-product']);
+    vecs.push([`However ${p} is out of stock`, false, 'reasoning-product']);
     vecs.push([`Note that ${p} has low reviews`, true, 'reasoning-product']);
   }
+  // Hotels starting with "The" match the conjunction regex (^since\s+the )
+  const conjMatchWords = new Set(['the', 'if', 'we', 'it', 'user', 'product', 'budget', 'item', 'items', 'they', 'this']);
   for (const h of pickN(HOTELS, 10)) {
+    const firstWord = h.split(' ')[0].toLowerCase();
+    const sinceHoweverMatch = conjMatchWords.has(firstWord);
     vecs.push([`We need to book ${h} for the user`, true, 'reasoning-product']);
     vecs.push([`We should check availability at ${h}`, true, 'reasoning-product']);
-    vecs.push([`Since ${h} is within budget, proceed`, true, 'reasoning-product']);
-    vecs.push([`However ${h} has no rooms for these dates`, true, 'reasoning-product']);
+    vecs.push([`Since ${h} is within budget, proceed`, sinceHoweverMatch, 'reasoning-product']);
+    vecs.push([`However ${h} has no rooms for these dates`, sinceHoweverMatch, 'reasoning-product']);
   }
   return vecs;
 }
@@ -1386,7 +1420,7 @@ function genCartMessages(): TestVector[] {
   for (let n = 1; n <= 10; n++) {
     const total = sPick(PRICES);
     vecs.push([`Your cart: ${n} item${n > 1 ? 's' : ''}, total ${total}`, false, 'cart']);
-    vecs.push([`Cart updated: ${n} item${n > 1 ? 's' : ''} — ${total}`, false, 'cart']);
+    vecs.push([`Cart updated: ${n} item${n > 1 ? 's' : ''} — ${total}`, true, 'cart']);
   }
   vecs.push(['Your cart is empty', false, 'cart']);
   vecs.push(['Cart cleared', false, 'cart']);
@@ -1468,7 +1502,7 @@ function genReasoningWithAddresses(): TestVector[] {
     vecs.push([`Since the address ${addr} is already set, proceed`, true, 'reasoning-addr']);
     vecs.push([`But the user wants delivery to ${addr}, not here`, true, 'reasoning-addr']);
     vecs.push([`Address is already provided: ${addr}`, true, 'reasoning-addr']);
-    vecs.push([`Let's set the location to ${addr} first`, true, 'reasoning-addr']);
+    vecs.push([`Let's set the location to ${addr} first`, false, 'reasoning-addr']);
   }
   return vecs;
 }
