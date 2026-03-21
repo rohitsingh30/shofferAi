@@ -72,7 +72,7 @@ function ChatInterfaceInner() {
   const taskIdRef = useRef<string | null>(null);
   const { openL2, closeL2 } = useL2Payment();
   const { closeCart } = useL2Cart();
-  const { clearCart, setTaskId: setCartTaskId, syncFromAgent } = useCart();
+  const { clearCart, setTaskId: setCartTaskId, syncFromAgent, addItem } = useCart();
 
   // Pick suggestions on client mount only — avoids hydration mismatch
   const [suggestions, setSuggestions] = useState(ALL_SUGGESTIONS.slice(0, 4));
@@ -382,6 +382,55 @@ function ChatInterfaceInner() {
 
   const handleInputResponse = async (value: string) => {
     if (!pendingInput) return;
+
+    // When user confirms selections from card_grid/carousel, sync items to CartContext
+    // so the floating CartBar appears at the bottom.
+    if (
+      (pendingInput.inputType === 'card_grid' || pendingInput.inputType === 'carousel') &&
+      pendingInput.cards?.length
+    ) {
+      try {
+        // Extract store name from question text (e.g., "from Blinkit", "on Flipkart")
+        const storeMatch = pendingInput.question.match(/(?:from|on|at)\s+([A-Z][a-zA-Z]+)/);
+        const store = storeMatch?.[1] || 'Cart';
+
+        const parsePrice = (s?: string): number => {
+          if (!s) return 0;
+          const m = s.match(/₹([\d,]+)/);
+          return m ? parseFloat(m[1].replace(/,/g, '')) : 0;
+        };
+
+        // CardGridInput: [{id, label, qty}], CarouselInput: ["id1"] or "id1"
+        let parsed: unknown;
+        try { parsed = JSON.parse(value); } catch { parsed = value; }
+
+        let selectedIds: Array<{ id: string; qty: number }> = [];
+        if (Array.isArray(parsed)) {
+          selectedIds = parsed.map((item: unknown) =>
+            typeof item === 'object' && item !== null && 'id' in item
+              ? { id: (item as { id: string }).id, qty: (item as { qty?: number }).qty || 1 }
+              : { id: String(item), qty: 1 },
+          );
+        } else if (typeof parsed === 'string' && parsed) {
+          selectedIds = [{ id: parsed, qty: 1 }];
+        }
+
+        if (selectedIds.length > 0) {
+          const agentItems = selectedIds.map((sel) => {
+            const card = pendingInput.cards?.find((c) => c.id === sel.id);
+            return {
+              name: card?.label || sel.id,
+              quantity: sel.qty,
+              price: card?.subtitle ? `₹${parsePrice(card.subtitle)}` : '₹0',
+            };
+          });
+          syncFromAgent(agentItems, store, '');
+        }
+      } catch {
+        // parse error — ignore
+      }
+    }
+
     try {
       const res = await fetch('/api/agent/input', {
         method: 'POST',
