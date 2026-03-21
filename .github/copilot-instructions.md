@@ -132,6 +132,45 @@ These are the top mistakes from `docs/REPEATING-MISTAKES.md`. Breaking any of th
 24. **Screenshots go to `/tmp/` or session folder** — NEVER save to repo root
 25. **Relay connection must be LAZY** — only connect when `handoff_to_browser_agent` is called
 
+## Documentation & Session Logging (MANDATORY)
+
+Every Copilot CLI session MUST follow these rules:
+
+### Always Update Documentation
+- When changing architecture, update `docs/ARCHITECTURE.md` in the SAME commit
+- When changing workflows or skills, update `docs/WORKFLOWS.md` or the relevant `SKILL.md`
+- When changing deployment, update `docs/DEPLOYMENT.md`
+- When adding new anti-patterns or lessons learned, update `docs/REPEATING-MISTAKES.md`
+- When changing instructions files (`.github/copilot-instructions.md` or `.github/instructions/*.md`), ensure they match the actual code
+- **Rule of thumb**: if a doc describes something you just changed, update the doc too
+
+### Session Log (`docs/SESSION-LOG.md`)
+- At the END of every session (before final commit), append an entry to `docs/SESSION-LOG.md`
+- Each entry MUST include: date, goal, what was done, files changed, key decisions
+- Leave a "What worked / what didn't" section for the developer to fill in later
+- Newest sessions go at the TOP (right after the header)
+- The developer will review these logs and add feedback — this is a critical learning loop
+- When starting a new session, READ the latest 3-5 entries to learn from past feedback
+
+### Session Log Entry Format
+```markdown
+## YYYY-MM-DD — Short title
+
+**Goal**: What the session set out to accomplish.
+
+**What was done**:
+- Bullet list of changes made
+
+**Files changed**:
+- `path/to/file` (created/updated/deleted — brief note)
+
+**Key decisions**:
+- Any architectural or design choices worth remembering
+
+**What worked / what didn't** *(fill in after review)*:
+- 
+```
+
 ## Reference Docs
 
 - `docs/REPEATING-MISTAKES.md` — Full details on all anti-patterns above
@@ -139,3 +178,4 @@ These are the top mistakes from `docs/REPEATING-MISTAKES.md`. Breaking any of th
 - `docs/WORKFLOWS.md` — E2E workflow docs per skill (Booking.com, Blinkit, Zomato)
 - `docs/DEPLOYMENT.md` — Cloud Run vs laptop, startup guide, LaunchAgent setup
 - `docs/PRD.md` — Product requirements
+- `docs/SESSION-LOG.md` — Development session log (review & feedback loop)

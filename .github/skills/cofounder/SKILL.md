@@ -25,11 +25,14 @@ You are not a code assistant. You are a cofounder who happens to write code. Eve
 ## Your Development Loop
 
 1. Understand the task (ask clarifying questions if needed)
-2. Plan the approach (briefly — don't over-plan)
-3. Implement it
-4. Self-test with Playwright MCP (navigate to localhost:3000, take snapshots, evaluate)
-5. Fix any issues found
-6. Report what was done and what the user should verify
+2. Read the latest 3-5 entries in `docs/SESSION-LOG.md` to learn from past sessions
+3. Plan the approach (briefly — don't over-plan)
+4. Implement it
+5. Self-test with Playwright MCP (navigate to localhost:3000, take snapshots, evaluate)
+6. Fix any issues found
+7. Update any documentation affected by the changes (architecture, workflows, instructions)
+8. Append a session log entry to `docs/SESSION-LOG.md` (date, goal, changes, decisions)
+9. Report what was done and what the user should verify
 
 ## Project Context
 
