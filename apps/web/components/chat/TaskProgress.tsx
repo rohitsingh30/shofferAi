@@ -3,16 +3,8 @@ export interface StepInfo {
   status: string;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  running: 'In progress',
-  completed: 'Done',
-  failed: 'Issue encountered',
-  paused_for_input: 'Waiting for you',
-};
-
 export function TaskProgress({ steps }: { steps: StepInfo[] }) {
-  const completedCount = steps.filter(s => s.status === 'completed').length;
-  const total = steps.length;
+  const allDone = steps.length > 0 && steps.every(s => s.status === 'completed');
   const latestRunning = [...steps].reverse().find(s => s.status === 'running');
   const hasRunning = steps.some(s => s.status === 'running');
   const isPaused = steps.some(s => s.status === 'paused_for_input');
@@ -21,7 +13,7 @@ export function TaskProgress({ steps }: { steps: StepInfo[] }) {
     ? 'Waiting for your input'
     : latestRunning
     ? latestRunning.action
-    : completedCount === total
+    : allDone
     ? 'All done!'
     : 'Working...';
 
@@ -40,29 +32,11 @@ export function TaskProgress({ steps }: { steps: StepInfo[] }) {
       </div>
 
       <div className="flex-1 rounded-2xl rounded-tl-md bg-white/[0.03] ring-1 ring-white/[0.06] overflow-hidden">
-        {/* Status header with progress */}
+        {/* Status header */}
         <div className="px-4 pt-3.5 pb-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[13px] font-medium text-zinc-200 truncate mr-3">
-              {statusLabel}
-            </span>
-            <span className="text-[11px] tabular-nums text-zinc-600 shrink-0">
-              {completedCount}/{total}
-            </span>
-          </div>
-
-          {/* Progress bar */}
-          <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
-            <div
-              className="h-full rounded-full transition-all duration-700 ease-out"
-              style={{
-                width: `${total > 0 ? Math.max((completedCount / total) * 100, 8) : 0}%`,
-                background: completedCount === total
-                  ? 'linear-gradient(90deg, #22c55e, #4ade80)'
-                  : 'linear-gradient(90deg, #8b5cf6, #a78bfa)',
-              }}
-            />
-          </div>
+          <span className="text-[13px] font-medium text-zinc-200 truncate">
+            {statusLabel}
+          </span>
         </div>
 
         {/* Steps timeline */}

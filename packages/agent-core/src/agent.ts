@@ -20,6 +20,14 @@ import { ScriptStore } from './scripts/store';
 // BookingMCPExecutor removed — replaced by generic record→replay pipeline
 // import { BookingMCPExecutor } from './scripts/mcp-executor';
 
+/** kebab-case skill id → "Behrouz Biryani" */
+function formatSkillName(id: string): string {
+  return id
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 export interface AgentCallbacks {
   onMessage: (content: string) => void;
   onStepUpdate: (step: { action: string; status: string }) => void;
@@ -390,7 +398,7 @@ export class AgentExecutor {
         this.systemPrompt = buildSystemPrompt(this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons);
         logger.info('Skill matched', { skillName: this.matchedSkill.name });
         callbacks.onStepUpdate({
-          action: `Using skill: ${this.matchedSkill.name}`,
+          action: `🧠 ${formatSkillName(this.matchedSkill.name)} — let me handle this`,
           status: 'running',
         });
 
@@ -404,7 +412,7 @@ export class AgentExecutor {
           try {
             logger.info('Compiled script found, running instant replay', { skill: this.matchedSkill.name });
             callbacks.onStepUpdate({
-              action: `Running ${this.matchedSkill.name} (instant mode)`,
+              action: `⚡ ${formatSkillName(this.matchedSkill.name)} — instant replay`,
               status: 'running',
             });
 
@@ -428,13 +436,13 @@ export class AgentExecutor {
 
             logger.warn('Compiled script failed, falling back to LLM + recording', { error: result.error });
             callbacks.onStepUpdate({
-              action: 'Script had an issue, switching to AI mode (recording)',
+              action: '🔄 Retrying with AI — hang tight',
               status: 'running',
             });
           } catch (error) {
             logger.warn('Script execution error, falling back to LLM + recording', { error });
             callbacks.onStepUpdate({
-              action: 'Switching to AI mode (recording)',
+              action: '🔄 Switching to AI mode',
               status: 'running',
             });
           }

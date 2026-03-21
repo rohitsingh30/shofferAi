@@ -160,7 +160,7 @@ function ChatInterfaceInner() {
           }
         }
 
-        if (status === 'running' && !action.startsWith('Using skill:') && !action.includes('instant mode') && !action.includes('AI mode')) break;
+        if (status === 'running' && !action.startsWith('🧠 ') && !action.startsWith('⚡ ') && !action.startsWith('🔄 ')) break;
 
         setCurrentSteps((prev) => {
           const step: StepInfo = { action, status };
