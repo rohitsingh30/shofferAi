@@ -137,6 +137,12 @@ import json
 p = json.load(open('$PREFS'))
 p.setdefault('profile', {})['exit_type'] = 'Normal'
 p.setdefault('profile', {})['exited_cleanly'] = True
+# Disable password save prompts and leak detection
+p.setdefault('credentials_enable_service', False)
+pw = p.setdefault('password_manager', {})
+pw['leak_detection'] = False
+pw['offer_to_save_passwords'] = False
+pw['compromised_credentials'] = {'dismissed_compromised_passwords': True}
 json.dump(p, open('$PREFS', 'w'))
 " 2>/dev/null || true
   fi
@@ -154,7 +160,7 @@ json.dump(p, open('$PREFS', 'w'))
     --disable-sync \
     --disable-default-apps \
     --disable-blink-features=AutomationControlled \
-    --disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching \
+    --disable-features=AutomationControlled,SigninInterceptBubble,IdentityStatusConsistency,OptimizationGuideModelDownloading,OptimizationHintsFetching,PasswordLeakDetection \
     --disable-infobars \
     --disable-ipc-flooding-protection \
     --disable-popup-blocking \
