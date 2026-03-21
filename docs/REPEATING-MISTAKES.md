@@ -646,4 +646,17 @@ launchctl list | grep shofferai
 
 ---
 
+## 36. Dropping Cancel Messages When Relay is Disconnected
+
+**What happens:** User closes browser tab → `beforeunload` fires → cancel request reaches Cloud Run → relay is temporarily disconnected (e.g. post-deploy revision change) → cancel message silently dropped → Chrome stays alive as zombie on laptop forever.
+
+**Symptoms:**
+- Chrome processes accumulate on the laptop after deployments
+- Cloud Run logs show `[cancel] relay not connected, cannot send task_cancel`
+- Cancel works sometimes (relay connected) but not others (relay briefly disconnected)
+
+**Rule:** NEVER drop cancel messages. Queue them in `pendingCancels` and flush when the relay WebSocket reconnects. Both `RelayBridge` (prod) and `RelayClient` (dev) have `pendingCancels: Set<string>` that auto-flush on the `ws.on('open')` handler. The `sendTaskMessage()` method handles queuing automatically for `task_cancel` type messages.
+
+---
+
 *Last updated: 2026-03-21*

@@ -4,6 +4,36 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Task cancel on tab/browser close + cancel queue for relay gaps
+
+**Goal**: Ensure closing the browser tab or window kills the running Copilot CLI + Chrome on the laptop, and fix cancel messages being silently dropped during relay disconnection windows.
+
+**What was done**:
+- Added `beforeunload` + `pagehide` event listeners in `ChatInterface.tsx` that fire `fetch('/api/agent/cancel', {keepalive: true})` on tab/browser close
+- Initially used `navigator.sendBeacon()` with Blob — didn't work (likely Content-Type issue with `request.json()` parsing). Switched to `fetch()` with `keepalive: true` for proper JSON headers
+- Made cancel endpoint body parsing defensive: `request.text()` + `JSON.parse()` instead of `request.json()`
+- **Root cause of failure**: Cloud Run logs showed cancel requests WERE reaching the server, but relay was temporarily disconnected (post-deploy reconnection gap) → cancel message silently dropped
+- Added `pendingCancels: Set<string>` to both `RelayBridge` (prod) and `RelayClient` (dev) — cancel messages queued when relay offline, auto-flushed on WebSocket reconnect
+- Committed password popup suppression for Chrome: `PasswordLeakDetection` in `--disable-features`, patched Preferences JSON to disable password save prompts + leak detection
+
+**Files changed**:
+- `apps/web/components/chat/ChatInterface.tsx` (updated — beforeunload/pagehide cancel handler)
+- `apps/web/app/api/agent/cancel/route.ts` (updated — defensive body parsing, removed isConnected gate)
+- `apps/web/lib/relay-bridge.ts` (updated — pendingCancels queue + flush on reconnect)
+- `apps/web/lib/relay-client.ts` (updated — pendingCancels queue + flush on reconnect)
+- `apps/playwright/scripts/playwright-mcp-with-chrome.sh` (updated — password popup suppression)
+- `docs/ARCHITECTURE.md` (updated — Task Cancellation Flow section)
+- `docs/REPEATING-MISTAKES.md` (updated — anti-pattern #36: dropping cancel messages)
+
+**Key decisions**:
+- `fetch(keepalive)` over `sendBeacon` — same page-teardown guarantee but with proper Content-Type headers
+- NOT using `visibilitychange` — fires on tab switch too, would kill tasks when user just switches tabs
+- Queue-and-flush pattern in relay classes rather than retry loop in cancel endpoint — cleaner, relay reconnect is the natural trigger
+- `SIGCONT` before `SIGTERM` — handles paused (SIGSTOP) Copilot CLI processes that ignore SIGTERM
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
 ## 2026-03-21 — Fixed relay duplicate-instance detection (false self-match)
 
 **Goal**: Diagnose why task `cmn0oodi` (Blinkit grocery order) died mid-execution, and fix relay startup failures.

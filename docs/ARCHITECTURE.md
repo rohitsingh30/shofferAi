@@ -252,6 +252,27 @@ sequenceDiagram
 4. When task completes, `SessionEndRequest` releases the tab back to the pool
 5. On cancellation (user closes tab / new chat), `TaskManager.cleanupTask()` calls `chromePool.releaseSlot(sessionId)` to immediately free the Chrome slot — no waiting for idle TTL
 
+### Task Cancellation Flow
+
+When a user clicks "New Chat" or closes the browser tab/window, a cancel signal propagates to the laptop to kill the Copilot CLI process and its Chrome instance:
+
+```
+User closes tab / clicks "New Chat"
+  → beforeunload event fires in browser
+  → fetch('/api/agent/cancel', {keepalive: true}) with taskId
+  → Cancel endpoint: remoteMcpHost.sendTaskMessage({type: 'task_cancel', taskId})
+  → If relay connected: sent immediately via WebSocket
+  → If relay disconnected: queued in pendingCancels Set, flushed on reconnect
+  → Laptop TaskManager.cleanupTask(): SIGCONT + SIGTERM to process group
+  → Copilot CLI + Chrome both killed
+```
+
+**Key design decisions:**
+- `fetch()` with `keepalive: true` (not `sendBeacon`) — survives page teardown with proper `Content-Type: application/json` headers
+- Cancel messages are queued in `RelayBridge.pendingCancels` / `RelayClient.pendingCancels` when the relay is offline (e.g. post-deploy reconnection gap) and auto-flushed on WebSocket reconnect
+- `SIGCONT` sent before `SIGTERM` — Copilot CLI may be in `SIGSTOP` state (paused for payment); stopped processes ignore `SIGTERM`
+- Cloud Run's `request.signal` abort detection is unreliable on HTTP/2 load balancers — the explicit cancel API is the primary mechanism
+
 ---
 
 ## 5. L2 Split View — Cart + Payment Panels
