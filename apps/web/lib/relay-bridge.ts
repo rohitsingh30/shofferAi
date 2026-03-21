@@ -199,12 +199,12 @@ export class RelayBridge implements MCPHostLike {
     if (this.connected && this.tools.length > 0) return;
 
     const start = Date.now();
-    while ((!this.connected || this.tools.length === 0) && Date.now() - start < 30000) {
+    while ((!this.connected || this.tools.length === 0) && Date.now() - start < 60000) {
       await new Promise((r) => setTimeout(r, 500));
     }
 
     if (!this.connected) {
-      throw new BrowserError('Laptop not connected to relay bridge (waited 30s)');
+      throw new BrowserError('Laptop not connected to relay bridge (waited 60s)');
     }
   }
 
@@ -315,9 +315,9 @@ export class RelayBridge implements MCPHostLike {
     this.lastPongAt = Date.now();
     this.heartbeatInterval = setInterval(() => {
       if (this.laptopSocket && this.connected) {
-        // Check if laptop is still alive (no pong for 45s → consider dead)
-        if (Date.now() - this.lastPongAt > 45000) {
-          logger.warn('RelayBridge: no heartbeat pong for 45s, closing dead connection');
+        // Check if laptop is still alive (no pong for 20s → consider dead)
+        if (Date.now() - this.lastPongAt > 20000) {
+          logger.warn('RelayBridge: no heartbeat pong for 20s, closing dead connection');
           this.laptopSocket.close();
           return;
         }

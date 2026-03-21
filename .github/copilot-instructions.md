@@ -105,6 +105,7 @@ These are the top mistakes from `docs/REPEATING-MISTAKES.md`. Breaking any of th
 3. **NEVER use `open` command** to launch browsers — you can't interact with them
 4. **NEVER use `npx @playwright/mcp@latest`** — use the globally-installed `playwright-mcp` binary
 5. **NEVER trust `/tmp/shofferai-relay.log`** for relay status — check `lsof` for ports 9400-9499 instead
+6. **NEVER start, stop, or restart the laptop relay** — the operator manages the relay lifecycle manually. If the relay is down, inform the operator and wait.
 
 ### Browser Automation
 6. **Login FIRST** — every site interaction must start with authentication

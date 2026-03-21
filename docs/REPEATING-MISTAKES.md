@@ -278,7 +278,7 @@ Other filter gates still active:
 - Agent curled Chrome ports 9222-9225 checking "pool health" → these are dynamic ports, never hardcoded
 - Agent ran health checks against localhost:3000 before testing → should just deploy to prod and test there
 
-**Rule:** NEVER curl localhost ports to check service health. The operator starts services manually. If you need to test, deploy to prod and test there. Do NOT try to start, stop, or health-check local services — they are the operator's responsibility.
+**Rule:** NEVER curl localhost ports to check service health. NEVER start, stop, restart, or `kill` the laptop relay process — the operator manages the relay lifecycle manually. If you need to test, deploy to prod and test there. If the relay appears to be down, inform the operator and wait for them to fix it.
 
 ---
 

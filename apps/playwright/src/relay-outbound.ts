@@ -45,10 +45,10 @@ export class RelayOutbound {
   private statusInterval: ReturnType<typeof setInterval> | null = null;
   private lastDataAt = Date.now();
 
-  /** Ping every 20s to keep connection alive and detect dead sockets */
-  private static readonly HEALTH_CHECK_INTERVAL_MS = 20000;
-  /** If no data received for 45s, consider the connection dead */
-  private static readonly DEAD_CONNECTION_TIMEOUT_MS = 45000;
+  /** Ping every 10s to keep connection alive and detect dead sockets */
+  private static readonly HEALTH_CHECK_INTERVAL_MS = 10_000;
+  /** If no data received for 20s, consider the connection dead (must be < Cloud Run's connect wait) */
+  private static readonly DEAD_CONNECTION_TIMEOUT_MS = 20_000;
 
   constructor(chromePool: ChromePool, cloudUrl: string, options: RelayOutboundOptions = {}) {
     this.chromePool = chromePool;
