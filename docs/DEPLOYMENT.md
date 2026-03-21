@@ -107,6 +107,13 @@ CMD ["node", "apps/web/server.js"]  # custom-server.js with WS support
 
 **Deploying:** `gcloud builds submit --config cloudbuild.yaml` — runs entirely in GCP Cloud Build (no local Docker needed). Uploads source, builds remotely, pushes to Artifact Registry, deploys to Cloud Run.
 
+**Relay auto-heal during deploys:** The `cloudbuild.yaml` pipeline has 3 steps:
+1. **Build** (Kaniko) — Docker image with layer caching
+2. **Pre-deploy relay release** — Curls `POST /api/admin/release-relay` on the current instance to force-close the laptop WS. The laptop auto-reconnects within 1-4s. Without this, the laptop stays connected to the old instance (Cloud Run treats the WS as an "active request" and keeps the old instance alive for up to `--timeout=3600s`), while new HTTP requests route to the new instance.
+3. **Deploy** — `gcloud run deploy` with the new image
+
+If the pre-deploy curl fails (e.g., endpoint not available on old instance), the laptop's stale connection detection kicks in — it terminates connections that receive no application-level messages for 45s and auto-reconnects.
+
 **What's NOT on Cloud Run:** Chrome, Playwright, CDP, any browser automation.
 
 ---

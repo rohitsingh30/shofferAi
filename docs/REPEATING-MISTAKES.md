@@ -328,16 +328,17 @@ Other filter gates still active:
 
 ## 20. Testing E2E Immediately After Cloud Run Deploy (Race Condition)
 
-**What happens:** Agent deploys to Cloud Run, then immediately tests E2E. The deploy kills the old container (dropping the laptop's WebSocket connection). The laptop relay auto-reconnects with exponential backoff (1s → 2s → 4s), but if the test starts before reconnection completes, it fails with "Cannot reach browser agent."
+**What happens:** Agent deploys to Cloud Run, then immediately tests E2E. The laptop relay needs a few seconds to detect the disconnection and reconnect to the new instance.
 
-**Examples:**
-- Deployed compiled script changes → tested within 10 seconds → "couldn't reach the browser"
-- Relay was alive but Cloud Run had a fresh RelayBridge with no laptop connection yet
-- Agent blamed the relay when the real cause was deployment timing
+**How it's mitigated (auto-heal):**
+1. `cloudbuild.yaml` Step #1 curls `POST /api/admin/release-relay` before deploying — force-closes the laptop WS on the current instance so the laptop reconnects immediately (within 1-4s)
+2. `relay-outbound.ts` tracks application-level messages separately from WS pong frames — if no app-level message for 45s, terminates and reconnects (catches cases where the pre-deploy curl misses)
 
-**Root cause:** Cloud Run deploy → new container → new `RelayBridge` instance (connected=false) → laptop relay detects close → reconnects with backoff → gap of 1-30 seconds where no laptop is connected.
+**Why WS pong alone isn't enough:** Cloud Run's load balancer responds to WS ping/pong frames even when the backend instance is dead (e.g., old instance after deploy). The laptop thinks the connection is alive because WS pongs keep arriving, but the backend isn't processing any messages.
 
-**Rule:** After deploying to Cloud Run, WAIT at least 30 seconds before running an E2E test. The laptop relay needs time to detect the dropped connection and reconnect to the new container. If the first attempt fails with a relay error, wait 30 seconds and retry once before investigating further.
+**Root cause of the original bug:** Cloud Run deploys create new instances while keeping old ones alive. WebSocket connections are treated as "active requests" — Cloud Run won't send SIGTERM until the WS closes or `--timeout` (3600s) expires. New HTTP requests route to the new instance (no laptop WS), while the laptop stays connected to the old instance.
+
+**Rule:** After deploying to Cloud Run, WAIT at least 30 seconds before running an E2E test. The relay auto-heals but needs a few seconds. If the first attempt fails with a relay error, wait 30 seconds and retry once before investigating further.
 
 ---
 
@@ -659,4 +660,26 @@ launchctl list | grep shofferai
 
 ---
 
-*Last updated: 2026-03-21*
+## 37. Trusting WS Ping/Pong to Detect Dead Cloud Run Backends
+
+**What happens:** The laptop relay sends WebSocket ping frames to detect dead connections. Cloud Run's load balancer responds to WS ping/pong at the proxy layer, even when the backend instance is gone (terminated, replaced by deploy). The laptop thinks the connection is alive because pong frames keep arriving, but no application-level messages are being processed.
+
+**Symptoms:**
+- Laptop shows "Connected to Cloud Run relay" indefinitely after deploy
+- Cloud Run logs show no laptop connection on the new instance
+- `lsof` shows ESTABLISHED TCP to Cloud Run's IP, but `release-relay` endpoint returns `wasConnected: false`
+- Tasks fail with "Laptop not connected to relay bridge"
+
+**Root cause:** WS ping/pong operates at the WebSocket protocol layer. Cloud Run's HTTP/2 reverse proxy handles these frames independently of the backend container. When the backend is dead, the proxy keeps the TCP/TLS connection alive and responds to pings, creating a zombie WS connection.
+
+**The fix (2026-03-21):**
+1. `relay-outbound.ts` now tracks `lastAppMessageAt` separately from `lastDataAt`
+2. WS `pong` frames update `lastDataAt` only (for TCP-level dead detection at 20s)
+3. Application-level messages (JSON from server) update both `lastDataAt` AND `lastAppMessageAt`
+4. If `lastAppMessageAt` exceeds 45s (3 missed server heartbeats at 15s interval), connection is terminated and laptop reconnects
+
+**Rule:** NEVER rely solely on WS ping/pong for health checks when behind a reverse proxy (Cloud Run, ALB, Nginx). Always include application-level heartbeats with their own timeout. The server sends `{"type":"ping"}` every 15s — if the laptop doesn't receive any for 45s, the backend is dead.
+
+---
+
+*Last updated: 2026-03-22*

@@ -39,6 +39,7 @@ export class RelayOutbound {
   private cloudUrl: string;
   private authToken: string;
   private shouldReconnect = true;
+  private reconnectScheduled = false;
   private reconnectDelay = 1000;
   private maxReconnectDelay: number;
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
@@ -75,6 +76,7 @@ export class RelayOutbound {
 
   async connect(): Promise<void> {
     this.shouldReconnect = true;
+    this.reconnectScheduled = false;
     return this.doConnect();
   }
 
@@ -122,16 +124,26 @@ export class RelayOutbound {
       });
 
       this.ws.on('close', (code: number, reason: Buffer) => {
-        logger.info('Disconnected from Cloud Run relay', { code, reason: reason?.toString() || '' });
+        logger.info('Disconnected from Cloud Run relay', {
+          code, reason: reason?.toString() || '', shouldReconnect: this.shouldReconnect,
+          reconnectScheduled: this.reconnectScheduled,
+        });
         this.stopHealthCheck();
         this.stopStatusBroadcast();
         // Server sent 1001 ("Going Away") — deploy or intentional shutdown.
-        // Reset delay so we reconnect to the new instance ASAP.
+        // Force reconnect regardless of shouldReconnect (deploy ≠ local disconnect).
         if (code === 1001) {
           this.reconnectDelay = 1000;
+          this.shouldReconnect = true;
         }
-        if (this.shouldReconnect) {
+        // Only schedule reconnect if one isn't already pending (prevents
+        // exponential chain duplication when doConnect() fails — both the
+        // 'close' handler and the catch block would call scheduleReconnect).
+        if (this.shouldReconnect && !this.reconnectScheduled) {
+          logger.info('Scheduling reconnect to Cloud Run relay', { delay: this.reconnectDelay });
           this.scheduleReconnect();
+        } else if (!this.shouldReconnect) {
+          logger.info('Not reconnecting (shouldReconnect=false, local disconnect)');
         }
       });
 
@@ -237,11 +249,20 @@ export class RelayOutbound {
   }
 
   private scheduleReconnect(): void {
+    if (this.reconnectScheduled) {
+      logger.debug('Reconnect already scheduled, skipping duplicate');
+      return;
+    }
+    this.reconnectScheduled = true;
     logger.info(`Reconnecting to Cloud Run in ${this.reconnectDelay}ms...`);
     setTimeout(async () => {
+      this.reconnectScheduled = false;
       try {
         await this.doConnect();
-      } catch {
+        logger.info('Reconnected to Cloud Run relay successfully');
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.warn('Reconnect attempt failed', { error: errMsg, nextDelay: Math.min(this.reconnectDelay * 2, this.maxReconnectDelay) });
         this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
         if (this.shouldReconnect) {
           this.scheduleReconnect();
@@ -261,6 +282,7 @@ export class RelayOutbound {
 
   async disconnect(): Promise<void> {
     this.shouldReconnect = false;
+    this.reconnectScheduled = false;
     this.stopHealthCheck();
     this.stopStatusBroadcast();
     if (this.ws) {

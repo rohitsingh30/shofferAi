@@ -112,7 +112,11 @@ graph TB
 - `ToolCallRequest` / `ToolCallResponse` — UUID-correlated tool execution
 - `ToolListRequest` / `ToolListResponse` — Discover available MCP tools
 - `SessionEndRequest` — Release Chrome tab slot
-- `Heartbeat` — 15s ping, 45s dead connection timeout
+- `Heartbeat` — 15s server ping, laptop responds with pong. Used for stale connection detection (see below).
+
+**Deploy Auto-Heal** — The relay survives Cloud Run deploys automatically via two layers:
+1. **Pre-deploy release** (`cloudbuild.yaml` Step #1): Before deploying a new revision, Cloud Build curls `POST /api/admin/release-relay` on the current instance. This force-closes the laptop WS, so the laptop reconnects to the new instance within 1-4s.
+2. **Stale connection detection** (`relay-outbound.ts`): The laptop tracks application-level messages separately from WS-level pong frames. Cloud Run's load balancer responds to WS pings even when the backend instance is dead (e.g., old instance after deploy), so WS pongs alone can't detect staleness. If no app-level message arrives for 45s (3 missed server heartbeats), the laptop terminates the connection and reconnects.
 
 **MCPHostLike Interface** — Both `MCPHost`, `RemoteMCPHost`, `RelayBridge`, and `SessionMCPHost` implement the same interface. `AgentExecutor` accepts any — zero changes to agent-core when switching modes.
 
@@ -678,6 +682,14 @@ shofferai/
 
 ## 10. Deployment Architecture
 
+### custom-server.js (Cloud Run entry point)
+
+`apps/web/custom-server.js` is the Node.js HTTP server that runs on Cloud Run. It handles:
+- **WebSocket upgrade** for relay connections at `/api/relay/ws` (auth via `?token=` or `x-relay-token` header)
+- **Early WS queue**: If the laptop connects before `singletons.ts` initializes the `RelayBridge`, the WS is queued and wired once the bridge is ready (polls every 500ms for up to 30s)
+- **SIGTERM handler**: On graceful shutdown, disconnects the relay WS so the laptop reconnects to the next instance
+- **Static file serving** and Next.js request handling
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    GOOGLE CLOUD                              │
@@ -767,7 +779,8 @@ ChromePool launches Chrome lazily per task:
 | Consecutive browser failures | 3 | Fail fast on broken pages |
 | User input timeout | 5 min | Don't block forever on OTP/payment |
 | Heartbeat interval | 15s | Detect dead relay connections |
-| Heartbeat timeout | 45s | Disconnect stale connections |
+| Heartbeat timeout (app-level) | 45s | Disconnect stale connections (3 missed server pings) |
+| Heartbeat timeout (WS pong) | 20s | Detect fully dead TCP connections |
 | Reconnect backoff | 1s → 30s max | Exponential backoff on relay disconnect |
 
 ---

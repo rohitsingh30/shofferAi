@@ -92,7 +92,7 @@ gcloud builds submit --config cloudbuild.yaml  # Deploy to Cloud Run
 - **Prod URL**: `https://shofferai-27188185100.asia-south1.run.app`
 - Deploy first (`/deploy`), then test on prod. NEVER test on localhost for functional flows.
 - localhost is ONLY for rapid CSS/layout iteration — no message sending, no agent flows.
-- After deploy, wait 30 seconds before E2E testing (relay reconnect delay).
+- After deploy, wait 30 seconds before E2E testing (relay auto-heals but needs a few seconds to reconnect).
 - Dev login: `demo@shofferai.com` / `demo1234` — see `apps/web/app/api/auth/dev-login/route.ts`
 
 ## Critical Rules (NEVER violate these)

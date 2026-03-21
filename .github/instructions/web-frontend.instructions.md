@@ -81,6 +81,11 @@ interface AgentCallbacks {
 - Relay connection is LAZY — only connect when `handoff_to_browser_agent` is called
 - Never block chat if relay is down — chat must work without laptop
 
+### Deploy auto-heal
+- `cloudbuild.yaml` pre-deploy step curls `POST /api/admin/release-relay` → force-closes laptop WS → laptop reconnects to new instance in 1-4s
+- Fallback: `relay-outbound.ts` detects no app-level messages for 45s → auto-terminates stale connection → reconnects
+- `custom-server.js` has early WS queue (handles laptop connecting before RelayBridge singleton initializes) + SIGTERM handler (disconnects WS on graceful shutdown)
+
 ### Relay message flow
 ```
 Laptop TaskManager → sendToRelay(TaskRelayMessage) → Cloud Run RemoteMCPHost
@@ -105,6 +110,7 @@ Message types: `task_progress`, `task_input_required`, `task_payment_required`, 
 ## Key Rules
 
 - Never use singleton `taskEventHandler` — use `Map<taskId, handler>` for concurrent tasks
-- `custom-server.js` handles WebSocket upgrade for relay connections
+- `custom-server.js` handles WebSocket upgrade for relay connections + early WS queue + SIGTERM handler
+- `/api/admin/release-relay` — admin endpoint to force-disconnect laptop WS (auth via Bearer RELAY_AUTH_TOKEN)
 - Docker: `FROM node:20-alpine` (no Chrome, no Playwright)
 - Docker: `ENV RELAY_MODE=cloud` — uses RelayBridge
