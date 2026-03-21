@@ -30,25 +30,20 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Collect missing information
-**EXTRACT FIRST**: If the user already mentioned items in their message, use those directly — do NOT ask again.
-Only call `ask_user` for information NOT already in the user's message.
+### Step 0: Collect delivery address
+**EXTRACT FIRST**: Parse the user's message for items AND address. Use whatever they already provided — do NOT re-ask.
 
-- If items ARE in the message but address is NOT → call `ask_user` with `input_type: "layout"` with ONE section: **address** (type: "address", required). Show saved addresses if available.
-- If BOTH items and address are missing → call `ask_user` with `input_type: "layout"` and two sections:
-  1. **address** (type: "address", required): Ask for delivery address. Show saved addresses if available.
-  2. **items** (type: "card_grid", required): Show common items as cards with emoji. Enable quantity steppers and custom item input.
-
-**CRITICAL**: Do NOT open the browser until you have both the delivery address and at least one item. Without a delivery location, these sites show ZERO products.
-
-### 1. Get Delivery Address
-- BEFORE opening the browser, check if user provided an address.
-- If not, use `ask_user` with `input_type: "address"`: "What's your delivery address or pincode for Amazon Fresh?" Include saved addresses if available:
+- If address is missing → call `ask_user` with `input_type: "address"`, question: "What's your delivery address or pincode for Amazon Fresh?". Show saved addresses if available:
   ```json
   {"input_type": "address", "saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
   ```
+- If address is already provided → skip directly to `handoff_to_browser_agent`.
+- **Do NOT ask for items** — extract them from the user's message. If truly missing, handoff anyway and let the browser agent figure it out.
+- **Do NOT show product cards, prices, or images** — the cloud LLM has no access to the site's catalog. Only the browser agent can fetch real product data.
 
-### 2. Open Amazon Fresh & Set Location
+**CRITICAL**: Do NOT open the browser until you have the delivery address. Without a delivery location, Amazon Fresh shows ZERO products.
+
+### 1. Open Amazon Fresh & Set Location
 - Open a NEW tab and navigate to `https://www.amazon.in/fresh`.
 - Take snapshot. Verify logged in (check for "Hello, [name]" in header).
 - If location/address popup appears, type the user's address or pincode, select best match.
@@ -57,7 +52,7 @@ Only call `ask_user` for information NOT already in the user's message.
 - **If session expired, STOP and tell user: "Session expired, please re-login in Chrome Debug."**
 - Confirm location set and Fresh products visible (green "Fresh" badge).
 
-### 3. Search & Add Items
+### 2. Search & Add Items
 For each item the user requested:
 - Use the search bar to search for the item. Add "amazon fresh" to search if needed to filter Fresh items.
 - Take snapshot of results.
@@ -76,7 +71,7 @@ For each item the user requested:
 - If out of stock, inform user and suggest alternatives.
 - Repeat for all items. Dismiss any popups or "Frequently bought together" suggestions.
 
-### 4. Review Cart
+### 3. Review Cart
 - Navigate to cart, take snapshot.
 - Ensure only Amazon Fresh items are in the cart (non-Fresh items ship separately).
 - Use `confirm_action` to present order summary:
@@ -87,7 +82,7 @@ For each item the user requested:
 - Ask user to pick a delivery window.
 - Do NOT proceed unless user confirms. If cancelled, ask what to change.
 
-### 5. Checkout & Payment
+### 4. Checkout & Payment
 - Proceed to checkout.
 - Verify delivery address and delivery window are correct.
 - Apply available coupons or Subscribe & Save discounts if beneficial.
@@ -97,7 +92,7 @@ For each item the user requested:
   - description: "Amazon Fresh grocery order"
 - STOP and WAIT for payment confirmation. If cancelled, ask what to change.
 
-### 6. Place Order & Confirm
+### 5. Place Order & Confirm
 - Click "Place Order" or equivalent.
 - Handle payment OTP via `ask_user` if needed.
 - Take snapshot of confirmation page.

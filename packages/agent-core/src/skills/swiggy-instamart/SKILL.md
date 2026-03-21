@@ -39,16 +39,15 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Collect delivery address (and items if not specified)
-**EXTRACT FIRST**: If the user already mentioned items (e.g. "order milk and bread"), use those directly — do NOT ask again.
-Only call `ask_user` for information NOT already in the user's message.
+### Step 0: Collect delivery address
+**EXTRACT FIRST**: Parse the user's message for items AND address. Use whatever they already provided — do NOT re-ask.
 
-- If items ARE in the message but address is NOT → ask ONLY for address (input_type: "layout", one section: address).
-- If BOTH items and address are missing → ask for both with `input_type: "layout"` and two sections:
-  1. **address** (type: "address", required): Ask for delivery address. Show saved addresses if available.
-  2. **items** (type: "card_grid", required): Show common grocery items as cards with emoji (🥛 Milk, 🍞 Bread, 🥚 Eggs, 🍚 Rice, 🌾 Atta, 🫒 Oil, 🍬 Sugar, 🫘 Dal, 🧈 Butter, 🍌 Banana, 🧅 Onion, 🥔 Potato). Enable quantity steppers and custom item input.
+- If address is missing → call `ask_user` with `input_type: "address"`, question: "What's your delivery address or area name?". Show saved addresses if available.
+- If address is already provided → skip directly to `handoff_to_browser_agent`.
+- **Do NOT ask for items** — extract them from the user's message. If truly missing, handoff anyway and let the browser agent figure it out.
+- **Do NOT show product cards, prices, or images** — the cloud LLM has no access to the site's catalog. Only the browser agent can fetch real product data.
 
-**CRITICAL**: Do NOT open the browser until you have both the delivery address and at least one item. Without a delivery location, Instamart shows ZERO products.
+**CRITICAL**: Do NOT open the browser until you have the delivery address. Without a delivery location, Swiggy Instamart shows ZERO products.
 
 ### 1. Open Swiggy Instamart & Set Location
 - Open a NEW tab and navigate to `https://www.swiggy.com/instamart`.
