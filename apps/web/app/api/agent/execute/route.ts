@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { AgentExecutor, type AgentCallbacks, matchSkill, getMessageRewriter, getInputEnricher } from '@shofferai/agent-core';
 import { CredentialInjector } from '@/lib/credential-vault';
-import { remoteMcpHost, workflowEngine, vault, skills } from '@/lib/singletons';
+import { remoteMcpHost, workflowEngine, vault, skills, lessonStore } from '@/lib/singletons';
 import { track, trackTimed } from '@/lib/telemetry';
 import { TaskLatencyTracker } from '@/lib/task-latency-tracker';
 import { getAuthUser } from '@/lib/auth-helper';
@@ -170,6 +170,7 @@ export async function POST(request: Request) {
           credentialInjector: injector,
           skills,
           vault,
+          lessonStore,
           trackEvent: track,
           taskId,
           userContext: {
@@ -463,6 +464,19 @@ export async function POST(request: Request) {
           onStepUpdate(step) {
             console.log('[execute] taskId=%s step_update: %o', taskId, step);
             send('step_update', step);
+            // Persist step to DB for audit trail (fire-and-forget)
+            const status = step.status === 'completed' ? 'completed'
+              : step.status === 'error' ? 'failed' : 'running';
+            prisma.taskStep.create({
+              data: {
+                taskId,
+                stepNumber: Date.now(), // monotonic ordering
+                action: step.action,
+                status,
+                startedAt: new Date(),
+                completedAt: status === 'completed' ? new Date() : undefined,
+              },
+            }).catch(e => console.error('[execute] DB step write failed:', e));
           },
           async onInputRequired(request) {
             console.log('[execute] taskId=%s INPUT_REQUIRED stepId=%s type=%s q=%s', taskId, request.stepId, request.inputType, request.question?.slice(0, 80));

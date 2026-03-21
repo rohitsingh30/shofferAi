@@ -3,7 +3,9 @@ import { RemoteMCPHost } from './remote-mcp-host';
 import { RelayBridge } from './relay-bridge';
 import { CredentialVault } from './credential-vault';
 import { WorkflowEngine } from './workflow-engine';
+import { PrismaLessonStore } from './lesson-store';
 import { loadSkills, type SkillMetadata } from '@shofferai/agent-core';
+import type { LessonStore } from '@shofferai/agent-core';
 import type { MCPHostLike, TaskRelayMessage } from '@shofferai/shared';
 
 // Use globalThis to ensure singletons are shared across Next.js route bundles
@@ -19,6 +21,7 @@ const g = globalThis as unknown as {
   relayBridge: RelayBridge;
   workflowEngine: WorkflowEngine;
   vault: CredentialVault;
+  lessonStore: LessonStore;
   skills: SkillMetadata[];
   __relayBridge: RelayBridge; // Accessed by custom-server.js
 };
@@ -50,6 +53,8 @@ export const workflowEngine = g.workflowEngine || new WorkflowEngine(prisma);
 
 export const vault = g.vault || new CredentialVault(prisma);
 
+export const lessonStore: LessonStore = g.lessonStore || new PrismaLessonStore(prisma);
+
 // Skills loaded from SKILL.md files in packages/agent-core/src/skills/
 if (!g.skills) {
   // In Docker/prod: SKILL.md files are copied to /app/skills
@@ -64,3 +69,4 @@ export const skills = g.skills;
 // Cache singletons on globalThis
 g.workflowEngine = workflowEngine;
 g.vault = vault;
+g.lessonStore = lessonStore;
