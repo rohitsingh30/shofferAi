@@ -85,6 +85,15 @@ async function main() {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
+  // Prevent stray errors from killing the relay process
+  process.on('uncaughtException', (err) => {
+    logger.error('Uncaught exception (relay stays alive)', { error: err.message, stack: err.stack });
+  });
+  process.on('unhandledRejection', (reason) => {
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    logger.error('Unhandled rejection (relay stays alive)', { error: msg });
+  });
+
   // ─── MCP Tool Log SSE server ──────────────────────────────────
   const logServer = createServer((req: IncomingMessage, res: ServerResponse) => {
     if (req.url?.startsWith('/logs/mcp')) {

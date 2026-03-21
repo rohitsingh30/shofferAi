@@ -313,7 +313,7 @@ The operator's Chrome profile must have:
 
 ## 11. Implementation Priority
 
-**Phase 0**: Documentation (this document + ARCHITECTURE.md + CLAUDE.md update) ✅
+**Phase 0**: Documentation (this document + ARCHITECTURE.md + .github/copilot-instructions.md update) ✅
 **Phase 1**: Relay infrastructure (cloud ↔ laptop tunnel) ✅
 **Phase 2**: L2 payment window (Razorpay + split-view UI) ✅
 **Phase 3**: GCP deployment (Cloud Run + Cloud SQL) ✅

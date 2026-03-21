@@ -287,6 +287,18 @@ export class ChromePool {
       }
     }
 
+    // Mark previous session as clean exit — suppresses "Restore pages?" bubble
+    const prefsPath = join(profileDir, 'Preferences');
+    if (existsSync(prefsPath)) {
+      try {
+        const prefs = JSON.parse(readFileSync(prefsPath, 'utf-8'));
+        if (!prefs.profile) prefs.profile = {};
+        prefs.profile.exit_type = 'Normal';
+        prefs.profile.exited_cleanly = true;
+        writeFileSync(prefsPath, JSON.stringify(prefs));
+      } catch { /* ignore parse errors */ }
+    }
+
     logger.debug(`Slot ${slot.index} profile setup complete`);
   }
 
@@ -302,6 +314,8 @@ export class ChromePool {
       '--no-default-browser-check',
       '--disable-sync',
       '--disable-default-apps',
+      '--hide-crash-restore-bubble',
+      '--disable-session-crashed-bubble',
       ...STEALTH_CHROME_ARGS,
     ];
 
