@@ -1,0 +1,98 @@
+import type { LLMClient } from './llm-client';
+import { createLLMClient } from './llm-client';
+import { shouldSuppressMessage } from '@shofferai/shared';
+import { logger } from '@shofferai/shared';
+
+/**
+ * System prompt for the message rewriter LLM.
+ * Kept minimal to reduce latency and cost.
+ */
+const REWRITER_SYSTEM_PROMPT = `You filter internal messages from a browser automation agent before showing them to a user of a concierge AI service called ShofferAI.
+
+RESPOND WITH EXACTLY ONE OF:
+1. SUPPRESS — if the message is internal narration, browser actions, reasoning, or technical details
+2. A clean 1-2 sentence rewrite — if the message has genuinely useful info for the user
+
+Rules:
+- Internal = "I can see...", "Let me click...", "The page shows...", "Navigating to...", step references, selector names, any browser mechanics
+- Useful = search results, prices, availability, order status, confirmation, errors that affect the user
+- Write as the AI assistant ("I found..." not "The agent found...")
+- Never mention browser, tabs, clicking, navigating, selectors, or internal tools
+- Never refer to "the user" in third person
+- Do not add information not present in the original
+- When in doubt, SUPPRESS
+- RESPOND ONLY with "SUPPRESS" or the rewritten text — nothing else`;
+
+/**
+ * AI-powered message rewriter that classifies browser agent messages
+ * and either suppresses internal narration or rewrites them into
+ * clean user-facing text.
+ *
+ * Two-tier architecture:
+ * 1. Fast path: regex `shouldSuppressMessage()` catches ~90% instantly (free)
+ * 2. AI path: LLM classifies + rewrites the remaining ~10% (~200ms per call)
+ */
+export class MessageRewriter {
+  private llm: LLMClient;
+
+  constructor(options?: { model?: string; llmClient?: LLMClient }) {
+    this.llm = options?.llmClient || createLLMClient({
+      model: options?.model || process.env.REWRITER_MODEL || process.env.LLM_MODEL,
+    });
+  }
+
+  /**
+   * Process a browser agent message. Returns:
+   * - null → suppress (don't show to user)
+   * - string → rewritten user-facing text
+   */
+  async rewrite(message: string): Promise<string | null> {
+    if (!message?.trim()) return null;
+
+    // Fast path: regex catches obviously internal messages (free, <1ms)
+    if (shouldSuppressMessage(message)) {
+      logger.debug('[rewriter] regex-suppressed', { message: message.slice(0, 80) });
+      return null;
+    }
+
+    try {
+      const response = await this.llm.chat({
+        system: REWRITER_SYSTEM_PROMPT,
+        messages: [{ role: 'user' as const, content: message }],
+        maxTokens: 256,
+      });
+
+      const textBlock = response.content
+        .find((b) => b.type === 'text') as { type: 'text'; text: string } | undefined;
+      const text = textBlock?.text?.trim();
+
+      if (!text || /^suppress$/i.test(text)) {
+        logger.debug('[rewriter] ai-suppressed', { message: message.slice(0, 80) });
+        return null;
+      }
+
+      // If the LLM echoed back something that looks like narration, suppress
+      if (shouldSuppressMessage(text)) {
+        logger.debug('[rewriter] ai-rewrite still narration, suppressing', { rewrite: text.slice(0, 80) });
+        return null;
+      }
+
+      logger.info('[rewriter] rewritten', { from: message.slice(0, 60), to: text.slice(0, 60) });
+      return text;
+    } catch (error) {
+      // Fallback: if AI fails, show original (already passed regex filter)
+      logger.warn('[rewriter] LLM call failed, passing original through', { error });
+      return message;
+    }
+  }
+}
+
+/** Lazy singleton — created on first use */
+let _instance: MessageRewriter | null = null;
+
+export function getMessageRewriter(): MessageRewriter {
+  if (!_instance) {
+    _instance = new MessageRewriter();
+  }
+  return _instance;
+}

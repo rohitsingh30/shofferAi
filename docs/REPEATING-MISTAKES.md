@@ -213,17 +213,23 @@ After making changes:
 
 **Patterns suppressed:** `"Browser: report_intent"`, `"Browser: playwright-browser_navigate"`, `"browser_snapshot"`, `"mcp__playwright__browser_click"`, `"report_intent"`, `"Agent starting..."`, plus 100+ narration patterns (observations, actions, status, reasoning, browser internals).
 
-**Architecture (2026-03-21 fix):**
-- `isAgentNarration()` splits multi-sentence messages on `.!?` boundaries and tests EACH sentence independently. If ANY sentence is narration → whole message suppressed.
-- Filler prefixes ("Good,", "Great,", "OK so", "Got it,", "Alright,", "Done,") are stripped before testing patterns.
-- New patterns for: "It opened/loaded/redirected...", "This looks/seems...", "Here we/I can see...", "That was/is..."
+**Architecture (2026-03-21 — AI rewrite layer):**
+Two-tier message filtering:
+1. **Fast path (regex)**: `shouldSuppressMessage()` catches ~90% of narration instantly (free, <1ms). Splits multi-sentence messages, strips filler prefixes, 100+ patterns.
+2. **AI path (LLM)**: `MessageRewriter` in `packages/agent-core/src/message-rewriter.ts` sends ambiguous messages through a lightweight LLM call (~200ms) that either SUPPRESSes or rewrites into clean user-facing text.
 
-**Five filter gates (all use `shouldSuppressMessage()`):**
-1. `task-manager.ts` — filters `assistant.message` events from Copilot CLI
-2. `bridge-mcp-server.ts` — filters `send_progress` tool calls
-3. `agent.ts` — filters LLM text blocks (BOTH tool-mixed and text-only responses)
-4. `execute/route.ts` — filters `task_progress` relay messages AND `onMessage` callback
-5. `ChatInterface.tsx` — client-side defense-in-depth
+Integration points in `execute/route.ts`:
+- `handleTaskEvent` → `task_progress` case: `getMessageRewriter().rewrite(msg.message)`
+- `callbacks.onMessage`: `getMessageRewriter().rewrite(content)`
+- Both use `.then()` to stay non-blocking in the SSE stream
+
+Other filter gates still active:
+- `task-manager.ts` — regex filter on `assistant.message` events (Gate 1)
+- `bridge-mcp-server.ts` — regex filter on `send_progress` calls (Gate 2)
+- `agent.ts` — regex filter on LLM text blocks (Gate 3)
+- `ChatInterface.tsx` — regex client-side defense-in-depth (Gate 5)
+
+`REWRITER_MODEL` env var configures a fast/cheap model for the rewriter (defaults to `LLM_MODEL`).
 
 **Rule:** The user should ONLY see in the chat: LLM natural language messages, `ask_user` prompts, `confirm_action` prompts, payment panels, and completion/error messages. ALL browser tool actions and internal labels are invisible to the user — they go to the MCP log stream (`mcpToolEvents`) and console debug logs for monitoring.
 
