@@ -6,6 +6,7 @@ import { TaskProgress, type StepInfo } from './TaskProgress';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { InputPrompt } from './InputPrompt';
 import { CartSummary, type CartItem } from './CartSummary';
+import { shouldSuppressMessage } from '@shofferai/shared';
 import { L2PaymentProvider, useL2Payment } from './L2PaymentContext';
 import { L2SplitView } from './L2SplitView';
 import { PaymentPanel } from './PaymentPanel';
@@ -121,16 +122,20 @@ function ChatInterfaceInner() {
 
   const handleSSEEvent = useCallback((event: { type: string; payload: Record<string, unknown> }) => {
     switch (event.type) {
-      case 'message':
+      case 'message': {
+        const content = event.payload.content as string;
+        // Client-side defense-in-depth: suppress any internal reasoning that slipped through server filters
+        if (shouldSuppressMessage(content)) break;
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
             role: 'assistant',
-            content: event.payload.content as string,
+            content,
           },
         ]);
         break;
+      }
       case 'step_update': {
         const action = event.payload.action as string;
         const status = event.payload.status as string;

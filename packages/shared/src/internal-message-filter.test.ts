@@ -115,6 +115,33 @@ describe('isAgentNarration', () => {
     expect(isAgentNarration('Added Toor Dal 1kg (₹89) to your cart')).toBe(false);
   });
 
+  it('filters internal reasoning and chain-of-thought', () => {
+    expect(isAgentNarration('We need product: user wants wireless earbuds under ₹2000')).toBe(true);
+    expect(isAgentNarration('Step 0 asks layout. Let\'s ask layout with product prefilled?')).toBe(true);
+    expect(isAgentNarration('But product is known: "true wireless earbuds". Budget also known: under ₹2000.')).toBe(true);
+    expect(isAgentNarration('So we can skip Step 0?')).toBe(true);
+    expect(isAgentNarration('Since provided budget 2000. So no ask needed.')).toBe(true);
+    expect(isAgentNarration('We have required info: product and budget. Proceed handoff.')).toBe(true);
+    expect(isAgentNarration('Let\'s handoff with task_description.')).toBe(true);
+    expect(isAgentNarration('Proceed to handoff with the extracted parameters')).toBe(true);
+    expect(isAgentNarration('The user wants wireless earbuds. So let\'s search Flipkart.')).toBe(true);
+  });
+
+  it('filters skill step references', () => {
+    expect(isAgentNarration('Step 0 asks for product and budget preferences')).toBe(true);
+    expect(isAgentNarration('Step 1 requires logging in first')).toBe(true);
+    expect(isAgentNarration('instructions say Must collect via ask_user')).toBe(true);
+  });
+
+  it('filters parameter analysis', () => {
+    expect(isAgentNarration('product is known from the user message')).toBe(true);
+    expect(isAgentNarration('budget is already provided: under 2000')).toBe(true);
+    expect(isAgentNarration('items are already specified in the message')).toBe(true);
+    expect(isAgentNarration('required info is available, no need to ask')).toBe(true);
+    expect(isAgentNarration('no ask needed since all params are provided')).toBe(true);
+    expect(isAgentNarration('Skip Step 0 since product is given')).toBe(true);
+  });
+
   it('handles empty/undefined', () => {
     expect(isAgentNarration(undefined)).toBe(true);
     expect(isAgentNarration('')).toBe(true);

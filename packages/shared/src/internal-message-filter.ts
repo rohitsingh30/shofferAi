@@ -92,7 +92,39 @@ export function isAgentNarration(message: string | undefined): boolean {
     /\bsearch (bar|box|field|input) (is |appears?|shows?)/,
   ];
 
-  const allPatterns = [...observational, ...action, ...status, ...thirdPerson, ...browserInternals];
+  // --- Internal reasoning / chain-of-thought (LLM thinking out loud) ---
+  const reasoning = [
+    // Planning phrases: "We need...", "We should...", "We have..."
+    /^we (need|should|must|can|have|don't|already|still)\b/,
+    // Skill step references: "Step 0 asks...", "Step 1 says..."
+    /\bstep\s+\d+\s*(asks?|says?|instructs?|requires?|tells?|is\b|:)/,
+    // Internal logic: "So we can skip...", "So no ask needed", "Proceed to..."
+    /^(so|thus|therefore|hence)[, ]/,
+    /\bproceed (to |with )?handoff/,
+    /\bproceed to (step|the|calling|search|open|handoff)\b/,
+    // Conditional reasoning: "But if...", "Since provided...", "If the user..."
+    /^(but|however|since|because|although)\s+(the |if |we |it |user|product|budget|items?|they|this)/,
+    // Self-referential planning: "Let's handoff", "Let's proceed", "Let's ask"
+    /^let'?s\s+(handoff|proceed|skip|ask|move|continue|call|use|go|start|check|extract|parse)/,
+    // Instruction references: "instructions say...", "SKILL.md says..."
+    /\binstructions?\s+(say|require|mention|state|tell|specify|ask)/,
+    /\bskill\.?md\b/i,
+    // Parameter analysis: "product is known", "budget is provided", "already provided"
+    /\b(product|budget|items?|address|destination|dates?|params?|required info)\s+(is |are |was )?(already |now )?(known|provided|given|specified|mentioned|set|available|clear|extracted)/,
+    // Skip/skip logic: "skip Step 0", "no ask needed", "can skip"
+    /\b(skip|skipping)\s+(step|this|the|asking|product|items?)/,
+    /\bno\s+(ask|question|input|prompt)\s+(needed|required|necessary)/,
+    // "Required info" analysis
+    /\brequired (info|information|params?|data|fields?)\b/,
+    // Generic reasoning connectors at start
+    /^(additionally|furthermore|moreover|in that case|in this case|given that|note that|considering)\b/,
+    // Extracted/extraction language
+    /\b(extracted?|extract(ing|s)?)\s+(from|the |all |param|value|info)/,
+    // "The user wants X. Y." pattern — states user intent then reasons about it
+    /^(the |this )?(user|customer|person) (wants?|needs?|is (looking|asking|trying)|requested?|said)\b.*\.\s*(so|let|but|step|we|i|now|proceed|since)/i,
+  ];
+
+  const allPatterns = [...observational, ...action, ...status, ...thirdPerson, ...browserInternals, ...reasoning];
   return allPatterns.some(p => p.test(lower));
 }
 

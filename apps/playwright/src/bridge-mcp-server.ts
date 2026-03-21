@@ -21,6 +21,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import WebSocket from 'ws';
 import { randomUUID } from 'crypto';
+import { shouldSuppressMessage } from '@shofferai/shared';
 import type {
   BridgeOutgoingMessage,
   BridgeIncomingMessage,
@@ -370,6 +371,13 @@ mcpServer.registerTool(
     },
   },
   async ({ message, step }) => {
+    // Filter internal reasoning/narration before it reaches the user
+    if (shouldSuppressMessage(message)) {
+      console.error(`[bridge] suppressed internal message: ${message.slice(0, 80)}`);
+      return {
+        content: [{ type: 'text' as const, text: 'Progress update sent.' }],
+      };
+    }
     sendToTaskManager({
       type: 'bridge_progress',
       taskId: BRIDGE_TASK_ID!,

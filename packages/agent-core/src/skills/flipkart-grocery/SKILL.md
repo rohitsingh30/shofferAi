@@ -64,7 +64,7 @@ Only call `ask_user` for information NOT already in the user's message.
 - For each grocery item the user requested:
   - Use the search bar to search for the item.
   - Take snapshot of search results.
-  - If multiple variants (brands, pack sizes, organic vs regular), use `ask_user` (input_type "choice") with top options showing brand, size, price.
+  - If multiple variants (brands, pack sizes, organic vs regular), use `ask_user` with `input_type: "carousel"` and a `cards` array with product image, name, price as subtitle. Extract the real image URL from the `<img>` tag in each product card.
   - Click "ADD TO CART" on the selected item.
   - Adjust quantity if user specified more than 1.
   - Take snapshot confirming item added.

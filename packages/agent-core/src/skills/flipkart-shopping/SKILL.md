@@ -50,15 +50,25 @@ Before opening the browser, call `ask_user` with `input_type: "layout"` and sect
 - Use the search bar to search for the product.
 - Take snapshot of search results page.
 - Apply relevant filters if budget specified (price range), or if user mentioned specs (brand, rating 4+, etc.).
-- Extract top 3-5 options with: name, price, rating, key specs, delivery date, any offers/discounts.
-- Use `ask_user` (input_type "choice") to present options. Format: "Product Name — ₹X,XXX — ⭐ Rating — Key Spec"
+- Extract top 5 options with: name, price, rating, key specs, product image URL (from the `<img>` tag in each product card).
+- Use `ask_user` with `input_type: "carousel"` and pass a `cards` array:
+  ```json
+  {
+    "input_type": "carousel",
+    "cards": [
+      {"id": "1", "label": "OnePlus Nord Buds 3r", "subtitle": "₹1,599 · Free delivery", "image": "https://rukminim2.flixcart.com/...", "badge": "⭐ 4.4"},
+      {"id": "2", "label": "realme Buds T310", "subtitle": "₹1,899 · 46dB ANC", "image": "https://...", "badge": "⭐ 4.3"}
+    ]
+  }
+  ```
+  Include the REAL image URL from Flipkart product cards (src of the `<img>` element).
 - If user wants to see more, scroll or go to next page.
 
 ### 4. View Product Details
 - Click selected product. Handle new tab if opened.
 - Take snapshot of product page.
 - Extract: full name, price, offers (bank discount, exchange), delivery date, seller info, warranty.
-- If product has variants (color, storage, size), present them via `ask_user` (input_type "choice").
+- If product has variants (color, storage, size), present them via `ask_user` with `input_type: "chip_bar"` and `options` array (e.g. `["Midnight Black", "Starlight White", "Thunder Grey"]`).
 - Confirm with user: "Add [product] at ₹X,XXX to cart?"
 
 ### 5. Add to Cart & Review
