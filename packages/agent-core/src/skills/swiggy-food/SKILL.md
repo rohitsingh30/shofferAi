@@ -33,13 +33,20 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Collect order preferences
+### Step 0: Confirm delivery address & order preferences
+**ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode). The user must pick a saved address or enter a full one.
+
 Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
-1. **address** (type: "address", required): Ask for delivery address. Show saved addresses.
+1. **address** (type: "address", required): Confirm delivery address. Show saved addresses. If the user mentioned an area, pre-fill it:
+   ```json
+   {"saved": [{"label": "Home", "value": "C-502, Honer Aquantis, Tellapur"}, {"label": "Office", "value": "T-Hub, Raidurg, Hyderabad"}]}
+   ```
 2. **cuisine** (type: "carousel", required): Show cuisine options as scrollable cards (🥘 Biryani, 🍕 Pizza, 🍔 Burger, 🍱 Thali, 🥡 Chinese, 🥞 South Indian, 🌯 Rolls, 🍰 Dessert). Allow typing specific restaurant/dish.
 3. **dietary** (type: "chip_bar", collapsed): Dietary preferences — 🟢 Veg only, 🔴 Non-veg OK, Jain, No onion, No garlic.
 
-**CRITICAL**: Do NOT open the browser until you have the delivery address. Without it, the site cannot show relevant restaurants.
+- **Only skip the address picker** if the user provided a FULL address with building/flat, street, city, and pincode (e.g. "E111, Ridgewood Estate, DLF Garden City, Pune 411032").
+
+**CRITICAL**: Do NOT open the browser until you have a complete delivery address. Without it, Swiggy cannot show relevant restaurants.
 
 ### 1. Gather ALL Requirements Upfront
 - BEFORE opening the browser, check what the user already provided: food/dish, delivery address, payment preference.
