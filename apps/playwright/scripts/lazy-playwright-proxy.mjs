@@ -2,9 +2,8 @@
 /**
  * lazy-playwright-proxy.mjs — MCP proxy that defers Chrome launch.
  *
- * TRANSPORT BRIDGE:
- *   Copilot CLI  ←→  proxy  ←→  playwright-mcp
- *   (NDJSON)          ↕         (Content-Length framed)
+ * TRANSPORT: Both Copilot CLI and playwright-mcp use NDJSON (newline-
+ * delimited JSON) over stdio. The proxy simply bridges them.
  *
  * Responds to initialize + tools/list instantly with static tool definitions.
  * On first tools/call, spawns playwright-mcp-with-chrome.sh, initializes the
@@ -56,40 +55,12 @@ function sendToParent(msg) {
   process.stdout.write(JSON.stringify(msg) + '\n');
 }
 
-// ─── Transport: playwright-mcp uses Content-Length framing (LSP-style) ─
+// ─── Transport: playwright-mcp ALSO uses NDJSON ─────────────────────
 
-/** Send Content-Length framed message to child (playwright-mcp) */
+/** Send NDJSON to child (playwright-mcp) */
 function sendToChild(msg) {
   if (!child) return;
-  const json = JSON.stringify(msg);
-  child.stdin.write(`Content-Length: ${Buffer.byteLength(json)}\r\n\r\n${json}`);
-}
-
-/** Read Content-Length framed messages from a stream */
-class ContentLengthReader {
-  constructor(stream, onMessage) {
-    this._buf = Buffer.alloc(0);
-    this._onMessage = onMessage;
-    stream.on('data', (chunk) => {
-      this._buf = Buffer.concat([this._buf, chunk]);
-      this._drain();
-    });
-  }
-  _drain() {
-    while (true) {
-      const idx = this._buf.indexOf('\r\n\r\n');
-      if (idx === -1) return;
-      const header = this._buf.subarray(0, idx).toString();
-      const m = header.match(/Content-Length:\s*(\d+)/i);
-      if (!m) { this._buf = this._buf.subarray(idx + 4); continue; }
-      const len = parseInt(m[1], 10);
-      const bodyStart = idx + 4;
-      if (this._buf.length < bodyStart + len) return;
-      const body = this._buf.subarray(bodyStart, bodyStart + len).toString();
-      this._buf = this._buf.subarray(bodyStart + len);
-      try { this._onMessage(JSON.parse(body)); } catch {}
-    }
-  }
+  child.stdin.write(JSON.stringify(msg) + '\n');
 }
 
 // ─── Proxy state ─────────────────────────────────────────────────────
@@ -176,8 +147,13 @@ function ensureChild() {
       child = null; childReady = false; childInitPromise = null;
     });
 
-    // Child speaks Content-Length framing
-    new ContentLengthReader(child.stdout, handleChild);
+    // Child also speaks NDJSON
+    const childRl = createInterface({ input: child.stdout, terminal: false });
+    childRl.on('line', (line) => {
+      const t = line.trim();
+      if (!t) return;
+      try { handleChild(JSON.parse(t)); } catch {}
+    });
 
     const initId = '__init__';
     pending.set(initId, {
