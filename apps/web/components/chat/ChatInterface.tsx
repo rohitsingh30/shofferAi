@@ -72,7 +72,7 @@ function ChatInterfaceInner() {
   const taskIdRef = useRef<string | null>(null);
   const { openL2, closeL2 } = useL2Payment();
   const { closeCart } = useL2Cart();
-  const { clearCart, setTaskId: setCartTaskId } = useCart();
+  const { clearCart, setTaskId: setCartTaskId, syncFromAgent } = useCart();
 
   // Pick suggestions on client mount only — avoids hydration mismatch
   const [suggestions, setSuggestions] = useState(ALL_SUGGESTIONS.slice(0, 4));
@@ -203,6 +203,8 @@ function ChatInterfaceInner() {
               setCartItems(cartData.items || []);
               setCartTotal(cartData.total || '');
               setCartStore(cartData.store || '');
+              // Sync to CartContext so CartBar appears at the bottom
+              syncFromAgent(cartData.items || [], cartData.store || '', cartData.total || '');
               break;
             }
           } catch {
@@ -296,7 +298,7 @@ function ChatInterfaceInner() {
         break;
       }
     }
-  }, [openL2]);
+  }, [openL2, syncFromAgent]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;

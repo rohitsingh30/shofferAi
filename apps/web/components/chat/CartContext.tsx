@@ -7,6 +7,12 @@ export interface CartItemData extends ProductCardData {
   quantity: number;
 }
 
+interface AgentCartItem {
+  name: string;
+  quantity: number;
+  price: string;
+}
+
 interface CartContextType {
   items: CartItemData[];
   store: string;
@@ -19,6 +25,8 @@ interface CartContextType {
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
+  /** Sync cart state from agent's cart_update SSE events */
+  syncFromAgent: (items: AgentCartItem[], store: string, total: string) => void;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -75,13 +83,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setTaskId(null);
   }, []);
 
+  // Parse formatted price string like "₹1,499" → 1499
+  const parsePrice = (priceStr: string): number => {
+    const cleaned = priceStr.replace(/[^\d.]/g, '');
+    return parseFloat(cleaned) || 0;
+  };
+
+  const syncFromAgent = useCallback((agentItems: AgentCartItem[], agentStore: string, _total: string) => {
+    setStore(agentStore);
+    setItems(
+      agentItems.map((item, i) => ({
+        id: `agent-${i}-${item.name}`,
+        name: item.name,
+        price: parsePrice(item.price),
+        store: agentStore,
+        quantity: item.quantity,
+      })),
+    );
+  }, []);
+
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const isEmpty = items.length === 0;
 
   return (
     <CartContext.Provider
-      value={{ items, store, taskId, itemCount, total, isEmpty, setTaskId, addItem, removeItem, updateQuantity, clearCart }}
+      value={{ items, store, taskId, itemCount, total, isEmpty, setTaskId, addItem, removeItem, updateQuantity, clearCart, syncFromAgent }}
     >
       {children}
     </CartContext.Provider>
