@@ -316,6 +316,19 @@ export class RelayBridge implements MCPHostLike {
     return this.connected;
   }
 
+  /** Send a close frame to the laptop so it reconnects to the new instance. */
+  gracefulClose(reason = 'Server shutting down'): void {
+    if (this.laptopSocket) {
+      try {
+        this.laptopSocket.close(1001, reason);
+      } catch {
+        // best-effort
+      }
+    }
+    this.stopHeartbeat();
+    this.connected = false;
+  }
+
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.lastPongAt = Date.now();

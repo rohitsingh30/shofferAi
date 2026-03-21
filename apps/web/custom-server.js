@@ -153,3 +153,20 @@ nextApp.prepare().then(() => {
     console.log(`> Relay WebSocket endpoint: ws://${hostname}:${port}/api/relay/ws`);
   });
 });
+
+// ─── Graceful Shutdown ─────────────────────────────────────────
+// Cloud Run sends SIGTERM on deploy/scale-down. Send a proper WebSocket
+// close frame so the laptop relay detects the disconnect immediately
+// instead of waiting for the 20s dead-connection timeout.
+function gracefulShutdown(signal) {
+  console.log(`[relay] ${signal} received — closing relay WebSocket`);
+  const bridge = globalThis.__relayBridge;
+  if (bridge && typeof bridge.gracefulClose === 'function') {
+    bridge.gracefulClose('Server shutting down');
+  }
+  // Give 2s for the close frame to flush, then exit
+  setTimeout(() => process.exit(0), 2000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

@@ -269,7 +269,7 @@ export class RelayOutbound {
 
       const silentMs = Date.now() - this.lastDataAt;
       if (silentMs > RelayOutbound.DEAD_CONNECTION_TIMEOUT_MS) {
-        logger.warn('RelayOutbound: no data for 45s, closing dead connection', {
+        logger.warn('RelayOutbound: no data for 20s, closing dead connection', {
           silentMs,
         });
         this.ws.terminate(); // Hard close — faster than ws.close() which waits for handshake
