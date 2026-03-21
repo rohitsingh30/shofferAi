@@ -78,7 +78,7 @@ function CartItemRow({ item, onUpdateQty, onRemove }: {
 }
 
 export function L2CartPanel() {
-  const { items, store, total, isEmpty, updateQuantity, removeItem, clearCart } = useCart();
+  const { items, store, taskId: cartTaskId, total, isEmpty, updateQuantity, removeItem, clearCart } = useCart();
   const { closeCart } = useL2Cart();
   const { openL2 } = useL2Payment();
 
@@ -97,7 +97,7 @@ export function L2CartPanel() {
 
     closeCart();
     openL2({
-      taskId: `cart-${Date.now()}`,
+      taskId: cartTaskId || `cart-${Date.now()}`,
       bookingSummary: summary,
       amountCents: total * 100,
       serviceFeeCents: 0,

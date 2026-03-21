@@ -14,6 +14,7 @@ import type {
   TaskPaymentResponseMessage,
   TaskCancelMessage,
 } from '@shofferai/shared';
+import { UserInputTimeoutError } from '@shofferai/shared';
 
 /** Lazy relay connection — only needed when agent actually tries to use the browser */
 async function ensureRelayConnected() {
@@ -253,8 +254,8 @@ export async function POST(request: Request) {
                   }
                 }).catch(err => {
                   console.error('[execute] taskId=%s rewriter error:', taskId, err);
-                  // Fallback: send original message if rewriter fails
-                  send('message', { content: msg.message });
+                  // Safety: suppress on rewriter failure — never leak unfiltered agent messages
+                  console.warn('[execute] taskId=%s suppressed message (rewriter failed): %s', taskId, msg.message?.slice(0, 100));
                 });
                 pendingRewrites.push(rewriteP);
               }
@@ -331,11 +332,15 @@ export async function POST(request: Request) {
               });
 
               // Wait for user input then send back to laptop
+              // Browsing-heavy inputs (carousel, card_grid, product_card) get 10 min like payments
+              const EXTENDED_INPUT_TYPES = new Set(['carousel', 'card_grid', 'product_card']);
+              const inputTimeout = EXTENDED_INPUT_TYPES.has(msg.inputType) ? 600_000 : undefined;
               pauseManager.waitForInput({
                 taskId,
                 stepId: msg.stepId,
                 question: msg.question,
                 inputType: msg.inputType,
+                ...(inputTimeout && { timeout: inputTimeout }),
               }).then((response) => {
                 console.log('[execute] taskId=%s input received for stepId=%s', taskId, msg.stepId);
                 // Persist the user's response
@@ -354,6 +359,12 @@ export async function POST(request: Request) {
                 remoteMcpHost.sendTaskMessage(inputMsg);
               }).catch((err) => {
                 console.error('[execute] taskId=%s input error:', taskId, err);
+                if (err instanceof UserInputTimeoutError) {
+                  send('error', { error: err.message, taskId, code: 'INPUT_TIMEOUT' });
+                  workflowEngine.addMessage(taskId, 'assistant', err.message, { type: 'task_error' })
+                    .catch(e => console.error('[execute] DB addMessage(input-timeout) failed:', e));
+                  workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
+                }
               });
               break;
             }
@@ -398,6 +409,12 @@ export async function POST(request: Request) {
                 remoteMcpHost.sendTaskMessage(paymentMsg);
               }).catch((err) => {
                 console.error('[execute] taskId=%s payment error:', taskId, err);
+                if (err instanceof UserInputTimeoutError) {
+                  send('error', { error: err.message, taskId, code: 'INPUT_TIMEOUT' });
+                  workflowEngine.addMessage(taskId, 'assistant', err.message, { type: 'task_error' })
+                    .catch(e => console.error('[execute] DB addMessage(payment-timeout) failed:', e));
+                  workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
+                }
               });
               break;
 
@@ -457,8 +474,8 @@ export async function POST(request: Request) {
               }
             }).catch(err => {
               console.error('[execute] taskId=%s rewriter error in onMessage:', taskId, err);
-              // Fallback: send original message if rewriter fails
-              send('message', { content });
+              // Safety: suppress on rewriter failure — never leak unfiltered agent messages
+              console.warn('[execute] taskId=%s suppressed message (rewriter failed): %s', taskId, content?.slice(0, 100));
             });
             pendingRewrites.push(rewriteP);
           },
@@ -512,7 +529,14 @@ export async function POST(request: Request) {
               product: request.product,
             });
             lat.startPhase('user_input_wait');
-            const response = await pauseManager.waitForInput({ ...request, taskId });
+            // Browsing-heavy inputs get 10 min timeout (same as payments)
+            const EXTENDED_AGENT_INPUT_TYPES = new Set(['carousel', 'card_grid', 'product_card']);
+            const agentInputTimeout = EXTENDED_AGENT_INPUT_TYPES.has(request.inputType) ? 600_000 : undefined;
+            const response = await pauseManager.waitForInput({
+              ...request,
+              taskId,
+              ...(agentInputTimeout && { timeout: agentInputTimeout }),
+            });
             lat.endPhase('user_input_wait', { inputType: request.inputType, stepId: request.stepId });
             console.log('[execute] taskId=%s input received for stepId=%s', taskId, request.stepId);
             // Save user's response with context about what was shown
@@ -638,13 +662,15 @@ export async function POST(request: Request) {
         console.log('[execute] taskId=%s agent.execute() finished', taskId);
 
       } catch (error) {
+        const isInputTimeout = error instanceof UserInputTimeoutError;
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        const errorCode = isInputTimeout ? 'INPUT_TIMEOUT' : 'FATAL_ERROR';
         const stack = error instanceof Error ? error.stack : '';
-        console.error('[execute] taskId=%s FATAL ERROR: %s\n%s', taskId, errorMsg, stack);
-        send('error', { error: errorMsg, taskId, code: 'FATAL_ERROR' });
+        console.error('[execute] taskId=%s %s: %s\n%s', taskId, errorCode, errorMsg, stack);
+        send('error', { error: errorMsg, taskId, code: errorCode });
         await workflowEngine.updateTaskStatus(taskId, 'failed');
         taskTimer.end({ success: false, metadata: { error: errorMsg } });
-        lat.finish(false, { error: errorMsg, completedVia: 'fatal_error' });
+        lat.finish(false, { error: errorMsg, completedVia: isInputTimeout ? 'input_timeout' : 'fatal_error' });
       } finally {
         if (handoffSent) {
           // Handoff was sent to laptop — keep the stream, heartbeat, and event listener alive.

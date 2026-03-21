@@ -76,7 +76,7 @@ export class PauseResumeManager {
       where: { taskId_stepId: { taskId, stepId } },
     }).catch(() => {});
 
-    throw new UserInputTimeoutError(taskId, stepId);
+    throw new UserInputTimeoutError(taskId, stepId, request.inputType, timeout);
   }
 
   /**

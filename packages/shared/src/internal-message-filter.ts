@@ -71,7 +71,7 @@ function isSentenceNarration(lower: string): boolean {
   ];
 
   // --- Action narration ("Let me click...", "I'll navigate to...") ---
-  const actionVerbs = 'navigate|go to|open|click|search|type|browse|check|look|read|scroll|select|visit|head to|dismiss|refresh|fill|submit|wait|load|close|handle|verify|proceed|update|change|set|switch|enter|tap|press|pick|choose|try|find|locate|expand|collapse|clear|modify|adjust|move';
+  const actionVerbs = 'navigate|go to|go back|open|click|search|type|browse|check|look|read|scroll|select|visit|head to|dismiss|refresh|fill|submit|wait|load|close|handle|verify|proceed|update|change|set|switch|enter|tap|press|pick|choose|try|find|locate|expand|collapse|clear|modify|adjust|move|sort|filter|apply|toggle|add|remove|bookmark|compare|take|copy|paste|drag|drop';
   const action = [
     new RegExp(`^(let me|i'll|i will|i'm going to|now i'll|now let me|i'm now|i need to|i'm about to|first,? i'll|next,? i'll)\\s+(${actionVerbs})\\b`),
     new RegExp(`^(navigating|going|opening|clicking|searching|typing|browsing|checking|looking|reading|scrolling|loading|heading|dismissing|refreshing|filling|submitting|waiting|closing|handling|verifying|proceeding|updating|changing|setting|switching|entering|tapping|pressing)\\s+(to|for|at|on|the|through|a |an )`),
@@ -118,6 +118,14 @@ function isSentenceNarration(lower: string): boolean {
     /\bsearch (bar|box|field|input) (is |appears?|shows?)/,
   ];
 
+  // --- Self-directed questions about internal/technical data (NOT user-facing questions) ---
+  // Only matches when the object is clearly internal (URLs, selectors, raw data fields).
+  // "Could you provide your mobile number?" is user-facing and must NOT match.
+  const selfDirected = [
+    /^(could you|can you|would you|please |kindly )?(provide|show|give|send|fetch|get|list|display|include|extract|retrieve)\s+(me |us )?(the |a |an |all |any |more |some |those |these )?(image url|image urls|ratings?|review scores?|selectors?|xpaths?|data-testid|api |endpoints?|html |css |json |raw |technical |internal )/i,
+    /^(provide|show|give|fetch|get|list|display|include|extract|retrieve)\s+(the |a |an |all |any |more |some |those |these )?(image url|image urls|ratings?|review scores?|selectors?|xpaths?|data-testid|api |endpoints?|html |css |json |raw |technical |internal )/i,
+  ];
+
   // --- Internal reasoning / chain-of-thought (LLM thinking out loud) ---
   const reasoning = [
     /^we (need|should|must|can|have|don't|already|still)\b/,
@@ -138,7 +146,7 @@ function isSentenceNarration(lower: string): boolean {
     /^(the |this )?(user|customer|person) (wants?|needs?|is (looking|asking|trying)|requested?|said)\b.*\.\s*(so|let|but|step|we|i|now|proceed|since)/i,
   ];
 
-  const allPatterns = [...observational, ...action, ...status, ...thirdPerson, ...browserInternals, ...reasoning];
+  const allPatterns = [...observational, ...action, ...status, ...thirdPerson, ...browserInternals, ...selfDirected, ...reasoning];
   return allPatterns.some(p => p.test(lower));
 }
 

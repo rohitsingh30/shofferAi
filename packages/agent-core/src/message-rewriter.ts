@@ -80,9 +80,9 @@ export class MessageRewriter {
       logger.info('[rewriter] rewritten', { from: message.slice(0, 60), to: text.slice(0, 60) });
       return text;
     } catch (error) {
-      // Fallback: if AI fails, show original (already passed regex filter)
-      logger.warn('[rewriter] LLM call failed, passing original through', { error });
-      return message;
+      // Safety: suppress on AI failure — never leak unfiltered agent messages
+      logger.warn('[rewriter] LLM call failed, suppressing for safety', { error, message: message.slice(0, 100) });
+      return null;
     }
   }
 }

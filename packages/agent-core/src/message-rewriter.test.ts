@@ -67,15 +67,15 @@ describe('MessageRewriter', () => {
   });
 
   describe('fallback on error', () => {
-    it('returns original message when LLM call fails', async () => {
+    it('suppresses message when LLM call fails (safety: never leak unfiltered)', async () => {
       const llm: LLMClient = {
         chat: vi.fn().mockRejectedValue(new Error('API timeout')),
       };
       const rewriter = new MessageRewriter({ llmClient: llm });
 
-      // Message that passes regex → LLM fails → returns original
+      // Message that passes regex → LLM fails → suppress for safety
       const result = await rewriter.rewrite('Your order total is ₹567.');
-      expect(result).toBe('Your order total is ₹567.');
+      expect(result).toBeNull();
     });
   });
 

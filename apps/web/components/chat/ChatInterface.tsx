@@ -72,7 +72,7 @@ function ChatInterfaceInner() {
   const taskIdRef = useRef<string | null>(null);
   const { openL2, closeL2 } = useL2Payment();
   const { closeCart } = useL2Cart();
-  const { clearCart } = useCart();
+  const { clearCart, setTaskId: setCartTaskId } = useCart();
 
   // Pick suggestions on client mount only — avoids hydration mismatch
   const [suggestions, setSuggestions] = useState(ALL_SUGGESTIONS.slice(0, 4));
@@ -175,7 +175,8 @@ function ChatInterfaceInner() {
 
     switch (event.type) {
       case 'task_started':
-        // taskId already captured above — no UI update needed
+        // Set taskId on cart so payment uses the real task ID
+        setCartTaskId(event.payload.taskId as string);
         break;
       case 'message': {
         const content = event.payload.content as string;

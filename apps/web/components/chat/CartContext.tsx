@@ -10,9 +10,11 @@ export interface CartItemData extends ProductCardData {
 interface CartContextType {
   items: CartItemData[];
   store: string;
+  taskId: string | null;
   itemCount: number;
   total: number;
   isEmpty: boolean;
+  setTaskId: (id: string) => void;
   addItem: (product: ProductCardData) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
@@ -24,6 +26,7 @@ const CartContext = createContext<CartContextType | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItemData[]>([]);
   const [store, setStore] = useState('');
+  const [taskId, setTaskId] = useState<string | null>(null);
 
   const addItem = useCallback((product: ProductCardData) => {
     setItems((prev) => {
@@ -69,6 +72,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const clearCart = useCallback(() => {
     setItems([]);
     setStore('');
+    setTaskId(null);
   }, []);
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -77,7 +81,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, store, itemCount, total, isEmpty, addItem, removeItem, updateQuantity, clearCart }}
+      value={{ items, store, taskId, itemCount, total, isEmpty, setTaskId, addItem, removeItem, updateQuantity, clearCart }}
     >
       {children}
     </CartContext.Provider>

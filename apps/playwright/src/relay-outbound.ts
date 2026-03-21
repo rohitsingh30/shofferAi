@@ -97,6 +97,9 @@ export class RelayOutbound {
         this.lastDataAt = Date.now();
         try {
           const msg: RelayMessage = JSON.parse(data.toString());
+          if (msg.type !== 'ping') {
+            logger.info('RelayOutbound: received message', { type: msg.type, taskId: (msg as { taskId?: string }).taskId });
+          }
           await this.handleMessage(msg);
         } catch (error) {
           const errMsg = error instanceof Error ? error.message : 'Unknown';
