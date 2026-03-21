@@ -4,6 +4,30 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Cart UX E2E verified on prod (images + ProductCard + CartBar + L2 Panel)
+
+**Goal**: Verify the entire cart UX pipeline on production — carousel with real images, ProductCard widget, CartBar, and L2 Cart Panel.
+
+**What was done**:
+- Discovered image validation was in the wrong place — `agent.ts` only covers Cloud Run LLM calls, but shopping flows use the **relay** path (Copilot CLI → bridge MCP → relay → frontend). The bridge-mcp-server.ts needed its own validation.
+- Added image validation bounce-back in `apps/playwright/src/bridge-mcp-server.ts` — intercepts `ask_user` calls with carousel/card_grid/product_card that lack real `https://` image URLs, returns system message telling LLM to snapshot and extract real URLs.
+- Fixed Playwright MCP browser recovery — killed stale playwright-mcp process (dead Chrome on port 60471), lazy proxy auto-respawned with fresh Chrome.
+- Full E2E test on prod verified:
+  - ✅ Carousel: 5 boAt products with **real Flipkart product images** (bounce-back worked!)
+  - ✅ ProductCard: Image, store badge, price/MRP/discount, rating, delivery, color, spec chips, bank offers, Add to Cart button
+  - ✅ CartBar: "1 item · Flipkart · ₹799 · View >" persistent bar above chat input
+  - ✅ L2 Cart Panel: Split view with product row, qty ±, delete, line items, Total ₹799, "Proceed to Buy · ₹799", Razorpay footer
+
+**Files changed**:
+- `apps/playwright/src/bridge-mcp-server.ts` (updated — image validation for relay-side ask_user)
+
+**Key decisions**:
+- Image validation must exist in TWO places: `agent.ts` (Cloud Run LLM path) AND `bridge-mcp-server.ts` (laptop relay path). The relay path is the one used for all browser-based shopping flows.
+- Lazy proxy's child process recovery: when playwright-mcp child dies (Chrome killed), proxy sets `child = null` and respawns on next `tools/call`. This was key to recovering the browser session.
+
+**What worked / what didn't** *(fill in after review)*:
+- 
+
 ## 2026-03-21 — Fix fake product cards in grocery skills + layout validation bypass
 
 **Goal**: BigBasket (and other grocery skills) were showing hallucinated product cards with fake prices/images before the browser agent ever visited the website. The intermediate image validation layer had a bypass hole for `layout` sections.
