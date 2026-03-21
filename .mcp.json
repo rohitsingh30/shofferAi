@@ -3,7 +3,8 @@
     "playwright": {
       "type": "stdio",
       "command": "node",
-      "args": ["apps/playwright/scripts/lazy-playwright-proxy.mjs"]
+      "args": ["apps/playwright/scripts/lazy-playwright-proxy.mjs"],
+      "timeout": 120000
     }
   }
 }

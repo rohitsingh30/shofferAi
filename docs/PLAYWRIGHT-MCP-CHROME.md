@@ -85,6 +85,24 @@ Each Chrome instance uses ~300-500MB RAM. With 3 concurrent sessions, that's ~1.
 | `apps/playwright/src/mcp-host.ts` | Connects Playwright MCP to a Chrome CDP endpoint |
 | `.mcp.json` | Copilot CLI MCP server config → points to `lazy-playwright-proxy.mjs` |
 
+## Copilot CLI MCP Timeout Workarounds
+
+The Copilot CLI has known bugs that cause MCP server disconnects:
+
+- **[copilot-cli#1378](https://github.com/github/copilot-cli/issues/1378)**: CLI resets its internal timeout after receiving `notifications/tools/list_changed`, silently reverting to a short default. Any tool call taking >~10s then triggers `-32001: Request timed out`.
+- **[copilot-cli#172](https://github.com/github/copilot-cli/issues/172)**: CLI doesn't always respect the `timeout` field in `.mcp.json`.
+
+### Mitigations in `lazy-playwright-proxy.mjs`
+
+1. **Suppresses `notifications/tools/list_changed`** from child playwright-mcp → Copilot CLI. This prevents the CLI from resetting its timeout config.
+2. **Crash-proof handlers**: `uncaughtException` + `unhandledRejection` keep the proxy alive instead of silently dying.
+3. **Safe async forwarding**: All `forward()` calls have `.catch()` to prevent unhandled rejections from crashing Node.js.
+4. **Auto-reconnect**: When the child exits (Chrome crash, etc.), state resets so the next tool call spawns a fresh child instead of permanently erroring.
+
+### `.mcp.json` timeout
+
+The `.mcp.json` config includes `"timeout": 120000` (120s) as belt-and-suspenders. While #1378 may cause this to be lost after `tools/list_changed`, the suppression above prevents that notification from ever reaching the CLI.
+
 ## Rules
 
 1. **NEVER revert to singleton** — the sharing bug will return
@@ -94,6 +112,7 @@ Each Chrome instance uses ~300-500MB RAM. With 3 concurrent sessions, that's ~1.
 5. **ALWAYS include `--output-dir /tmp/playwright-mcp-output`** in Playwright MCP launch
 6. **NEVER put `playwright` in `~/.copilot/mcp-config.json`** — project `.mcp.json` is the only source; duplicates cause 2 Chrome windows
 7. **NEVER point `.mcp.json` directly to `playwright-mcp-with-chrome.sh`** — always use `lazy-playwright-proxy.mjs` to avoid Chrome on every session
+8. **NEVER remove the `tools/list_changed` suppression** from the proxy — it's a critical workaround for copilot-cli#1378
 
 ## Gotcha: Duplicate MCP Configs = Multiple Chrome Windows
 

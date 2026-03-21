@@ -572,4 +572,27 @@ This applies to: port scanning, reconnect backoff, file path fallbacks, API endp
 
 ---
 
+## 18. Copilot CLI MCP Timeout Reset (Upstream Bug)
+
+**What happens:** Copilot CLI silently resets its MCP timeout config after receiving `notifications/tools/list_changed` from the MCP server (copilot-cli#1378). The CLI reverts to a short default timeout (~10s), causing `-32001: Request timed out` disconnects during normal browser operations that take a few seconds.
+
+**Examples:**
+- Playwright MCP connects, sends `tools/list_changed` → CLI drops 120s timeout → next `browser_snapshot` disconnects
+- Proxy crashes silently from unhandled rejection → Copilot CLI marks server as disconnected → no auto-recovery
+- Multiple stale Chrome instances and orphaned processes accumulate from repeated disconnect/reconnect cycles
+
+**Root cause:** Upstream bug in Copilot CLI's MCP protocol handler — not in our code.
+
+**Workaround (in `lazy-playwright-proxy.mjs`):**
+1. Suppress `notifications/tools/list_changed` from child → parent (prevents timeout reset)
+2. `uncaughtException` + `unhandledRejection` handlers keep proxy alive
+3. `.catch()` on all async `forward()` calls to prevent unhandled rejections
+4. `.mcp.json` includes `"timeout": 120000` as belt-and-suspenders
+
+**Rule:** NEVER remove the `tools/list_changed` suppression from the lazy proxy. NEVER remove the crash handlers. These are workarounds for upstream Copilot CLI bugs (copilot-cli#1378, copilot-cli#172) and must stay until the CLI team fixes the root cause.
+
+**Tracking:** [copilot-cli#1378](https://github.com/github/copilot-cli/issues/1378), [copilot-cli#172](https://github.com/github/copilot-cli/issues/172)
+
+---
+
 *Last updated: 2026-03-21*

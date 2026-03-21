@@ -9,6 +9,12 @@
  * On first tools/call, spawns playwright-mcp-with-chrome.sh, initializes the
  * real MCP server, and proxies the call through. Zero Chrome overhead for
  * sessions that never touch browser tools.
+ *
+ * WORKAROUNDS for Copilot CLI MCP timeout bugs:
+ *  - Suppresses notifications/tools/list_changed from child to prevent
+ *    CLI timeout reset (github/copilot-cli#1378)
+ *  - Auto-reconnects child on crash (next tool call spawns fresh Chrome)
+ *  - Catches unhandled rejections to prevent silent proxy death
  */
 
 import { spawn } from 'node:child_process';
@@ -19,6 +25,14 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REAL_SCRIPT = join(__dirname, 'playwright-mcp-with-chrome.sh');
 const log = (msg) => process.stderr.write(msg + '\n');
+
+// Prevent silent crashes from killing the proxy
+process.on('uncaughtException', (err) => {
+  log('⚠️  Uncaught exception (proxy stays alive): ' + err.message);
+});
+process.on('unhandledRejection', (err) => {
+  log('⚠️  Unhandled rejection (proxy stays alive): ' + (err?.message || err));
+});
 
 // ─── Static tool definitions (playwright-mcp snapshot mode) ──────────
 const TOOLS = [
@@ -93,7 +107,9 @@ function handleParent(msg) {
 
     case 'tools/list':
       if (childReady) {
-        forward(msg);
+        forward(msg).catch((err) => {
+          log('⚠️  Forward error (tools/list): ' + err.message);
+        });
       } else {
         sendToParent({ jsonrpc: '2.0', id: msg.id, result: { tools: TOOLS } });
       }
@@ -104,12 +120,20 @@ function handleParent(msg) {
       break;
 
     default:
-      forward(msg);
+      forward(msg).catch((err) => {
+        log('⚠️  Forward error: ' + err.message);
+      });
       break;
   }
 }
 
 // ─── Handle messages from child (playwright-mcp) ─────────────────────
+
+// Notifications that trigger Copilot CLI timeout reset bug (copilot-cli#1378).
+// Suppress these to prevent the CLI from silently dropping its timeout config.
+const SUPPRESSED_NOTIFICATIONS = new Set([
+  'notifications/tools/list_changed',
+]);
 
 function handleChild(msg) {
   if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
@@ -117,7 +141,12 @@ function handleChild(msg) {
     if (p) { pending.delete(msg.id); p.resolve(msg); }
     return;
   }
-  // Notification → parent
+  // Suppress notifications known to trigger CLI bugs
+  if (msg.method && SUPPRESSED_NOTIFICATIONS.has(msg.method)) {
+    log('🛡️  Suppressed ' + msg.method + ' (copilot-cli#1378 workaround)');
+    return;
+  }
+  // Other notifications → parent
   sendToParent(msg);
 }
 
@@ -141,10 +170,11 @@ function ensureChild() {
     });
 
     child.on('exit', (code) => {
-      log('⚠️  Child exited (code ' + code + ')');
+      log('⚠️  Child exited (code ' + code + ') — will auto-reconnect on next tool call');
       for (const [, p] of pending) p.reject(new Error('Child exited'));
       pending.clear();
       child = null; childReady = false; childInitPromise = null;
+      if (childRl) try { childRl.close(); } catch {}
     });
 
     // Child also speaks NDJSON

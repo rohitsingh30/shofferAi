@@ -4,6 +4,35 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-21 — Fixed Playwright MCP disconnects (Copilot CLI timeout workaround)
+
+**Goal**: Diagnose and fix frequent Playwright MCP server disconnections during Copilot CLI sessions.
+
+**What was done**:
+- Investigated MCP disconnect root cause — traced to upstream Copilot CLI bugs (copilot-cli#1378, #172) where the CLI resets its timeout config after receiving `notifications/tools/list_changed`
+- Updated `lazy-playwright-proxy.mjs` with 4 mitigations:
+  - Suppress `notifications/tools/list_changed` from child → parent (prevents timeout reset)
+  - Added `uncaughtException` + `unhandledRejection` handlers to prevent silent proxy death
+  - Added `.catch()` on all async `forward()` calls
+  - Improved child exit logging ("will auto-reconnect on next tool call")
+- Added `"timeout": 120000` to `.mcp.json` as belt-and-suspenders
+- Updated `docs/PLAYWRIGHT-MCP-CHROME.md` with new "Copilot CLI MCP Timeout Workarounds" section
+- Added anti-pattern #18 to `docs/REPEATING-MISTAKES.md`
+
+**Files changed**:
+- `apps/playwright/scripts/lazy-playwright-proxy.mjs` (updated — crash handlers, notification suppression, safe async)
+- `.mcp.json` (updated — added timeout: 120000)
+- `docs/PLAYWRIGHT-MCP-CHROME.md` (updated — new workarounds section + rule #8)
+- `docs/REPEATING-MISTAKES.md` (updated — new anti-pattern #18)
+- `docs/SESSION-LOG.md` (updated — this entry)
+
+**Key decisions**:
+- Chose to suppress `tools/list_changed` entirely rather than delaying it — the proxy already serves static tool defs on `tools/list` before child is ready, so the CLI doesn't need the notification
+- Kept proxy alive on crash rather than restarting — auto-reconnect on next tool call is cleaner
+
+**What worked / what didn't** *(fill in after review)*:
+- 
+
 ## 2026-03-21 — Verified "New Chat closes L2 panel" fix on prod (E2E)
 
 **Goal**: Visually verify on production that clicking "New Chat" correctly closes the L2 cart panel, clears cart state, and resets chat to the welcome screen.
