@@ -150,6 +150,8 @@ export async function POST(request: Request) {
         // Relay is only needed when handoff_to_browser_agent or browse_website is called.
         console.log('[execute] taskId=%s starting (relay connection deferred)', taskId);
 
+        // Send taskId to frontend so it can cancel the task explicitly
+        send('task_started', { taskId });
         // ─── Phase: skill_match ──────────────────────────────────────
         lat.startPhase('skill_match');
         // Match a skill for the user's request

@@ -138,6 +138,7 @@ export function buildSystemPrompt(
   allSkills?: SkillMetadata[],
   activeSkill?: SkillMetadata,
   lessons?: LessonEntry[],
+  extractedParams?: Record<string, string>,
 ): string {
   const parts = [SYSTEM_PROMPT];
 
@@ -179,20 +180,28 @@ export function buildSystemPrompt(
     const today = new Date().toISOString().split('T')[0];
     let skillSection = `## ACTIVE SKILL: ${activeSkill.name}\nToday's date: ${today}\n`;
 
-    // Inject param definitions so LLM knows what to extract vs ask
+    // Inject param definitions with pre-extracted values (deterministic, not prompt engineering)
     if (activeSkill.params?.length) {
-      skillSection += `\n### Skill Parameters (OVERRIDE any conflicting instructions below)\n`;
-      skillSection += `RULE: Extract parameter values from the user's ORIGINAL message. Do NOT ask for values already provided.\n`;
-      skillSection += `Examples:\n`;
-      skillSection += `- "order milk and bread" → items=["milk","bread"] ALREADY KNOWN. Do NOT show an items input.\n`;
-      skillSection += `- "wireless earbuds under 2000" → product="wireless earbuds", budget=2000 ALREADY KNOWN. Do NOT show product text or budget slider.\n`;
-      skillSection += `- "book hotel in Mumbai for 2 nights" → destination="Mumbai", nights=2 ALREADY KNOWN.\n`;
-      skillSection += `Only call ask_user for parameters that are TRULY MISSING from the user's message.\n`;
-      skillSection += `If Step 0 says "ask for X" but X is already in the message, SKIP that section entirely — only ask for what's genuinely missing.\n`;
-      skillSection += `If ALL params are already known, SKIP ask_user completely and proceed to the next step.\n\n`;
+      skillSection += `\n### Skill Parameters (PRE-EXTRACTED)\n`;
+      const hasExtracted = extractedParams && Object.keys(extractedParams).length > 0;
       for (const param of activeSkill.params) {
         const tag = param.required ? 'REQUIRED' : 'optional';
-        skillSection += `- **${param.name}** (${tag}): ${param.hint}\n`;
+        const extracted = extractedParams?.[param.name];
+        if (extracted) {
+          skillSection += `- **${param.name}** (${tag}): ✅ ALREADY EXTRACTED = "${extracted}" — DO NOT ask for this value.\n`;
+        } else {
+          skillSection += `- **${param.name}** (${tag}): ❌ MISSING — ${param.required ? 'ask user for this' : 'use default or skip'}. Hint: ${param.hint}\n`;
+        }
+      }
+      if (hasExtracted) {
+        const allExtracted = activeSkill.params
+          .filter(p => p.required)
+          .every(p => extractedParams?.[p.name]);
+        if (allExtracted) {
+          skillSection += `\n**ALL required params are extracted. SKIP ask_user entirely — proceed directly to browser handoff.**\n`;
+        } else {
+          skillSection += `\nOnly ask_user for MISSING required params above. Do NOT re-ask for extracted values.\n`;
+        }
       }
     }
 

@@ -69,6 +69,7 @@ function ChatInterfaceInner() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const taskIdRef = useRef<string | null>(null);
   const { openL2, closeL2 } = useL2Payment();
   const { closeCart } = useL2Cart();
   const { clearCart } = useCart();
@@ -85,6 +86,16 @@ function ChatInterfaceInner() {
   }, []);
 
   const resetChat = useCallback(() => {
+    // Send explicit cancel to server before aborting the SSE stream.
+    // Fire-and-forget — UI resets immediately regardless of cancel result.
+    if (taskIdRef.current) {
+      fetch('/api/agent/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: taskIdRef.current }),
+      }).catch(() => {});
+      taskIdRef.current = null;
+    }
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
@@ -133,7 +144,15 @@ function ChatInterfaceInner() {
   }, []);
 
   const handleSSEEvent = useCallback((event: { type: string; payload: Record<string, unknown> }) => {
+    // Capture taskId for cancel support
+    if (event.payload.taskId) {
+      taskIdRef.current = event.payload.taskId as string;
+    }
+
     switch (event.type) {
+      case 'task_started':
+        // taskId already captured above — no UI update needed
+        break;
       case 'message': {
         const content = event.payload.content as string;
         // Server-side two-tier filter (regex + AI rewrite) already cleaned this message.

@@ -2,6 +2,7 @@ import type { Tool, ContentBlock, ToolUseBlock, TextBlock } from '@anthropic-ai/
 import { type LLMClient, createLLMClient } from './llm-client';
 import { ConversationManager } from './conversation';
 import { buildSystemPrompt } from './prompts/system';
+import { ParamExtractor } from './param-extractor';
 import {
   logger,
   type MCPHostLike,
@@ -397,6 +398,25 @@ export class AgentExecutor {
         }
         this.systemPrompt = buildSystemPrompt(this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons);
         logger.info('Skill matched', { skillName: this.matchedSkill.name });
+
+        // Pre-extract params from user message so the LLM never re-asks for known values
+        let extractedParams: Record<string, string> = {};
+        if (this.matchedSkill.params?.length) {
+          try {
+            const extractor = new ParamExtractor({ model: process.env.REWRITER_MODEL });
+            extractedParams = await extractor.extract(userMessage, this.matchedSkill.params);
+            if (Object.keys(extractedParams).length > 0) {
+              // Rebuild system prompt with extracted params injected as facts
+              this.systemPrompt = buildSystemPrompt(
+                this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons, extractedParams,
+              );
+              logger.info('Rebuilt prompt with extracted params', { params: extractedParams });
+            }
+          } catch (err) {
+            logger.warn('Param extraction failed, LLM will handle extraction', { error: err });
+          }
+        }
+
         callbacks.onStepUpdate({
           action: `🧠 ${formatSkillName(this.matchedSkill.name)} — let me handle this`,
           status: 'running',
