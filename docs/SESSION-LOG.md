@@ -55,29 +55,26 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 ## 2026-03-21 — Fix Chrome zombie windows on task cancellation
 
-**Goal**: When a user presses "New Chat" or closes the tab mid-task, Chrome windows lingered for ~15 min until ChromePool's idle TTL. Fix `cancelTask()` to immediately release the Chrome slot.
+**Goal**: When a user presses "New Chat" or closes the tab mid-task, Chrome windows lingered as zombies. Fix `cleanupTask()` to actually kill stopped Chrome processes.
 
 **What was done**:
-- Added `sessionId` field to `RunningTask` interface in `task-manager.ts`
-- Capture `sessionId` when bridge registers (`msg.taskId` IS the sessionId used by ChromePool)
-- Added `chromePool` option to `TaskManagerOptions` and stored as private field
-- In `cleanupTask()`, call `chromePool.releaseSlot(sessionId)` after killing CLI process
-- Passed `chromePool` reference from `index.ts` when constructing `TaskManager`
-- Updated ARCHITECTURE.md with cancellation cleanup path (step 5 in tab isolation)
-- Updated REPEATING-MISTAKES.md entry #29 with the Chrome slot release fix
-- Deployed to Cloud Run (build `d184a702`, 5m11s) — HTTP 200 verified
+- **First attempt (wrong)**: Added `chromePool.releaseSlot(sessionId)` to `cleanupTask()` — but per-task Chrome is launched by `playwright-mcp-with-chrome.sh`, NOT by ChromePool. This did nothing.
+- **Root cause found**: `cleanupTask()` sent `SIGTERM` to the process group, but the CLI was in `SIGSTOP` state (paused for `ask_user`). Stopped processes **silently ignore SIGTERM**. Chrome shares the same process group as the CLI, so it survived too.
+- **Actual fix**: Send `SIGCONT` immediately before `SIGTERM` in `cleanupTask()` itself (line 678-679 in compiled output). This resumes the process group before killing it.
+- Removed the `chromePool.releaseSlot()` call (wrong approach)
+- Kept `sessionId` on `RunningTask` and `chromePool` on `TaskManagerOptions` (useful for future ChromePool integration)
+- Cleaned up 6+ orphaned `gh copilot` processes with stuck Chrome windows from previous runs
+- Verified: `SIGCONT` + `SIGTERM` on process group kills both CLI and its Chrome child
 
 **Files changed**:
-- `apps/playwright/src/task-manager.ts` (updated — sessionId on RunningTask, chromePool in cleanup)
-- `apps/playwright/src/index.ts` (updated — pass chromePool to TaskManager)
+- `apps/playwright/src/task-manager.ts` (updated — SIGCONT before SIGTERM in cleanupTask)
 - `docs/ARCHITECTURE.md` (updated — cancellation cleanup in tab isolation section)
-- `docs/REPEATING-MISTAKES.md` (updated — entry #29 with Chrome slot release)
+- `docs/REPEATING-MISTAKES.md` (updated — entry #29 with correct root cause)
 
 **Key decisions**:
-- `sessionId` is nullable (`string | null`) — only set when bridge registers, not at task creation
-- `releaseSlot()` is fire-and-forget (`.catch()`) — cancellation shouldn't block on Chrome cleanup failure
-- `chromePool` typed as `ChromePool | null` — TaskManager still works without it (tests don't need it)
-- Options type uses `Required<Omit<TaskManagerOptions, 'chromePool'>>` to avoid forcing chromePool as required
+- Per-task Chrome is NOT managed by ChromePool — it shares the CLI's process group (PGID)
+- `cleanupTask()` must be self-contained: SIGCONT+SIGTERM, don't rely on caller
+- `proc.unref()` + `detached: true` means if TaskManager restarts, orphans are invisible — future work needed for orphan reaping
 
 **What worked / what didn't** *(fill in after review)*:
 -
