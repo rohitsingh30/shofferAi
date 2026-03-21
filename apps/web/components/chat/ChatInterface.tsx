@@ -132,6 +132,27 @@ function ChatInterfaceInner() {
     };
   }, []);
 
+  // Cancel running task when user closes the tab or browser window.
+  // sendBeacon is guaranteed to fire even during page unload and includes cookies for auth.
+  useEffect(() => {
+    const cancelOnUnload = () => {
+      if (taskIdRef.current) {
+        const blob = new Blob(
+          [JSON.stringify({ taskId: taskIdRef.current })],
+          { type: 'application/json' }
+        );
+        navigator.sendBeacon('/api/agent/cancel', blob);
+        taskIdRef.current = null;
+      }
+    };
+    window.addEventListener('beforeunload', cancelOnUnload);
+    window.addEventListener('pagehide', cancelOnUnload);
+    return () => {
+      window.removeEventListener('beforeunload', cancelOnUnload);
+      window.removeEventListener('pagehide', cancelOnUnload);
+    };
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, currentSteps, cartItems]);
