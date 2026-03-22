@@ -5,6 +5,8 @@ import type { ProductCardData } from '@shofferai/shared';
 
 export interface CartItemData extends ProductCardData {
   quantity: number;
+  /** "user" = picked via card_grid/carousel, "agent" = synced from agent cart_update */
+  source: 'user' | 'agent';
 }
 
 interface AgentCartItem {
@@ -41,16 +43,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       // If different store, clear cart first
       if (prev.length > 0 && prev[0].store !== product.store) {
         setStore(product.store);
-        return [{ ...product, quantity: 1 }];
+        return [{ ...product, quantity: 1, source: 'user' as const }];
       }
       // If same item exists, increment quantity
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
         return prev.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+          item.id === product.id ? { ...item, quantity: item.quantity + 1, source: 'user' as const } : item,
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity: 1, source: 'user' as const }];
     });
     setStore(product.store);
   }, []);
@@ -91,15 +93,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const syncFromAgent = useCallback((agentItems: AgentCartItem[], agentStore: string, _total: string) => {
     setStore(agentStore);
-    setItems(
-      agentItems.map((item, i) => ({
+    setItems((prev) => {
+      // Keep all user-picked items intact — only replace agent-sourced items
+      const userItems = prev.filter((item) => item.source === 'user');
+      const newAgentItems = agentItems.map((item, i) => ({
         id: `agent-${i}-${item.name}`,
         name: item.name,
         price: parsePrice(item.price),
         store: agentStore,
         quantity: item.quantity,
-      })),
-    );
+        source: 'agent' as const,
+      }));
+      return [...userItems, ...newAgentItems];
+    });
   }, []);
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);

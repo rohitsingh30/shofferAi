@@ -289,14 +289,15 @@ The L2 split view is a 60/40 layout that slides in from the right for cart revie
 ### Cart Flow (Grocery/Shopping)
 
 ```
-User clicks "ADD" on ProductCardInput → CartContext.addItem(product) → CartBar appears
+User clicks "ADD" on ProductCardInput → CartContext.addItem(product) [source: 'user'] → CartBar appears
+Agent sends cart_update SSE → syncFromAgent() [source: 'agent'] → merges with user items (never overwrites)
 User clicks CartBar summary → L2CartContext.openCart() → L2CartPanel slides in (40%)
 User reviews items, adjusts quantities → clicks "Proceed to Buy"
 L2CartPanel → closeCart() → openL2(paymentData) → PaymentPanel slides in
 ```
 
 **Components:**
-- `CartContext.tsx` — Cart items state (add/remove/update/clear), single-store enforcement
+- `CartContext.tsx` — Cart items state (add/remove/update/clear), single-store enforcement. Items tagged with `source: 'user' | 'agent'` — user picks are never overwritten by agent `cart_update` sync
 - `L2CartContext.tsx` — Cart panel open/close state machine (`CLOSED → OPENING → OPEN → CLOSING`)
 - `CartBar.tsx` — Floating bar showing item count + total; click opens L2CartPanel
 - `L2CartPanel.tsx` — Full cart view with quantity ±, price breakdown, "Proceed to Buy"
