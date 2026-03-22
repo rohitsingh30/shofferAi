@@ -179,13 +179,10 @@ export function buildSystemPrompt(
     parts.push(`Preferences: ${JSON.stringify(userContext.preferences)}`);
   }
 
-  // Level 1: All skill summaries (always included, ~100 tokens each)
-  if (allSkills?.length) {
-    const summaries = allSkills
-      .map((s) => `- **${s.name}**: ${s.description}`)
-      .join('\n');
-    parts.push(`## AVAILABLE SKILLS\n${summaries}`);
-  }
+  // Skill summaries removed — matchSkill() already picks the right skill before
+  // the LLM sees anything. Injecting 500+ summaries added ~20k tokens per call
+  // (3.4s avg latency, 86% of input tokens were wasted). Only the matched skill's
+  // full instructions are included below.
 
   // Level 2: Active skill full instructions (only when matched)
   if (activeSkill) {

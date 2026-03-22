@@ -6,7 +6,7 @@ describe('SYSTEM_PROMPT', () => {
     expect(SYSTEM_PROMPT).toContain('ShofferAI');
     expect(SYSTEM_PROMPT).toContain('ask_user');
     expect(SYSTEM_PROMPT).toContain('confirm_action');
-    expect(SYSTEM_PROMPT).toContain('browse_website');
+    expect(SYSTEM_PROMPT).toContain('handoff_to_browser_agent');
     expect(SYSTEM_PROMPT).toContain('rsinghtomar3011@gmail.com');
   });
 });
@@ -46,13 +46,14 @@ describe('buildSystemPrompt', () => {
     expect(result).toContain('"language":"en"');
   });
 
-  it('includes skill summaries when provided', () => {
+  it('does not include all skill summaries (removed for latency)', () => {
     const skills = [
       { name: 'booking-hotel', description: 'Book hotels', triggers: [], siteUrl: '', requiresAuth: false, params: [], instructions: '' },
     ];
     const result = buildSystemPrompt({}, skills);
-    expect(result).toContain('AVAILABLE SKILLS');
-    expect(result).toContain('booking-hotel');
+    // Skill summaries deliberately removed — matchSkill() picks the skill before the LLM sees anything.
+    // Injecting 500+ summaries added ~20k tokens per call (86% of input was wasted).
+    expect(result).not.toContain('AVAILABLE SKILLS');
   });
 
   it('includes active skill instructions when provided', () => {

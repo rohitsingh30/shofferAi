@@ -509,37 +509,46 @@ export class AgentExecutor {
     if (this.allSkills.length > 0) {
       this.matchedSkill = matchSkill(this.allSkills, userMessage);
       if (this.matchedSkill) {
-        // Load lessons learned from past executions for this skill
-        if (this.config.lessonStore) {
-          try {
-            this.activeLessons = await this.config.lessonStore.loadForSkill(this.matchedSkill.name, 10);
-            if (this.activeLessons.length > 0) {
-              logger.info('Loaded lessons for skill', { skillName: this.matchedSkill.name, count: this.activeLessons.length });
+        // Load lessons + extract params in parallel (both independent)
+        const [lessons, extractedParams] = await Promise.all([
+          // Lesson loading
+          (async () => {
+            if (!this.config.lessonStore) return [];
+            try {
+              const l = await this.config.lessonStore.loadForSkill(this.matchedSkill!.name, 10);
+              if (l.length > 0) {
+                logger.info('Loaded lessons for skill', { skillName: this.matchedSkill!.name, count: l.length });
+              }
+              return l;
+            } catch (err) {
+              logger.warn('Failed to load lessons', { error: err });
+              return [];
             }
-          } catch (err) {
-            logger.warn('Failed to load lessons', { error: err });
-          }
-        }
-        this.systemPrompt = buildSystemPrompt(this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons, undefined, this.config.previousContext);
-        logger.info('Skill matched', { skillName: this.matchedSkill.name });
+          })(),
+          // Param extraction
+          (async () => {
+            if (!this.matchedSkill!.params?.length) return {};
+            try {
+              const extractor = new ParamExtractor({ model: process.env.REWRITER_MODEL });
+              const params = await extractor.extract(userMessage, this.matchedSkill!.params!);
+              if (Object.keys(params).length > 0) {
+                logger.info('Extracted params from user message', { params });
+              }
+              return params;
+            } catch (err) {
+              logger.warn('Param extraction failed, LLM will handle extraction', { error: err });
+              return {};
+            }
+          })(),
+        ]);
 
-        // Pre-extract params from user message so the LLM never re-asks for known values
-        let extractedParams: Record<string, string> = {};
-        if (this.matchedSkill.params?.length) {
-          try {
-            const extractor = new ParamExtractor({ model: process.env.REWRITER_MODEL });
-            extractedParams = await extractor.extract(userMessage, this.matchedSkill.params);
-            if (Object.keys(extractedParams).length > 0) {
-              // Rebuild system prompt with extracted params injected as facts
-              this.systemPrompt = buildSystemPrompt(
-                this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons, extractedParams, this.config.previousContext,
-              );
-              logger.info('Rebuilt prompt with extracted params', { params: extractedParams });
-            }
-          } catch (err) {
-            logger.warn('Param extraction failed, LLM will handle extraction', { error: err });
-          }
-        }
+        this.activeLessons = lessons;
+        this.systemPrompt = buildSystemPrompt(
+          this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons,
+          Object.keys(extractedParams).length > 0 ? extractedParams : undefined,
+          this.config.previousContext,
+        );
+        logger.info('Skill matched', { skillName: this.matchedSkill.name });
 
         callbacks.onStepUpdate({
           action: `🧠 ${formatSkillName(this.matchedSkill.name)} — let me handle this`,
@@ -854,6 +863,7 @@ export class AgentExecutor {
         // while the user is still being asked a question.
         const USER_BLOCKING_TOOLS = new Set(['ask_user', 'confirm_action', 'collect_payment']);
 
+        let handoffSent = false;
         for (const toolCall of toolUseBlocks) {
           const result = await this.handleToolCall(toolCall, callbacks);
 
@@ -868,6 +878,21 @@ export class AgentExecutor {
 
           this.conversation.addToolResult(toolCall.id, JSON.stringify(result));
 
+          // After handoff, skip the next LLM call — send a canned message instead.
+          // The 2nd LLM call just generates "I'll help you find..." (2-3s, 22k tokens wasted).
+          if (toolCall.name === 'handoff_to_browser_agent' && result && typeof result === 'object' && 'handoff' in result) {
+            const skillName = this.matchedSkill?.name;
+            const siteName = this.matchedSkill?.siteUrl
+              ? new URL(this.matchedSkill.siteUrl).hostname.replace('www.', '').split('.')[0]
+              : skillName;
+            const canned = siteName
+              ? `On it! Searching ${siteName.charAt(0).toUpperCase() + siteName.slice(1)} for you now ✨`
+              : 'On it! Working on this now ✨';
+            callbacks.onMessage(canned);
+            handoffSent = true;
+            break;
+          }
+
           if (USER_BLOCKING_TOOLS.has(toolCall.name)) {
             // Return remaining tool calls as not-executed so LLM can re-evaluate
             const remaining = toolUseBlocks.slice(toolUseBlocks.indexOf(toolCall) + 1);
@@ -879,6 +904,11 @@ export class AgentExecutor {
             }
             break;
           }
+        }
+
+        // Break out of the agent loop after handoff — browser agent takes over
+        if (handoffSent) {
+          break;
         }
       }
 

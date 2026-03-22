@@ -831,6 +831,9 @@ export async function POST(request: Request) {
             handoffSent = true;
             lat.endPhase('handoff_setup', { skill: handoff.skill?.name });
             lat.startPhase('browser_execution');  // starts when handoff sent, ends on task_complete/error
+
+            // Instant feedback — user sees progress immediately instead of 5-6s silence
+            send('step_update', { action: `Browsing ${handoff.skill?.name ? handoff.skill.name.split('-')[0] : 'the web'}...`, status: 'running' });
             // Don't close the stream — keep it open for task events from the laptop
           },
         };
