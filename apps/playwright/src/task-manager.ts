@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, execSync, type ChildProcess } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -92,6 +92,8 @@ export class TaskManager {
   private options: Required<Omit<TaskManagerOptions, 'chromePool'>>;
   private chromePool: ChromePool | null = null;
   private taskTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Cached GitHub token — avoids keyring issues in detached child processes */
+  private ghTokenCache: { token: string; fetchedAt: number } | null = null;
 
   constructor(options: TaskManagerOptions = {}) {
     this.chromePool = options.chromePool || null;
@@ -159,6 +161,20 @@ export class TaskManager {
 
     logger.info(`TaskManager: received handoff for task ${taskId}`, { userId, skill: skill?.name });
 
+    // Pre-flight: resolve GitHub token (parent reads keyring, child gets env var)
+    const ghToken = this.resolveGhToken();
+    if (!ghToken) {
+      logger.error('TaskManager: GitHub auth unavailable — cannot spawn Copilot CLI');
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_error',
+        taskId,
+        error: 'GitHub CLI is not authenticated. Run `gh auth login` on the laptop to fix.',
+        recoverable: true,
+      });
+      return;
+    }
+
     // Build the prompt for Copilot CLI
     const prompt = this.buildPrompt(description, skill, extractedParams, conversationContext);
 
@@ -167,7 +183,7 @@ export class TaskManager {
 
     // Spawn Copilot CLI
     try {
-      const agentProcess = this.spawnCopilotCLI(prompt, mcpConfig, taskId);
+      const agentProcess = this.spawnCopilotCLI(prompt, mcpConfig, taskId, ghToken);
 
       const task: RunningTask = {
         taskId,
@@ -415,7 +431,41 @@ export class TaskManager {
     });
   }
 
-  private spawnCopilotCLI(prompt: string, mcpConfig: string, taskId: string): ChildProcess {
+  /**
+   * Resolve GitHub token from cache, env, or `gh auth token`.
+   * Caches for 30 min to avoid repeated keyring lookups.
+   * Passing GH_TOKEN to the subprocess avoids keyring issues in detached processes.
+   */
+  private resolveGhToken(): string | null {
+    // Prefer explicit env var (already works without keyring)
+    if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
+    if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
+    if (process.env.COPILOT_GITHUB_TOKEN) return process.env.COPILOT_GITHUB_TOKEN;
+
+    // Return cached token if fresh (30 min TTL)
+    const TTL_MS = 30 * 60_000;
+    if (this.ghTokenCache && Date.now() - this.ghTokenCache.fetchedAt < TTL_MS) {
+      return this.ghTokenCache.token;
+    }
+
+    // Fetch from gh CLI (reads keyring in parent process — works reliably)
+    try {
+      const token = execSync(`${this.options.copilotBin} auth token 2>/dev/null`, {
+        timeout: 5_000,
+        encoding: 'utf-8',
+      }).trim();
+      if (token) {
+        this.ghTokenCache = { token, fetchedAt: Date.now() };
+        logger.info('TaskManager: cached GitHub token from gh auth');
+        return token;
+      }
+    } catch {
+      logger.warn('TaskManager: failed to get GitHub token from gh auth');
+    }
+    return null;
+  }
+
+  private spawnCopilotCLI(prompt: string, mcpConfig: string, taskId: string, ghToken: string | null): ChildProcess {
     // Embed system instructions into the prompt (no --system-prompt flag in gh copilot)
     const fullPrompt = `${SYSTEM_PROMPT}\n\n---\n\nTASK:\n${prompt}`;
 
@@ -431,16 +481,23 @@ export class TaskManager {
     logger.info(`TaskManager: spawning Copilot CLI for task ${taskId}`, {
       model: this.options.model,
       promptLength: prompt.length,
+      hasGhToken: !!ghToken,
     });
+
+    const env: Record<string, string | undefined> = {
+      ...process.env,
+      BRIDGE_WS_PORT: String(this.bridgePort),
+      BRIDGE_TASK_ID: taskId,
+    };
+    // Inject token so detached child doesn't need keyring access
+    if (ghToken) {
+      env.GH_TOKEN = ghToken;
+    }
 
     const proc = spawn(this.options.copilotBin, args, {
       detached: true,  // Own process group — allows SIGSTOP/SIGCONT on entire tree
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        BRIDGE_WS_PORT: String(this.bridgePort),
-        BRIDGE_TASK_ID: taskId,
-      },
+      env,
     });
 
     // Don't let the detached child keep the parent alive
