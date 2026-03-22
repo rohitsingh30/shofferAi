@@ -541,7 +541,38 @@ erDiagram
         string status
         int amountCents
         int serviceFeeCents
+        int totalCents
         string razorpayOrderId UK
+    }
+    
+    Order {
+        string id PK
+        string orderNumber UK
+        string taskId FK
+        string userId FK
+        string paymentId FK
+        string status
+        string targetSite
+        string targetOrderId
+        string targetTrackingUrl
+        int productAmountCents
+        int serviceFeeCents
+        int totalCents
+        json items
+        json deliveryAddress
+        datetime placedAt
+        datetime shippedAt
+        datetime deliveredAt
+        datetime cancelledAt
+    }
+    
+    OrderStatusHistory {
+        string id PK
+        string orderId FK
+        string fromStatus
+        string toStatus
+        string message
+        json metadata
     }
     
     SkillLesson {
@@ -565,13 +596,16 @@ erDiagram
     User ||--o{ Credential : stores
     User ||--o{ Task : creates
     User ||--o{ Payment : makes
+    User ||--o{ Order : places
     Task ||--o{ TaskStep : contains
     Task ||--o{ Message : has
     Task ||--o| Payment : "paid via"
     Task ||--o{ TelemetryEvent : tracks
+    Payment ||--o| Order : "creates"
+    Order ||--o{ OrderStatusHistory : "tracks"
 ```
 
-**10 Models** — See `prisma/schema.prisma` for full definitions.
+**13 Models** — See `prisma/schema.prisma` for full definitions.
 
 **Credential Vault** (`apps/web/lib/credential-vault/`):
 - `vault.ts` — `CredentialVault` class with AES-256-GCM encryption

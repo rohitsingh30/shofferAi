@@ -15,6 +15,15 @@ applyTo: "apps/web/**"
 | `error` | `{error: string}` | Something went wrong |
 | `complete` | `{summary: string}` | Task finished |
 
+### Order-related step_update statuses
+| Status | Trigger | DB Side-effect |
+|--------|---------|----------------|
+| `order_placed` | Agent completes checkout | `handleCheckoutSuccess()` → updates Order status, sets `placedAt` |
+| `order_failed` | Checkout fails on target site | `handleCheckoutFailure()` → auto-refund, sets `cancelledAt` |
+| `order_status` | Agent reports delivery update | `handleOrderStatusUpdate()` → transition validation, timestamp mapping, history recording |
+
+The `execute/route.ts` `onStepUpdate` callback handles all three: finds Order by `taskId`, calls the appropriate handler from `lib/order-operations.ts`, fires SSE to frontend. Errors are logged but don't block SSE delivery.
+
 ### What the user does NOT see
 Internal tool calls, status labels, and agent narration are filtered before reaching the chat UI via a two-tier architecture:
 - **Tier 1 (Regex)**: `shouldSuppressMessage()` catches ~90% instantly — tool labels, narration (`"I can see..."`, `"Let me click..."`), reasoning (`"Step 0 asks..."`). Splits multi-sentence messages, strips filler prefixes.
@@ -97,10 +106,29 @@ Message types: `task_progress`, `task_input_required`, `task_payment_required`, 
 ## Chat UI Components
 
 - `ChatInterface.tsx` — main chat, handles SSE events, filters `step_update` with `status: 'running'`
-- `MessageBubble.tsx` — renders user/assistant messages
+- `MessageBubble.tsx` — renders user/assistant messages + order cards (orderPlaced, orderFailed, orderStatus fields)
 - `TaskProgress.tsx` — non-interactive progress display
 - `InputPrompt.tsx` — interactive user input (address, choices, OTP)
 - `ask_user` → ONLY renders `InputPrompt`, NEVER `TaskProgress`
+
+### Order Chat Cards
+- `OrderConfirmation.tsx` — shown after payment verified, before agent checks out
+- `OrderPlaced.tsx` — shown when agent successfully places order on target site
+- `OrderFailed.tsx` — shown when checkout fails (includes auto-refund notice)
+- `OrderStatusUpdate.tsx` — shown for delivery updates (shipped, delivered, etc.) with status-coloured border and tracking link
+
+## Orders Dashboard
+
+- `/dashboard/orders` — list page with `OrderStatusBadge`, clickthrough to detail
+- `/dashboard/orders/[id]` — detail page with:
+  - Hero card with status-aware accent border/glow/ring (emerald for delivered, indigo for shipped, etc.)
+  - Two-column grid: Items + Payment, Delivery Address + Site Details
+  - `OrderTimeline` — vertical timeline with colour-coded dots, gradient connector, courier metadata chips
+  - "Track Package" and "View on {site}" action links
+  - `flex-1 overflow-y-auto` for scrolling, `max-w-5xl` for full width
+- Shared components in `components/orders/`:
+  - `OrderStatusBadge.tsx` — 14 status configs with labels, colours, icons + `formatCents()` utility
+  - `OrderTimeline.tsx` — renders `OrderStatusHistory[]` entries
 
 ## Workflow Engine
 

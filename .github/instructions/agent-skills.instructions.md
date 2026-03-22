@@ -8,8 +8,15 @@ applyTo: "packages/agent-core/**"
 
 - LLM loop: Azure OpenAI → tool calls → MCP dispatch → results → LLM → repeat
 - Max 50 iterations per task
-- Tool dispatch: MCP tools relayed to laptop, internal tools (ask_user, confirm_action, collect_payment) handled locally
+- Tool dispatch: MCP tools relayed to laptop, internal tools (ask_user, confirm_action, collect_payment, update_order_status) handled locally
 - Auto-ask_user: if LLM outputs a question as text instead of calling `ask_user`, auto-converts to interactive prompt
+
+### update_order_status Tool
+After the agent places an order on the target site, it uses `update_order_status` to report delivery progress:
+- **Statuses**: `order_placed`, `shipped`, `out_for_delivery`, `delivered`, `cancelled`
+- **Params**: `status` (required), `order_id` (target site order ID), `tracking_url`, `tracking_number`, `courier_name`, `message`, `estimated_delivery`
+- Fires `onStepUpdate()` with status `order_placed`/`order_failed`/`order_status` → SSE → frontend
+- DB side-effects handled by `execute/route.ts` → `lib/order-operations.ts`
 
 ## Skill System
 

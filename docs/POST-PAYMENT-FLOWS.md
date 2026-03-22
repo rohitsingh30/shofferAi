@@ -899,27 +899,31 @@ When user requests a return:
 
 ## 15. Implementation Phases
 
-### Phase 1: Order Model + Post-Payment Checkout ← START HERE
-- [ ] Prisma schema: Order, OrderStatusHistory models + migration
-- [ ] Order number generation utility
-- [ ] Update `/api/payments/verify` to create Order after payment capture
-- [ ] New SSE events: `order_confirmed`, `order_placed`, `order_failed`
-- [ ] `OrderConfirmation` chat component
-- [ ] `OrderPlaced` chat component
-- [ ] Auto-refund on checkout failure (10 min timeout)
-- [ ] Update Flipkart Shopping skill with post-payment checkout instructions
-- [ ] `/dashboard/orders` page (basic list)
-- [ ] E2E test: payment → order created → checkout on Flipkart → order placed
+### Phase 1: Order Model + Post-Payment Checkout ✅ DONE
+- [x] Prisma schema: Order, OrderStatusHistory models + migration (20260322053134)
+- [x] Order number generation utility (`lib/order-number.ts`)
+- [x] Update `/api/payments/verify` to create Order after payment capture (with `inferTargetSite()`, collision retry)
+- [x] New SSE events: `order_confirmed`, `order_placed`, `order_failed`
+- [x] `OrderConfirmation` chat component
+- [x] `OrderPlaced` / `OrderFailed` chat components
+- [x] Auto-refund on checkout failure (`handleCheckoutFailure()` in `lib/order-operations.ts`)
+- [x] Update Flipkart & Blinkit skills with post-payment checkout instructions
+- [x] `/dashboard/orders` page (list with status badges, clickthrough)
+- [x] 9 tests (6 verify route + 3 order number util)
 
-### Phase 2: Delivery Tracking + Orders UI
-- [ ] Scrape tracking URL from Flipkart at checkout time
-- [ ] `/dashboard/orders/[id]` detail page with timeline
-- [ ] `OrderStatusBadge` component
-- [ ] Add "Orders" to sidebar navigation
-- [ ] Passive tracking: "Track on Flipkart" link
-- [ ] `order_status` SSE event for status changes
+### Phase 2: Delivery Tracking + Orders UI ✅ DONE
+- [x] Extended `update_order_status` agent tool: shipped/out_for_delivery/delivered/cancelled statuses + tracking_number/courier_name/message params
+- [x] `/dashboard/orders/[id]` detail page — hero card with status-aware accent colours, two-column grid (Items+Payment, Address+Site details), tracking links
+- [x] `OrderStatusBadge` component (14 statuses with labels, colours, icons) + shared `formatCents` utility
+- [x] `OrderTimeline` component — vertical timeline with colour-coded dots, gradient connector, courier metadata chips
+- [x] `OrderStatusUpdate` chat card — status-coloured left border, icon, tracking link
+- [x] `order_status` SSE event wired in ChatInterface.tsx + execute/route.ts (both relay and chat-only paths)
+- [x] `handleOrderStatusUpdate()` in `lib/order-operations.ts` — transition validation, timestamp mapping (shippedAt/deliveredAt/cancelledAt), status history recording
+- [x] "Orders" sidebar nav + clickthrough from list → detail
+- [x] 6 tests for handleOrderStatusUpdate (shipped/delivered/cancelled transitions, tracking URL, courier metadata)
+- [x] Pages use `flex-1 overflow-y-auto` for proper scrolling, `max-w-5xl` for full horizontal coverage
 
-### Phase 3: Invoices & Receipts
+### Phase 3: Invoices & Receipts ← NEXT
 - [ ] Prisma schema: Invoice model + migration
 - [ ] Invoice number generation
 - [ ] PDF generation (server-side)
@@ -968,4 +972,4 @@ When user requests a return:
 
 ---
 
-*Last updated: March 21, 2026*
+*Last updated: March 22, 2026*
