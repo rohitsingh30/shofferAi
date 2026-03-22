@@ -1,19 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface ChipBarInputProps {
   options: string[];
   multiSelect?: boolean;
   onSubmit: (value: string) => void;
+  /** When true, hides the submit button and auto-submits on selection (used inside LayoutInput) */
+  inline?: boolean;
 }
 
 export function ChipBarInput({
   options,
   multiSelect = true,
   onSubmit,
+  inline = false,
 }: ChipBarInputProps) {
   const [selected, setSelected] = useState<string[]>([]);
+  const didSubmit = useRef(false);
 
   function toggle(option: string) {
     if (multiSelect) {
@@ -26,6 +30,16 @@ export function ChipBarInput({
       setSelected((prev) => (prev[0] === option ? [] : [option]));
     }
   }
+
+  // Auto-submit when inline (inside LayoutInput) — fires on every selection change
+  useEffect(() => {
+    if (!inline || selected.length === 0) return;
+    // Small debounce so user can multi-select quickly
+    const timer = setTimeout(() => {
+      onSubmit(multiSelect ? JSON.stringify(selected) : selected[0]);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [inline, selected, multiSelect, onSubmit]);
 
   function handleSubmit() {
     if (selected.length === 0) return;
@@ -56,14 +70,16 @@ export function ChipBarInput({
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={selected.length === 0}
-        className="mt-3 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Continue →
-      </button>
+      {!inline && (
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={selected.length === 0}
+          className="mt-3 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Continue →
+        </button>
+      )}
     </div>
   );
 }

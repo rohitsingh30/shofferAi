@@ -57,7 +57,7 @@ export function LayoutInput({ sections, onSubmit }: LayoutInputProps) {
     setExpanded(prev => ({ ...prev, [name]: !prev[name] }));
   }, []);
 
-  const requiredSections = sections.filter(s => s.required !== false);
+  const requiredSections = sections.filter(s => s.required === true);
   const allRequiredFilled = requiredSections.every(s => values[s.name]);
 
   const handleSubmit = () => {
@@ -107,6 +107,7 @@ export function LayoutInput({ sections, onSubmit }: LayoutInputProps) {
             options={section.options || []}
             multiSelect={section.multi_select}
             onSubmit={onSectionValue}
+            inline
           />
         );
       case 'address':
@@ -162,12 +163,29 @@ export function LayoutInput({ sections, onSubmit }: LayoutInputProps) {
     return null;
   };
 
+  /** Show a human-readable summary of the completed value */
+  function formatCompletedValue(raw: string): string {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.join(', ');
+      if (typeof parsed === 'object' && parsed !== null) {
+        // Address or complex object — show label or first value
+        if (parsed.label) return `${parsed.label}${parsed.address ? ' — ' + parsed.address : ''}`;
+        return Object.values(parsed).filter(Boolean).join(', ');
+      }
+      return String(parsed);
+    } catch {
+      return raw;
+    }
+  }
+
   return (
     <div className="space-y-4">
       {sections.map((section) => {
         const isExpanded = expanded[section.name];
         const completed = !!values[section.name];
         const isCollapsible = section.collapsed;
+        const isRequired = section.required === true;
 
         return (
           <div key={section.name} className="space-y-2">
@@ -183,8 +201,11 @@ export function LayoutInput({ sections, onSubmit }: LayoutInputProps) {
                 <span className={`text-xs transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▸</span>
               )}
               <span>{section.label}</span>
-              {section.required !== false && !completed && (
+              {isRequired && !completed && (
                 <span className="text-xs text-destructive">*</span>
+              )}
+              {!isRequired && isCollapsible && !completed && !isExpanded && (
+                <span className="text-[10px] text-muted-foreground/50 italic">optional</span>
               )}
               {completed && (
                 <svg className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -200,22 +221,27 @@ export function LayoutInput({ sections, onSubmit }: LayoutInputProps) {
               </div>
             )}
 
-            {/* Completed summary */}
+            {/* Completed summary — show selected value */}
             {completed && (
-              <button
-                type="button"
-                onClick={() => {
-                  setValues(prev => {
-                    const next = { ...prev };
-                    delete next[section.name];
-                    return next;
-                  });
-                  setExpanded(prev => ({ ...prev, [section.name]: true }));
-                }}
-                className="ml-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                ✎ Edit
-              </button>
+              <div className="flex items-center gap-2 ml-1">
+                <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                  {formatCompletedValue(values[section.name])}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValues(prev => {
+                      const next = { ...prev };
+                      delete next[section.name];
+                      return next;
+                    });
+                    setExpanded(prev => ({ ...prev, [section.name]: true }));
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ✎ Edit
+                </button>
+              </div>
             )}
           </div>
         );
