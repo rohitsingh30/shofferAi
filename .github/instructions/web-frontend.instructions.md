@@ -50,11 +50,19 @@ interface AgentCallbacks {
 ## Auth (Auth.js v5 / NextAuth)
 
 - Credentials provider + Google OAuth
+- `strategy: 'jwt'` with `PrismaAdapter` — adapter creates users, JWT stores session
 - Dev login: `demo@shofferai.com` / `demo1234`
 - Dev login route: `app/api/auth/dev-login/route.ts` — upserts demo user
 - Login page: `app/(auth)/login/page.tsx` — has "Dev Login" button
 - On prod: click "Dev Login (demo@shofferai.com)" or POST `/api/auth/dev-login` first
 - NEVER ask the user for login credentials — they are in the codebase
+
+### Auth critical rules
+- **Every user creation path MUST create a Profile**: `profile: { create: {} }` — applies to register, dev-login, google-mobile, AND the `createUser` event (for web Google OAuth via PrismaAdapter)
+- **Email always lowercase**: All email lookups and inserts use `.toLowerCase()` — prevents duplicate accounts from case mismatches
+- **JWT `account` fallback**: The `jwt` callback resolves userId from the linked `Account` record if `user.id` is missing — guards against Auth.js beta not passing `user` on re-authentication (stale JWT → cross-user contamination)
+- **`allowDangerousEmailAccountLinking: true`**: Links Google OAuth to existing email-password accounts — needed for seamless login but means email is the identity anchor
+- **Onboarding safety**: `/onboarding` page fetches existing profile on mount (pre-populates form) and only sends fields the user actually filled in (skipped fields → `undefined`, never `[]`)
 
 ## Payments (Razorpay)
 

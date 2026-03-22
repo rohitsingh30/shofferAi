@@ -47,6 +47,7 @@ export async function POST(request: Request) {
             access_token: accessToken,
           },
         },
+        profile: { create: {} },
       },
     });
   } else {

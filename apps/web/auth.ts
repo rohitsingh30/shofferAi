@@ -32,7 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email: (credentials.email as string).toLowerCase() },
         });
 
         if (!user || !user.passwordHash) {
@@ -74,9 +74,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
+    async jwt({ token, user, account }) {
+      if (user?.id) {
         token.id = user.id;
+      } else if (account?.providerAccountId) {
+        // Fallback: Auth.js beta may not pass user on re-auth.
+        // Resolve the correct userId from the linked OAuth account
+        // to prevent stale JWT keeping the previous user's identity.
+        const linked = await prisma.account.findUnique({
+          where: {
+            provider_providerAccountId: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            },
+          },
+          select: { userId: true },
+        });
+        if (linked) {
+          console.warn('[auth] jwt: user.id missing on sign-in — resolved from linked account userId=%s', linked.userId);
+          token.id = linked.userId;
+        }
       }
       return token;
     },
