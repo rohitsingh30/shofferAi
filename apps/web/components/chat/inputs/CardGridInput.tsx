@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useImagePreloader } from './useImagePreloader';
+import { CardGridSkeleton } from './CardSkeletons';
 
 interface CardItem {
   id: string;
@@ -34,9 +36,14 @@ export function CardGridInput({
   const [selections, setSelections] = useState<Map<string, number>>(new Map());
   const [customText, setCustomText] = useState('');
   const [customItems, setCustomItems] = useState<CardItem[]>([]);
-  const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
 
   const isProductMode = hasProductImages(cards);
+
+  // Preload all product images — show shimmer until ready
+  const imageUrls = useMemo(() => cards.map((c) => c.image), [cards]);
+  const { ready: imagesReady, failed: imgErrors } = useImagePreloader(
+    isProductMode ? imageUrls : [],
+  );
 
   function toggleCard(id: string) {
     setSelections((prev) => {
@@ -91,10 +98,6 @@ export function CardGridInput({
     onSubmit(JSON.stringify(result));
   }
 
-  const handleImgError = useCallback((id: string) => {
-    setImgErrors((prev) => new Set(prev).add(id));
-  }, []);
-
   const allCards = [...cards, ...customItems];
 
   const summaryParts = Array.from(selections.entries()).map(([id, qty]) => {
@@ -116,12 +119,19 @@ export function CardGridInput({
   if (isProductMode) {
     return (
       <div className="space-y-3">
-        {/* Product grid */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {/* Shimmer skeleton while images preload */}
+        {!imagesReady && <CardGridSkeleton count={allCards.length} />}
+
+        {/* Real product grid — hidden until all images ready, then fades in */}
+        <div
+          className={`grid grid-cols-2 gap-3 sm:grid-cols-3 transition-opacity duration-300 ${
+            imagesReady ? 'opacity-100' : 'h-0 overflow-hidden opacity-0'
+          }`}
+        >
           {allCards.map((card, i) => {
             const qty = selections.get(card.id);
             const isSelected = qty !== undefined;
-            const showImg = card.image && !imgErrors.has(card.id);
+            const showImg = card.image && !imgErrors.has(card.image);
             const parsed = parseCardSubtitle(card.subtitle);
 
             return (
@@ -161,8 +171,6 @@ export function CardGridInput({
                       src={card.image!}
                       alt={card.label}
                       className="h-full w-full rounded-lg object-contain transition-transform duration-200 group-hover:scale-105"
-                      loading="lazy"
-                      onError={() => handleImgError(card.id)}
                     />
                   ) : (
                     <span className="text-5xl leading-none transition-transform duration-200 group-hover:scale-110">

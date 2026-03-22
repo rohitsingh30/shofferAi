@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useImagePreloader } from './useImagePreloader';
+import { CardGridSkeleton } from './CardSkeletons';
 
 interface CardData {
   id: string;
@@ -42,9 +44,14 @@ export function CarouselInput({
   const [customText, setCustomText] = useState('');
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
-  const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const productMode = hasImages(cards);
+
+  // Preload all product images — show shimmer until ready
+  const imageUrls = useMemo(() => cards.map((c) => c.image), [cards]);
+  const { ready: imagesReady, failed: imgErrors } = useImagePreloader(
+    productMode ? imageUrls : [],
+  );
 
   const updateArrows = useCallback(() => {
     const el = scrollRef.current;
@@ -97,14 +104,15 @@ export function CarouselInput({
     );
   }
 
-  const handleImgError = useCallback((id: string) => {
-    setImgErrors((prev) => new Set(prev).add(id));
-  }, []);
-
   /* ─── Product Mode: large image cards ─── */
   if (productMode) {
     return (
       <div className="flex flex-col gap-3">
+        {/* Shimmer skeleton while images preload */}
+        {!imagesReady && <CardGridSkeleton count={cards.length} cols="carousel" />}
+
+        {/* Real carousel — hidden until all images ready, then fades in */}
+        <div className={`transition-opacity duration-300 ${imagesReady ? 'opacity-100' : 'h-0 overflow-hidden opacity-0'}`}>
         {/* Carousel wrapper */}
         <div className="carousel-wrapper relative -mx-1">
           {/* Edge fade — left */}
@@ -152,7 +160,7 @@ export function CarouselInput({
           >
             {cards.map((card, i) => {
               const isSelected = selected.includes(card.id);
-              const showImg = card.image && !imgErrors.has(card.id);
+              const showImg = card.image && !imgErrors.has(card.image);
               const { price, detail } = parseSubtitle(card.subtitle);
 
               return (
@@ -190,8 +198,6 @@ export function CarouselInput({
                         src={card.image!}
                         alt={card.label}
                         className="h-full w-full rounded-lg object-contain transition-transform duration-200 group-hover:scale-105"
-                        loading="lazy"
-                        onError={() => handleImgError(card.id)}
                       />
                     ) : (
                       <span className="text-5xl leading-none transition-transform duration-200 group-hover:scale-110">
@@ -232,6 +238,7 @@ export function CarouselInput({
               );
             })}
           </div>
+        </div>
         </div>
 
         {/* Scroll indicator dots */}

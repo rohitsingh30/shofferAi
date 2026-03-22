@@ -1,7 +1,10 @@
 'use client';
 
+import { useMemo } from 'react';
 import type { ProductCardData } from '@shofferai/shared';
 import { useCart } from '../CartContext';
+import { useImagePreloader } from './useImagePreloader';
+import { ProductCardSkeleton } from './CardSkeletons';
 
 interface ProductCardInputProps {
   product: ProductCardData;
@@ -20,25 +23,31 @@ function formatPrice(amount: number): string {
 export function ProductCardInput({ product, onSubmit }: ProductCardInputProps) {
   const { addItem } = useCart();
 
+  const imageUrls = useMemo(() => [product.image], [product.image]);
+  const { ready: imageReady, failed: imgFailed } = useImagePreloader(imageUrls);
+
   const handleAddToCart = () => {
     addItem(product);
     onSubmit('added_to_cart');
   };
+
+  if (!imageReady) {
+    return <ProductCardSkeleton />;
+  }
+
+  const showImage = product.image && !imgFailed.has(product.image);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
       {/* Product content */}
       <div className="flex gap-4 p-4">
         {/* Image */}
-        {product.image && (
+        {showImage && (
           <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl bg-white/[0.06]">
             <img
-              src={product.image}
+              src={product.image!}
               alt={product.name}
               className="h-full w-full object-contain p-2"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
             />
           </div>
         )}
