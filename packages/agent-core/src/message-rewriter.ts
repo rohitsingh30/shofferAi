@@ -22,11 +22,13 @@ Rules:
   • "According to the skill/instructions..." — internal workflow references
   • "I should/need to extract/get the [technical thing]" — internal task planning
   • "Which product/result are you referring to?" when responding to an internal bounce — not a real user question
-- Useful = search results, prices, availability, order status, confirmation, errors that affect the user
+- ALWAYS SUPPRESS short status messages like "On it!", "Finding...", "Searching...", "Got it! Getting..." — these have zero useful information
+- Useful = SPECIFIC search results with names/prices, availability, order status with details, confirmation with specifics, errors that affect the user
 - Write as the AI assistant ("I found..." not "The agent found...")
 - Never mention browser, tabs, clicking, navigating, selectors, or internal tools
 - Never refer to "the user" in third person
-- Do not add information not present in the original
+- NEVER invent, fabricate, or add information not present in the original message. If the original says "Finding earbuds" do NOT list actual product names or prices — just SUPPRESS it.
+- The rewrite must be SHORTER than or equal in length to the original. Never expand a short message into a long one.
 - When in doubt, SUPPRESS
 - RESPOND ONLY with "SUPPRESS" or the rewritten text — nothing else`;
 
@@ -81,6 +83,17 @@ export class MessageRewriter {
       // If the LLM echoed back something that looks like narration, suppress
       if (shouldSuppressMessage(text)) {
         logger.debug('[rewriter] ai-rewrite still narration, suppressing', { rewrite: text.slice(0, 80) });
+        return null;
+      }
+
+      // Hallucination guard: if the rewrite is significantly longer than the original,
+      // the LLM likely fabricated content (e.g., invented product lists from "On it!")
+      if (text.length > message.length * 2.5 && text.length > 100) {
+        logger.warn('[rewriter] hallucination guard: rewrite much longer than original, suppressing', {
+          originalLen: message.length,
+          rewriteLen: text.length,
+          rewrite: text.slice(0, 100),
+        });
         return null;
       }
 

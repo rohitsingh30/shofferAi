@@ -92,6 +92,13 @@ function isSentenceNarration(lower: string): boolean {
     /^look for /,
   ];
 
+  // --- Short status/excitement messages ("On it!", "Finding the best...", "Got it! Getting...") ---
+  // These are agent acknowledgments with no actionable info — suppress before LLM rewrites them
+  const shortStatus = [
+    /^(on it|finding|searching|looking|checking|getting|working on|handling|processing|starting|almost|one sec|hold on|hang on|give me|let me|brb)[.!…]*$/,
+    /^(on it|got it|understood|will do|sure thing|no problem|absolutely|right away)[!.]?\s+(finding|searching|looking|getting|ordering|handling|checking|opening|browsing|working)/,
+  ];
+
   // --- Status narration ("Location is now set to...", "I've updated the...") ---
   const status = [
     /^(location|address|delivery|delivery address|city|area|pincode) (is |has been |was )?(now |successfully )?(set|changed|updated|confirmed|selected|saved)/,
@@ -174,7 +181,7 @@ function isSentenceNarration(lower: string): boolean {
     /\b(tap|click|select|choose)\s+(your |the )?.+(above|below|in the widget|in the panel)\b/,
   ];
 
-  const allPatterns = [...observational, ...action, ...status, ...thirdPerson, ...browserInternals, ...selfDirected, ...reasoning];
+  const allPatterns = [...observational, ...action, ...shortStatus, ...status, ...thirdPerson, ...browserInternals, ...selfDirected, ...reasoning];
   return allPatterns.some(p => p.test(lower));
 }
 
