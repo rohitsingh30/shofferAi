@@ -119,11 +119,30 @@ If ALL parameters are already known, SKIP ask_user entirely and go straight to S
   - description: "Flipkart order"
 - STOP and WAIT for payment confirmation. If cancelled, ask what to change.
 
-### 7. Complete Order & Confirm
-- Select payment method and complete payment flow.
-- Handle OTP via `ask_user` if needed.
-- Take snapshot of order confirmation page.
-- Report: order ID, product, price paid, estimated delivery date, seller.
+### 7. Post-Payment Checkout
+After user pays via Razorpay and `collect_payment` returns `{ paid: true }`:
+1. Navigate to Flipkart cart page
+2. Click "Place Order" / "Proceed to Checkout"
+3. Enter/select delivery address (collected earlier via `ask_user`)
+4. Select payment method: use the saved card on Chrome Profile 3
+5. Confirm the order on Flipkart
+6. Take snapshot of the order confirmation page as proof
+7. Scrape from the confirmation page:
+   - Flipkart Order ID (e.g. OD426218...)
+   - Estimated delivery date
+   - Order details/tracking URL
+8. Call `update_order_status` with:
+   - status: "order_placed"
+   - target_order_id: scraped Flipkart order ID
+   - target_order_url: URL to order on Flipkart
+   - estimated_delivery: delivery date text
+9. If checkout fails at any step (item OOS, payment rejected, etc.):
+   - Call `update_order_status` with status: "checkout_failed", failure_reason: reason
+   - Tell the user the checkout failed and a refund is being processed
+
+### 8. Complete & Confirm
+- Report final summary: order ID, product, price paid, estimated delivery, seller.
+- Do NOT end the task until `update_order_status` has been called.
 
 ## Site Notes
 

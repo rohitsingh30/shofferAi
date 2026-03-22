@@ -212,6 +212,38 @@ function ChatInterfaceInner() {
           }
         }
 
+        if (status === 'order_placed' || status === 'order_failed') {
+          try {
+            const orderData = JSON.parse(action);
+            if (orderData._type === 'order_status_update') {
+              if (status === 'order_placed') {
+                handleSSEEvent({
+                  type: 'order_placed',
+                  payload: {
+                    orderNumber: '',
+                    targetSite: '',
+                    targetOrderId: orderData.targetOrderId,
+                    targetOrderUrl: orderData.targetOrderUrl,
+                    targetTrackingUrl: orderData.targetTrackingUrl,
+                    estimatedDelivery: orderData.estimatedDelivery,
+                  },
+                });
+              } else {
+                handleSSEEvent({
+                  type: 'order_failed',
+                  payload: {
+                    orderNumber: '',
+                    reason: orderData.failureReason || 'Checkout failed',
+                  },
+                });
+              }
+              break;
+            }
+          } catch {
+            // Not JSON, treat as normal step
+          }
+        }
+
         if (status === 'running' && !action.startsWith('🧠 ') && !action.startsWith('⚡ ') && !action.startsWith('🔄 ')) break;
 
         setCurrentSteps((prev) => {
@@ -265,6 +297,63 @@ function ChatInterfaceInner() {
           description: event.payload.description as string | undefined,
         });
         break;
+      case 'order_confirmed': {
+        const p = event.payload;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `order-confirmed-${Date.now()}`,
+            role: 'assistant',
+            content: '',
+            orderConfirmed: {
+              orderNumber: p.orderNumber as string,
+              items: p.items as Array<{ name: string; qty?: number; quantity?: number; priceCents?: number; price?: string }>,
+              productAmountCents: p.productAmountCents as number,
+              serviceFeeCents: p.serviceFeeCents as number,
+              totalCents: p.totalCents as number,
+              targetSite: p.targetSite as string,
+            },
+          },
+        ]);
+        break;
+      }
+      case 'order_placed': {
+        const p = event.payload;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `order-placed-${Date.now()}`,
+            role: 'assistant',
+            content: '',
+            orderPlaced: {
+              orderNumber: p.orderNumber as string,
+              targetSite: p.targetSite as string,
+              targetOrderId: p.targetOrderId as string | undefined,
+              targetOrderUrl: p.targetOrderUrl as string | undefined,
+              targetTrackingUrl: p.targetTrackingUrl as string | undefined,
+              estimatedDelivery: p.estimatedDelivery as string | undefined,
+            },
+          },
+        ]);
+        break;
+      }
+      case 'order_failed': {
+        const p = event.payload;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `order-failed-${Date.now()}`,
+            role: 'assistant',
+            content: '',
+            orderFailed: {
+              orderNumber: p.orderNumber as string,
+              reason: (p.reason as string) || (p.message as string) || 'Unknown error',
+              refundAmountCents: p.refundAmountCents as number | undefined,
+            },
+          },
+        ]);
+        break;
+      }
       case 'complete': {
         const summary = event.payload.summary as string | undefined;
         // Always show the completion summary as a message so users see the result

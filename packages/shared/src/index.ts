@@ -9,3 +9,4 @@ export * from './utils/logger';
 export * from './utils/errors';
 export * from './internal-message-filter';
 export * from './product-parser';
+export * from './order-number';

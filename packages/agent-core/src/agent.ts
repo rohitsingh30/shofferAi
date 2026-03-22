@@ -312,6 +312,42 @@ const AGENT_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'update_order_status',
+    description:
+      'Update the order status after completing checkout on the target site. Call this after placing an order on a site like Flipkart, Blinkit, Swiggy, etc. Reports the target site order ID, delivery estimate, and order URL back to the user.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        status: {
+          type: 'string',
+          description: 'New order status: "order_placed", "checkout_failed"',
+          enum: ['order_placed', 'checkout_failed'],
+        },
+        target_order_id: {
+          type: 'string',
+          description: 'Order ID on the target site (e.g. Flipkart order ID "OD426218...")',
+        },
+        target_order_url: {
+          type: 'string',
+          description: 'URL to the order on the target site',
+        },
+        target_tracking_url: {
+          type: 'string',
+          description: 'Courier/delivery tracking URL if available',
+        },
+        estimated_delivery: {
+          type: 'string',
+          description: 'Estimated delivery date/time as text (e.g. "Wed, Mar 25")',
+        },
+        failure_reason: {
+          type: 'string',
+          description: 'Reason for checkout failure (only when status is "checkout_failed")',
+        },
+      },
+      required: ['status'],
+    },
+  },
+  {
     name: 'handoff_to_browser_agent',
     description:
       'Hand off a browser task to the autonomous browser agent running on the operator laptop. ' +
@@ -980,6 +1016,31 @@ export class AgentExecutor {
         status: 'cart_update',
       });
       return { acknowledged: true, itemCount: items.length };
+    }
+
+    if (name === 'update_order_status') {
+      const status = args.status as string;
+      const payload: Record<string, unknown> = {
+        _type: 'order_status_update',
+        status,
+        targetOrderId: args.target_order_id,
+        targetOrderUrl: args.target_order_url,
+        targetTrackingUrl: args.target_tracking_url,
+        estimatedDelivery: args.estimated_delivery,
+        failureReason: args.failure_reason,
+      };
+      if (status === 'order_placed') {
+        callbacks.onStepUpdate({
+          action: JSON.stringify(payload),
+          status: 'order_placed',
+        });
+      } else if (status === 'checkout_failed') {
+        callbacks.onStepUpdate({
+          action: JSON.stringify(payload),
+          status: 'order_failed',
+        });
+      }
+      return { acknowledged: true, status };
     }
 
     if (name === 'confirm_action') {

@@ -21,6 +21,7 @@ model User {
   profile     Profile?
   credentials Credential[]
   tasks       Task[]
+  orders      Order[]
   accounts    Account[]
   sessions    Session[]
   payments    Payment[]
@@ -101,6 +102,7 @@ model Task {
   steps        TaskStep[]
   messages     Message[]
   payments     Payment[]
+  orders       Order[]
 
   @@index([userId])
 }
@@ -152,11 +154,79 @@ model Payment {
   updatedAt         DateTime  @updatedAt
   paidAt            DateTime?
 
-  task Task @relation(fields: [taskId], references: [id])
-  user User @relation(fields: [userId], references: [id])
+  task  Task   @relation(fields: [taskId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+  order Order?
 
   @@index([taskId])
   @@index([userId])
+}
+
+model Order {
+  id                  String    @id @default(cuid())
+  orderNumber         String    @unique
+  taskId              String
+  userId              String
+  paymentId           String    @unique
+
+  // Status
+  status              String    @default("payment_received")
+  statusMessage       String?
+  statusUpdatedAt     DateTime  @default(now())
+
+  // Target site
+  targetSite          String
+  targetOrderId       String?
+  targetOrderUrl      String?
+  targetTrackingUrl   String?
+
+  // Delivery
+  deliveryAddress     String?   // JSON
+  estimatedDelivery   DateTime?
+  actualDelivery      DateTime?
+
+  // Items (denormalized from cart for quick access)
+  items               String    // JSON array
+  itemCount           Int       @default(1)
+
+  // Amounts (duplicated from Payment for easy querying)
+  productAmountCents  Int
+  serviceFeeCents     Int       @default(0)
+  totalCents          Int
+
+  // Timestamps
+  placedAt            DateTime?
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  task                Task      @relation(fields: [taskId], references: [id])
+  user                User      @relation(fields: [userId], references: [id])
+  payment             Payment   @relation(fields: [paymentId], references: [id])
+  statusHistory       OrderStatusHistory[]
+
+  @@index([userId])
+  @@index([taskId])
+  @@index([status])
+  @@index([orderNumber])
+  @@index([targetSite, targetOrderId])
+}
+
+model OrderStatusHistory {
+  id          String   @id @default(cuid())
+  orderId     String
+  fromStatus  String
+  toStatus    String
+  message     String?
+  metadata    String?  // JSON
+  createdAt   DateTime @default(now())
+
+  order       Order    @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
 }
 
 model SkillLesson {

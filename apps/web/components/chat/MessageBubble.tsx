@@ -1,10 +1,16 @@
 import React from 'react';
 import { renderMarkdown } from './render-markdown';
+import { OrderConfirmation } from './OrderConfirmation';
+import { OrderPlaced } from './OrderPlaced';
+import { OrderFailed } from './OrderFailed';
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  orderConfirmed?: { orderNumber: string; items: Array<{ name: string; qty?: number; quantity?: number; priceCents?: number; price?: string }>; productAmountCents: number; serviceFeeCents: number; totalCents: number; targetSite: string };
+  orderPlaced?: { orderNumber: string; targetSite: string; targetOrderId?: string; targetOrderUrl?: string; targetTrackingUrl?: string; estimatedDelivery?: string };
+  orderFailed?: { orderNumber: string; reason: string; refundAmountCents?: number };
 }
 
 export function MessageBubble({ message }: { message: Message }) {
@@ -18,6 +24,17 @@ export function MessageBubble({ message }: { message: Message }) {
         </div>
       </div>
     );
+  }
+
+  // Render order cards when present (standalone, no avatar wrapper)
+  if (message.orderConfirmed) {
+    return <OrderConfirmation {...message.orderConfirmed} />;
+  }
+  if (message.orderPlaced) {
+    return <OrderPlaced {...message.orderPlaced} />;
+  }
+  if (message.orderFailed) {
+    return <OrderFailed {...message.orderFailed} />;
   }
 
   return (

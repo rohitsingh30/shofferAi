@@ -25,6 +25,10 @@ async function ensureRelayConnected() {
   }
 }
 
+function safeParseJSON(str: string): unknown {
+  try { return JSON.parse(str); } catch { return str; }
+}
+
 export async function POST(request: Request) {
   console.log('[execute] POST /api/agent/execute — incoming request');
 
@@ -448,13 +452,37 @@ export async function POST(request: Request) {
                 question: 'Waiting for payment',
                 inputType: 'payment',
                 timeout: 600000,
-              }).then((response) => {
+              }).then(async (response) => {
                 console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
                 // Persist the payment confirmation/decline
                 workflowEngine.addMessage(taskId, 'user',
                   response.value === 'confirmed' ? 'Payment confirmed' : 'Payment declined',
                   { type: 'payment_response', stepId: msg.stepId },
                 ).catch(e => console.error('[execute] DB addMessage(task_payment_response) failed:', e));
+
+                // Send order_confirmed SSE if an Order was created by the verify route
+                if (response.value === 'confirmed') {
+                  try {
+                    const order = await prisma.order.findFirst({
+                      where: { taskId },
+                      orderBy: { createdAt: 'desc' },
+                    });
+                    if (order) {
+                      send('order_confirmed', {
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        items: safeParseJSON(order.items),
+                        productAmountCents: order.productAmountCents,
+                        serviceFeeCents: order.serviceFeeCents,
+                        totalCents: order.totalCents,
+                        targetSite: order.targetSite,
+                        status: order.status,
+                      });
+                    }
+                  } catch (e) {
+                    console.error('[execute] taskId=%s failed to send order_confirmed SSE:', taskId, e);
+                  }
+                }
 
                 const paymentMsg: TaskPaymentResponseMessage = {
                   id: randomUUID(),
@@ -649,6 +677,31 @@ export async function POST(request: Request) {
             });
             console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
             workflowEngine.addMessage(taskId, 'user', response.value === 'confirmed' ? 'Payment confirmed' : 'Payment declined', { type: 'payment' }).catch(e => console.error('[execute] DB addMessage(payment-resp) failed:', e));
+
+            // Send order_confirmed SSE if an Order was created by the verify route
+            if (response.value === 'confirmed') {
+              try {
+                const order = await prisma.order.findFirst({
+                  where: { taskId },
+                  orderBy: { createdAt: 'desc' },
+                });
+                if (order) {
+                  send('order_confirmed', {
+                    orderId: order.id,
+                    orderNumber: order.orderNumber,
+                    items: safeParseJSON(order.items),
+                    productAmountCents: order.productAmountCents,
+                    serviceFeeCents: order.serviceFeeCents,
+                    totalCents: order.totalCents,
+                    targetSite: order.targetSite,
+                    status: order.status,
+                  });
+                }
+              } catch (e) {
+                console.error('[execute] taskId=%s failed to send order_confirmed SSE:', taskId, e);
+              }
+            }
+
             return response.value === 'confirmed';
           },
           onComplete(summary) {

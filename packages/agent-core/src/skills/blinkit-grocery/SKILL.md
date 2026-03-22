@@ -145,10 +145,25 @@ For each product the user selected (with quantities):
 - STOP and WAIT — payment panel opens for user.
 - Only proceed if payment confirmed. If cancelled, ask what to change.
 
-### 7. Place Order & Confirm
-- After payment is confirmed on Blinkit, handle payment OTP via `ask_user` if needed.
-- Take snapshot of confirmation page.
+### 7. Post-Payment Checkout
+After user pays via Razorpay and `collect_payment` returns `{ paid: true }`:
+1. Complete the payment on Blinkit (select payment method, handle OTP via `ask_user` if needed)
+2. Take snapshot of the order confirmation page
+3. Scrape from the confirmation page:
+   - Blinkit Order ID/number
+   - Estimated delivery time
+   - Order tracking URL (if available)
+4. Call `update_order_status` with:
+   - status: "order_placed"
+   - target_order_id: scraped Blinkit order ID
+   - estimated_delivery: delivery time text (e.g. "15 min")
+5. If checkout fails (payment rejected, items removed, etc.):
+   - Call `update_order_status` with status: "checkout_failed", failure_reason: reason
+   - Tell the user the checkout failed and a refund is being processed
+
+### 8. Complete & Confirm
 - Report: order number/ID, items ordered, total paid, estimated delivery time, delivery address.
+- Do NOT end the task until `update_order_status` has been called.
 
 ## Site Notes
 
