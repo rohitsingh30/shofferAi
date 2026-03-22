@@ -19,22 +19,12 @@ params:
   - name: payment_method
     required: false
     hint: Payment preference (UPI, card, COD)
-layoutQuestion: "Let's set up your Zomato order! 🍛"
+layoutQuestion: "Where should we deliver?"
 layoutSections:
   - id: address
     label: Delivery Address
     type: address
     required: true
-  - id: cuisine
-    label: What are you craving?
-    type: carousel
-    required: true
-    options: 🥘 Biryani|🍕 Pizza|🍔 Burger|🍱 Thali|🥡 Chinese|🥞 South Indian|🌯 Rolls|🍰 Dessert
-  - id: dietary
-    label: Dietary Preferences
-    type: chip_bar
-    collapsed: true
-    options: 🟢 Veg only|🔴 Non-veg OK|Jain|No onion|No garlic
 ---
 
 # Zomato Food Ordering
@@ -43,33 +33,18 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ## Steps
 
-### Step 0: Confirm delivery address & order preferences
-**ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode, phone). The user must pick a saved address or enter a full one. The address widget collects flat/building, street, city, pincode, AND contact phone — all critical for delivery.
+### Step 0: Confirm delivery address
+**ALWAYS show the address picker FIRST** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode, phone). The user must pick a saved address or enter a full one.
 
-**REQUIRED — use `input_type: "layout"` (NOT separate ask_user calls).** Call `ask_user` with `input_type: "layout"` and these sections:
-1. **address** (type: "address", required): Confirm delivery address. Show saved addresses. If the user mentioned an area, pre-fill it:
-   ```json
-   {"saved": <use the saved addresses from the system prompt>}
-   ```
-2. **cuisine** (type: "carousel", required): Show cuisine options as scrollable cards (🥘 Biryani, 🍕 Pizza, 🍔 Burger, 🍱 Thali, 🥡 Chinese, 🥞 South Indian, 🌯 Rolls, 🍰 Dessert). Allow typing specific restaurant/dish.
-3. **dietary** (type: "chip_bar", collapsed): Dietary preferences — 🟢 Veg only, 🔴 Non-veg OK, Jain, No onion, No garlic.
+**This step asks ONLY for the address.** Do NOT combine cuisine, dietary, or any other question here.
 
-Example `ask_user` call (adapt saved addresses from system prompt):
+Call `ask_user` with `input_type: "layout"` containing ONLY the address section:
 ```json
 {
   "input_type": "layout",
-  "question": "Let's set up your Zomato order!",
+  "question": "Where should we deliver?",
   "sections": [
-    {"id": "address", "label": "Delivery Address", "type": "address", "required": true, "saved": []},
-    {"id": "cuisine", "label": "What are you craving?", "type": "carousel", "required": true,
-     "cards": [
-       {"id": "biryani", "label": "🥘 Biryani"}, {"id": "pizza", "label": "🍕 Pizza"},
-       {"id": "burger", "label": "🍔 Burger"}, {"id": "thali", "label": "🍱 Thali"},
-       {"id": "chinese", "label": "🥡 Chinese"}, {"id": "south-indian", "label": "🥞 South Indian"},
-       {"id": "rolls", "label": "🌯 Rolls"}, {"id": "dessert", "label": "🍰 Dessert"}
-     ]},
-    {"id": "dietary", "label": "Dietary Preferences", "type": "chip_bar", "collapsed": true,
-     "options": ["🟢 Veg only", "🔴 Non-veg OK", "Jain", "No onion", "No garlic"]}
+    {"id": "address", "label": "Delivery Address", "type": "address", "required": true, "saved": []}
   ]
 }
 ```
@@ -77,6 +52,28 @@ Example `ask_user` call (adapt saved addresses from system prompt):
 - **Only skip the address picker** if the user provided a FULL address with building/flat, street, city, pincode, AND phone number (e.g. "E111, Ridgewood Estate, DLF Garden City, Pune 411032").
 
 **CRITICAL**: Do NOT open the browser until you have a complete delivery address with phone. Without it, Zomato cannot show relevant restaurants.
+
+### Step 0b: Cuisine & dietary preferences (if needed)
+After the address is collected, if the user's `food` param is vague or missing (e.g. "order food from Zomato" with no specific dish), ask what they're craving using plain text suggestion chips:
+
+```json
+{
+  "input_type": "chip_bar",
+  "question": "What type of food are you craving?",
+  "options": ["Biryani", "Pizza", "Burger", "Thali", "Chinese", "South Indian", "Rolls", "Dessert"]
+}
+```
+
+Then optionally ask dietary preferences:
+```json
+{
+  "input_type": "chip_bar",
+  "question": "Any dietary preferences?",
+  "options": ["Veg only", "Non-veg OK", "Jain", "No onion", "No garlic"]
+}
+```
+
+**Skip Step 0b entirely** if the user already specified a dish (e.g. "order butter chicken" → food = "butter chicken", skip cuisine question).
 
 ### 1. Gather ALL Requirements Upfront
 - BEFORE opening the browser, check what the user already provided: food/dish, delivery address, payment preference.
