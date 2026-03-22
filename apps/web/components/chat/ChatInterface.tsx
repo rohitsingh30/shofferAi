@@ -583,11 +583,10 @@ function ChatInterfaceInner() {
       }
     }
 
-    // Persist the question + selection as chat messages so the conversation
-    // doesn't feel empty after the transient InputPrompt disappears.
+    // Persist the question + selection as a single assistant message so the
+    // conversation reads naturally (question with confirmed answer below it).
     if (pendingInput.question) {
       const ts = Date.now();
-      // Resolve user-friendly label for the selection
       const selectionLabel = formatSelectionLabel(pendingInput, value);
       setMessages((prev) => [
         ...prev,
@@ -595,11 +594,7 @@ function ChatInterfaceInner() {
           id: `msg-q-${ts}`,
           role: 'assistant',
           content: pendingInput!.question,
-        },
-        {
-          id: `msg-a-${ts}`,
-          role: 'user',
-          content: selectionLabel,
+          selection: selectionLabel,
         },
       ]);
     }

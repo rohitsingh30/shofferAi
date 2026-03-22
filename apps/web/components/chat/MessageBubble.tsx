@@ -11,6 +11,8 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** Inline selection shown below assistant question (e.g. address, date pick) */
+  selection?: string;
   orderConfirmed?: { orderNumber: string; items: Array<{ name: string; qty?: number; quantity?: number; priceCents?: number; price?: string }>; productAmountCents: number; serviceFeeCents: number; totalCents: number; targetSite: string };
   orderPlaced?: { orderNumber: string; targetSite: string; targetOrderId?: string; targetOrderUrl?: string; targetTrackingUrl?: string; estimatedDelivery?: string };
   orderFailed?: { orderNumber: string; reason: string; refundAmountCents?: number };
@@ -59,6 +61,11 @@ export function MessageBubble({ message }: { message: Message }) {
         <p className="text-[14px] leading-relaxed text-zinc-200">
           {renderMarkdown(message.content)}
         </p>
+        {message.selection && (
+          <p className="mt-2 border-t border-white/[0.06] pt-2 text-[13px] font-medium text-zinc-400">
+            {message.selection}
+          </p>
+        )}
       </div>
     </div>
   );
