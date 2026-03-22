@@ -8,6 +8,7 @@ import { InputPrompt } from './InputPrompt';
 import { CartSummary, type CartItem } from './CartSummary';
 // shouldSuppressMessage removed from client — server-side two-tier filter (regex + AI rewrite) is authoritative
 import type { ProductCardData } from '@shofferai/shared';
+import { formatSelectionLabel } from '@/lib/format-selection-label';
 import { L2PaymentProvider, useL2Payment } from './L2PaymentContext';
 import { L2CartProvider, useL2Cart } from './L2CartContext';
 import { CartProvider, useCart } from './CartContext';
@@ -562,16 +563,7 @@ function ChatInterfaceInner() {
     if (pendingInput.question) {
       const ts = Date.now();
       // Resolve user-friendly label for the selection
-      let selectionLabel = value;
-      if (pendingInput.cards?.length) {
-        const card = pendingInput.cards.find((c) => c.id === String(value));
-        if (card) selectionLabel = card.label;
-      } else if (pendingInput.options?.length) {
-        const idx = parseInt(value, 10);
-        if (!isNaN(idx) && pendingInput.options[idx - 1]) {
-          selectionLabel = pendingInput.options[idx - 1];
-        }
-      }
+      const selectionLabel = formatSelectionLabel(pendingInput, value);
       setMessages((prev) => [
         ...prev,
         {
