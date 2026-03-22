@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, type UIEvent } from 'react';
 
 interface SavedAddress {
   label: string;
@@ -123,12 +123,32 @@ export function AddressInput({ saved: savedProp = [], onSubmit }: AddressInputPr
 
   const inp = 'w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-primary/50 focus:bg-white/[0.06] transition-all';
 
+  const [showFade, setShowFade] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Detect if the list is scrollable and whether we're at the bottom
+  const checkScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollHeight > el.clientHeight + 4;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+    setShowFade(hasOverflow && !atBottom);
+  }, []);
+
+  useEffect(() => { checkScroll(); }, [addresses.length, checkScroll]);
+
+  const hiddenCount = addresses.length > 3 && showFade ? addresses.length - 3 : 0;
+
   return (
     <div className="flex flex-col gap-2.5">
       {/* Saved addresses — scrollable when many, with fade hint */}
       {addresses.length > 0 && (
         <div className="relative">
-          <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto overscroll-contain pr-0.5 scroll-smooth">
+          <div
+            ref={listRef}
+            onScroll={checkScroll}
+            className="flex flex-col gap-1.5 max-h-[11.5rem] overflow-y-auto overscroll-contain pr-0.5 scroll-smooth"
+          >
             {addresses.map((entry, i) => {
               const on = mode === 'saved' && selectedIdx === i;
               return (
@@ -154,8 +174,19 @@ export function AddressInput({ saved: savedProp = [], onSubmit }: AddressInputPr
               );
             })}
           </div>
-          {addresses.length > 4 && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-background to-transparent rounded-b-lg" />
+          {showFade && (
+            <>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#09090b] via-[#09090b]/80 to-transparent rounded-b-lg" />
+              {hiddenCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => listRef.current?.scrollBy({ top: 120, behavior: 'smooth' })}
+                  className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 px-2.5 py-0.5 rounded-full bg-white/[0.08] text-[10px] text-white/50 hover:text-white/70 hover:bg-white/[0.12] transition-all backdrop-blur-sm"
+                >
+                  {hiddenCount} more ↓
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
