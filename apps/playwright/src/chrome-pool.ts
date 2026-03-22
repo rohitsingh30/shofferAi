@@ -529,6 +529,18 @@ export class ChromePool {
     return slot;
   }
 
+  /**
+   * Acquire a Chrome slot and return its CDP endpoint URL.
+   * Used by ScriptRunner to connect compiled scripts directly to Chrome.
+   */
+  async acquireCdpEndpoint(sessionId: string): Promise<string> {
+    const slot = await this.acquireSlot(sessionId);
+    if (!slot.port) {
+      throw new Error(`Slot ${slot.index} has no CDP port`);
+    }
+    return `http://127.0.0.1:${slot.port}`;
+  }
+
   async releaseSlot(sessionId: string): Promise<void> {
     const slotIndex = this.sessionMap.get(sessionId);
     if (slotIndex === undefined) {

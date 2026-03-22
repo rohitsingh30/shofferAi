@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 import { createServer, type Server as HttpServer } from 'http';
 import { mcpToolEvents, ChromePool } from './chrome-pool';
+import { hasCompiledScript, runCompiledScript, sendInputToScript, type RunningScript } from './script-runner';
 import {
   logger,
   shouldSuppressMessage,
@@ -29,12 +30,16 @@ interface RunningTask {
   userId: string;
   description: string;
   skill?: string;
-  agentProcess: ChildProcess;
+  agentProcess: ChildProcess | null;
   bridgeWs: WebSocket | null;
   startedAt: number;
   status: 'starting' | 'running' | 'complete' | 'error';
   /** ChromePool sessionId — set when bridge registers (taskId IS the sessionId) */
   sessionId: string | null;
+  /** Execution mode: 'script' bypasses LLM, 'copilot' uses Copilot CLI */
+  mode: 'copilot' | 'script';
+  /** Handle for compiled script process (only when mode='script') */
+  scriptHandle?: RunningScript;
 }
 
 export interface TaskManagerOptions {
@@ -161,6 +166,15 @@ export class TaskManager {
 
     logger.info(`TaskManager: received handoff for task ${taskId}`, { userId, skill: skill?.name });
 
+    // ── Fast path: compiled script (no LLM needed) ──────────────────
+    const skillId = skill?.name;
+    if (skillId && this.chromePool && hasCompiledScript(skillId)) {
+      logger.info(`TaskManager: using compiled script for ${skillId} (task ${taskId.slice(0, 8)})`);
+      return this.runScriptTask(taskId, userId, description, skillId, extractedParams || {});
+    }
+
+    // ── Slow path: Copilot CLI (LLM-driven) ─────────────────────────
+
     // Pre-flight: resolve GitHub token (parent reads keyring, child gets env var)
     const ghToken = this.resolveGhToken();
     if (!ghToken) {
@@ -195,6 +209,7 @@ export class TaskManager {
         startedAt: Date.now(),
         status: 'starting',
         sessionId: null,
+        mode: 'copilot',
       };
       this.tasks.set(taskId, task);
 
@@ -228,9 +243,83 @@ export class TaskManager {
     }
   }
 
+  /** Run a compiled script task (no LLM needed — direct Playwright execution) */
+  private async runScriptTask(
+    taskId: string,
+    userId: string,
+    description: string,
+    skillId: string,
+    extractedParams: Record<string, string>,
+  ): Promise<void> {
+    try {
+      const scriptHandle = await runCompiledScript({
+        taskId,
+        skillId,
+        params: extractedParams,
+        userContext: {},
+        chromePool: this.chromePool!,
+        sendToRelay: (msg) => this.sendToRelay(msg),
+        timeoutMs: this.options.taskTimeoutMs,
+      });
+
+      const task: RunningTask = {
+        taskId,
+        userId,
+        description,
+        skill: skillId,
+        agentProcess: scriptHandle.child,
+        bridgeWs: null,
+        startedAt: Date.now(),
+        status: 'running',
+        sessionId: taskId,
+        mode: 'script',
+        scriptHandle,
+      };
+      this.tasks.set(taskId, task);
+
+      // Set task timeout
+      const timeoutId = setTimeout(() => {
+        this.handleTaskTimeout(taskId);
+      }, this.options.taskTimeoutMs);
+      this.taskTimeouts.set(taskId, timeoutId);
+
+      // Monitor for process exit to update task status
+      scriptHandle.child.on('close', () => {
+        const t = this.tasks.get(taskId);
+        if (t && t.status !== 'complete') {
+          t.status = 'complete';
+        }
+        this.cleanupTask(taskId);
+      });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Failed to run compiled script';
+      logger.error(`TaskManager: script failed for task ${taskId}`, { error: errMsg });
+      this.sendToRelay({
+        id: randomUUID(),
+        type: 'task_error',
+        taskId,
+        error: errMsg,
+        recoverable: false,
+      });
+    }
+  }
+
   /** Route an input response from Cloud Run to the appropriate Bridge MCP */
   handleInputResponse(taskId: string, stepId: string, value: string): void {
     const task = this.tasks.get(taskId);
+
+    // Script mode: route input directly to script's stdin
+    if (task?.mode === 'script' && task.scriptHandle) {
+      const sent = sendInputToScript(task.scriptHandle, stepId, value);
+      if (sent) {
+        logger.info(`TaskManager: input routed to script for task ${taskId.slice(0, 8)}`);
+      } else {
+        logger.warn(`TaskManager: failed to route input to script for task ${taskId.slice(0, 8)}`);
+      }
+      return;
+    }
+
+    // Copilot CLI mode: route via Bridge WebSocket
     if (!task?.bridgeWs || task.bridgeWs.readyState !== WebSocket.OPEN) {
       logger.warn(`TaskManager: no bridge connection for task ${taskId}`);
       return;
@@ -258,6 +347,18 @@ export class TaskManager {
   /** Route a payment response from Cloud Run to the appropriate Bridge MCP */
   handlePaymentResponse(taskId: string, stepId: string, confirmed: boolean, paymentId?: string): void {
     const task = this.tasks.get(taskId);
+
+    // Script mode: route payment response to script's stdin
+    if (task?.mode === 'script' && task.scriptHandle) {
+      const value = confirmed ? 'confirm' : 'cancel';
+      const sent = sendInputToScript(task.scriptHandle, stepId, value);
+      if (sent) {
+        logger.info(`TaskManager: payment response routed to script for task ${taskId.slice(0, 8)}`);
+      }
+      return;
+    }
+
+    // Copilot CLI mode: route via Bridge WebSocket
     if (!task?.bridgeWs || task.bridgeWs.readyState !== WebSocket.OPEN) {
       logger.warn(`TaskManager: no bridge connection for task ${taskId}`);
       return;
@@ -887,12 +988,12 @@ export class TaskManager {
     // This also kills the per-task Chrome launched by playwright-mcp-with-chrome.sh
     // since Chrome shares the same process group as the Copilot CLI.
     try {
-      if (!task.agentProcess.killed && task.agentProcess.pid) {
+      if (task.agentProcess && !task.agentProcess.killed && task.agentProcess.pid) {
         process.kill(-task.agentProcess.pid, 'SIGCONT');
         process.kill(-task.agentProcess.pid, 'SIGTERM');
         setTimeout(() => {
           try {
-            if (!task.agentProcess.killed && task.agentProcess.pid) {
+            if (task.agentProcess && !task.agentProcess.killed && task.agentProcess.pid) {
               process.kill(-task.agentProcess.pid, 'SIGKILL');
             }
           } catch { /* already dead */ }
