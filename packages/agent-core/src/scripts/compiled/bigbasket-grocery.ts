@@ -91,6 +91,57 @@ const fs = require('fs');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(3000);
 
+    // ── Step 1b: Clear stale cart from previous sessions ───────
+    log({ step: 'Clearing previous cart...', status: 'running' });
+    await page.goto('https://www.bigbasket.com/basket/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
+
+    const emptyCartIndicator = page.locator('text=/your basket is empty|no items|start shopping/i').first();
+    const isCartEmpty = await emptyCartIndicator.isVisible({ timeout: 3000 }).catch(() => false);
+
+    if (!isCartEmpty) {
+      // Try "Remove All" / "Clear All" / "Empty Cart" button first
+      const clearAllBtn = page.locator('button:has-text("Remove All"), button:has-text("Clear All"), button:has-text("Empty Cart"), button:has-text("Delete All"), a:has-text("Remove All"), a:has-text("Clear All")').first();
+      if (await clearAllBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await clearAllBtn.click();
+        await page.waitForTimeout(1000);
+        // Handle confirmation dialog if one pops up
+        const confirmClear = page.locator('button:has-text("Yes"), button:has-text("Confirm"), button:has-text("OK"), button:has-text("Remove")').first();
+        if (await confirmClear.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await confirmClear.click();
+          await page.waitForTimeout(1500);
+        }
+        log({ step: 'Previous cart cleared', status: 'running' });
+      } else {
+        // Fallback: remove items one-by-one via X / Remove buttons
+        let removed = 0;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const removeBtn = page.locator('button:has-text("Remove"), button[aria-label*="remove" i], button[aria-label*="delete" i], [data-testid*="remove"], [data-testid*="delete"]').first();
+          if (!(await removeBtn.isVisible({ timeout: 2000 }).catch(() => false))) break;
+          await removeBtn.click();
+          await page.waitForTimeout(1000);
+          // Handle confirmation if any
+          const confirmRemove = page.locator('button:has-text("Yes"), button:has-text("Confirm"), button:has-text("Remove")').first();
+          if (await confirmRemove.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await confirmRemove.click();
+            await page.waitForTimeout(1000);
+          }
+          removed++;
+        }
+        if (removed > 0) {
+          log({ step: 'Removed ' + removed + ' leftover item(s) from previous cart', status: 'running' });
+        }
+      }
+    } else {
+      log({ step: 'Cart already empty — good to go', status: 'running' });
+    }
+
+    // Navigate back to home for location popup + item search
+    await page.goto('https://www.bigbasket.com');
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2000);
+
     // ── Step 2: Handle location popup ──────────────────────────
     log({ step: 'Setting delivery location...', status: 'running' });
     const locationInput = page.getByPlaceholder('Search for area or street name').first();
@@ -253,6 +304,17 @@ const fs = require('fs');
         await page.waitForTimeout(1500);
         addedItems.push({ name: selected.name, price: selected.price, weight: selected.weight, searchTerm: item });
         log({ step: 'Added: ' + selected.name + ' ' + selected.price, status: 'running' });
+
+        // Sync cart state to frontend so CartBar appears progressively
+        log({
+          step: JSON.stringify({
+            _type: 'cart_update',
+            items: addedItems.map(it => ({ name: it.name, quantity: 1, price: it.price })),
+            store: 'BigBasket',
+            total: '',
+          }),
+          status: 'cart_update',
+        });
       } else {
         log({ step: 'Could not find Add button for: ' + selected.name, status: 'running' });
       }
@@ -298,6 +360,17 @@ const fs = require('fs');
         (cartDetails.savings ? '\\nSavings: ' + cartDetails.savings : '') +
         '\\nTotal: ' + cartDetails.total
       : '';
+
+    // Send final cart_update with totals so frontend CartContext is fully synced
+    log({
+      step: JSON.stringify({
+        _type: 'cart_update',
+        items: addedItems.map(it => ({ name: it.name, quantity: 1, price: it.price, weight: it.weight })),
+        store: 'BigBasket',
+        total: cartDetails.total || '',
+      }),
+      status: 'cart_update',
+    });
 
     const confirmResp = await requestFromHost({
       type: 'confirm_action',

@@ -54,6 +54,7 @@ Chrome profile: rsinghtomar3011@gmail.com. Operator phone: 8109137158.
 
 ### 1. Open Blinkit & Verify Login
 - Open a NEW tab and navigate to `https://blinkit.com`.
+- **CLEAR PREVIOUS CART FIRST**: Navigate to the cart page and remove any leftover items from a previous session. Click "Remove" or "Clear" on each item if the cart is not empty. This ensures a clean cart for the new order. Then navigate back to the homepage.
 - Take a snapshot. Check if logged in — look for "Account" text in the header right section `[class*="Header__HeaderRight"]`.
 - If Blinkit shows a location popup (`[class*="LocationModal"]`), type the user's address in the location search input, wait for suggestions, click best match.
 - If area is not serviceable, tell user and stop.

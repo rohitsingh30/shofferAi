@@ -60,6 +60,7 @@ Chrome profile: rsinghtomar3011@gmail.com. Operator phone: 8109137158.
 
 ### 2. Open Zepto & Verify Login
 - Open a NEW tab and navigate to `https://www.zeptonow.com`.
+- **CLEAR PREVIOUS CART FIRST**: Check the cart for leftover items from a previous session. If not empty, remove all items before proceeding. This ensures a clean cart for the new order.
 - Take a snapshot. Check if logged in — look for a profile/account icon in the header area.
 - If Zepto shows a location/address popup or banner, type the user's address in the location search input, wait for autocomplete suggestions, click the best match.
 - If area is not serviceable, tell user and stop.

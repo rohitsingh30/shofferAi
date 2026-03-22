@@ -53,6 +53,7 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ### 1. Open BigBasket & Set Delivery Location
 - Open a NEW tab and navigate to `https://www.bigbasket.com`.
+- **CLEAR PREVIOUS CART FIRST**: Before doing anything else, navigate to `https://www.bigbasket.com/basket/`. If there are any leftover items from a previous session, click "Remove All" or remove each item individually. This ensures a clean cart for the new order. Then navigate back to `https://www.bigbasket.com`.
 - Take snapshot immediately to confirm the page loaded and determine the current state.
 - **Location popup auto-appears**: BigBasket shows a `menu "Delivery in 10 mins Select Location"` overlay with text "Select a location for delivery" and "Choose your address location to see product availability and delivery options".
 - Find `textbox "Search for area or street name"` inside the popup.

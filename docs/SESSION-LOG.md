@@ -4,6 +4,45 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-22 — P0 Cart Reliability: Clear Cart + Cart Sync + L2 Confirmation
+
+**Goal**: Fix three critical cart bugs that made BigBasket grocery ordering broken: stale items from previous sessions, cart items not syncing to frontend, and confirmation not opening L2 panel.
+
+**Root causes**:
+1. Chrome Profile 3 persists cart across sessions — no "clear cart first" logic existed
+2. Compiled BigBasket script tracked items in local `addedItems[]` but never sent `cart_update` SSE events to frontend
+3. `confirm_action` showed inline text + Yes/Cancel buttons instead of opening the rich L2CartPanel
+
+**What was done**:
+- Added **clear-cart step** to `bigbasket-grocery.ts`: navigates to `/basket/`, removes all stale items (try "Remove All" button, fallback to one-by-one removal), then returns to homepage
+- Added **`cart_update` events** after each item is added AND before confirmation — frontend CartContext now syncs progressively, CartBar appears as items accumulate
+- Added **`pendingConfirm` state** to `L2CartContext` — when confirmation arrives with cart items, auto-opens L2CartPanel with "Proceed to Checkout" button instead of inline Yes/Cancel
+- Updated **4 SKILL.md files** (BigBasket, Blinkit, Swiggy Instamart, Zepto) with "CLEAR PREVIOUS CART FIRST" instruction for LLM-driven fallback
+- Added **Rule 39** to REPEATING-MISTAKES.md documenting the clear-cart-first pattern
+
+**Files changed**:
+- `packages/agent-core/src/scripts/compiled/bigbasket-grocery.ts` (updated — clear cart step + cart_update events)
+- `apps/web/components/chat/L2CartContext.tsx` (updated — pendingConfirm, openCartForConfirm, clearPendingConfirm)
+- `apps/web/components/chat/L2CartPanel.tsx` (updated — "Proceed to Checkout" button when pendingConfirm set)
+- `apps/web/components/chat/InputPrompt.tsx` (updated — auto-open L2 on confirmation with cart items)
+- `packages/agent-core/src/skills/bigbasket-grocery/SKILL.md` (updated — clear cart instruction)
+- `packages/agent-core/src/skills/blinkit-grocery/SKILL.md` (updated — clear cart instruction)
+- `packages/agent-core/src/skills/swiggy-instamart/SKILL.md` (updated — clear cart instruction)
+- `packages/agent-core/src/skills/zepto-grocery/SKILL.md` (updated — clear cart instruction)
+- `docs/REPEATING-MISTAKES.md` (updated — Rule 39)
+- `docs/SESSION-LOG.md` (updated — this entry)
+
+**Key decisions**:
+1. Clear cart in compiled script (not SKILL.md alone) — the BigBasket script runs via ScriptPlayer which bypasses LLM, so SKILL.md instructions don't apply
+2. `cart_update` events emitted from compiled script via `log({step: JSON.stringify(...), status: 'cart_update'})` — ScriptPlayer's `onStepUpdate` forwards these directly to SSE, matching ChatInterface's existing `cart_update` handler
+3. L2 opens via `openCartForConfirm(callback)` — the callback sends 'yes' when user clicks "Proceed to Checkout". Inline fallback (Yes/Cancel buttons) still exists for when cart is empty
+4. Cancel button remains inline (not in L2) — user can cancel without dismissing the cart panel
+
+**What worked / what didn't** *(fill in after review)*:
+-
+
+---
+
 ## 2026-03-22 — E2E Latency Optimization (Phase 1 shipped, Phase 2 in progress)
 
 **Goal**: Reduce TTFM from 27.5s to <2s and browser execution from 6min to <1min, based on real prod telemetry data.

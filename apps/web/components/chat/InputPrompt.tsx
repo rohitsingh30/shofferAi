@@ -65,6 +65,14 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const { isEmpty: cartIsEmpty } = useCart();
+  const { openCartForConfirm } = useL2Cart();
+
+  // When confirmation arrives AND cart has items, auto-open L2CartPanel
+  useEffect(() => {
+    if (inputType === 'confirmation' && !cartIsEmpty) {
+      openCartForConfirm(() => onSubmit('yes'));
+    }
+  }, [inputType, cartIsEmpty, openCartForConfirm, onSubmit]);
 
   useEffect(() => {
     if (inputType !== 'choice' && inputType !== 'confirmation' && !isRichType(inputType)) {
@@ -277,23 +285,38 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
               </form>
             </div>
           ) : inputType === 'confirmation' ? (
-            /* Confirmation: rich cart summary + Yes / Cancel */
+            /* Confirmation: L2 cart panel (when items exist) or inline fallback */
             <div className="space-y-3">
-              <CartConfirmItems />
-              <div className="flex gap-2.5">
-                <button
-                  onClick={() => onSubmit('yes')}
-                  className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
-                >
-                  ✓ Yes, proceed
-                </button>
-                <button
-                  onClick={() => onSubmit('no')}
-                  className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-zinc-200"
-                >
-                  Cancel
-                </button>
-              </div>
+              {cartIsEmpty ? (
+                /* Fallback: inline Yes/Cancel when cart has no items */
+                <div className="flex gap-2.5">
+                  <button
+                    onClick={() => onSubmit('yes')}
+                    className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-medium text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-[0.98]"
+                  >
+                    ✓ Yes, proceed
+                  </button>
+                  <button
+                    onClick={() => onSubmit('no')}
+                    className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-6 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-zinc-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                /* Cart panel is open — show pointer + cancel option inline */
+                <div className="flex items-center gap-2.5">
+                  <span className="text-sm text-emerald-400">
+                    Review your cart in the panel →
+                  </span>
+                  <button
+                    onClick={() => onSubmit('no')}
+                    className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 text-sm font-medium text-zinc-400 transition-all hover:bg-white/[0.06] hover:text-zinc-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           ) : inputType === 'otp' ? (
             /* OTP: monospace 6-digit input */

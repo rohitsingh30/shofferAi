@@ -79,9 +79,16 @@ function CartItemRow({ item, onUpdateQty, onRemove }: {
 
 export function L2CartPanel() {
   const { items, store, taskId: cartTaskId, total, isEmpty, updateQuantity, removeItem, clearCart } = useCart();
-  const { closeCart } = useL2Cart();
+  const { closeCart, pendingConfirm, clearPendingConfirm } = useL2Cart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleCheckoutConfirm = useCallback(() => {
+    if (!pendingConfirm) return;
+    pendingConfirm();
+    clearPendingConfirm();
+    closeCart();
+  }, [pendingConfirm, clearPendingConfirm, closeCart]);
 
   const handlePayNow = useCallback(async () => {
     if (isEmpty) return;
@@ -258,23 +265,35 @@ export function L2CartPanel() {
           <p className="text-sm text-red-400 text-center">{error}</p>
         )}
 
-        {/* Pay Now */}
-        <button
-          onClick={handlePayNow}
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98] disabled:opacity-50"
-        >
-          {loading ? (
-            'Processing...'
-          ) : (
-            <>
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-              Pay Now · {formatPrice(total)}
-            </>
-          )}
-        </button>
+        {/* Action button: "Proceed to Checkout" (confirmation) or "Pay Now" (direct payment) */}
+        {pendingConfirm ? (
+          <button
+            onClick={handleCheckoutConfirm}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-semibold text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-500/25 active:scale-[0.98]"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Proceed to Checkout · {formatPrice(total)}
+          </button>
+        ) : (
+          <button
+            onClick={handlePayNow}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98] disabled:opacity-50"
+          >
+            {loading ? (
+              'Processing...'
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                Pay Now · {formatPrice(total)}
+              </>
+            )}
+          </button>
+        )}
 
         {/* Trust badge */}
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-600">

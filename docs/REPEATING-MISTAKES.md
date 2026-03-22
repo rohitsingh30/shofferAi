@@ -723,3 +723,13 @@ BASE Profile 3 (permanent)
 Blinkit, Swiggy, Zomato, Booking.com, Amazon, Flipkart, BigBasket, Zepto, JioMart, Myntra, Nykaa, Croma
 
 **Health check:** `npx tsx apps/playwright/scripts/check-p0-sessions.ts`
+
+### Rule 39 — Clear Website Cart Before Starting New Orders
+
+Chrome Profile 3 persists shopping cart state across sessions. If a previous order was cancelled or abandoned, old items remain in the retailer's cart. When the agent starts a new order without clearing the cart first, stale items get included in the new order — wrong totals, confused users, wasted money.
+
+**Compiled scripts (Tier 2):** Must navigate to the cart page and clear all items BEFORE searching for new items. BigBasket script (`bigbasket-grocery.ts`) goes to `/basket/`, clicks "Remove All" or removes items one-by-one, then returns to homepage.
+
+**LLM-driven skills (SKILL.md):** Every shopping/grocery skill includes a **"CLEAR PREVIOUS CART FIRST"** instruction in Step 1 after opening the site.
+
+**Rule:** ALWAYS clear the website's cart before adding new items. Never assume the cart is empty. This applies to ALL shopping/grocery skills: BigBasket, Blinkit, Swiggy Instamart, Zepto, Flipkart, Amazon, JioMart, DMart, etc.

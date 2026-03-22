@@ -54,6 +54,7 @@ Chrome profile: rsinghtomar3011@gmail.com.
 
 ### 1. Open Swiggy Instamart & Set Location
 - Open a NEW tab and navigate to `https://www.swiggy.com/instamart`.
+- **CLEAR PREVIOUS CART FIRST**: Check the cart icon for any existing items. If the cart has items from a previous session, navigate to the cart and remove all items. This ensures a clean cart for the new order. Then return to Instamart.
 - Take snapshot. Verify logged in — look for profile name (e.g., "Rohit") or account icon in header (link with href `/my-account`).
 - If NOT logged in, login transparently using operator credentials. Do NOT ask user for credentials.
 - **If session expired, STOP and tell user: "Session expired, please re-login in Chrome Debug."**
