@@ -71,6 +71,7 @@ export interface CardItem {
   image?: string;
   subtitle?: string;
   badge?: string;
+  url?: string;
 }
 
 /** Rich product data for the product_card widget */
@@ -78,6 +79,7 @@ export interface ProductCardData {
   id: string;
   name: string;
   image?: string;
+  url?: string;
   price: number;
   mrp?: number;
   discount?: string;

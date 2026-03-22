@@ -121,6 +121,7 @@ For each item (specific from user message, or category/search from Step 3):
     - `image`: REAL product image URL from BigBasket CDN — extract the `src` attribute from `<img>` tags inside product cards
     - `subtitle`: price and weight (e.g., "₹28 · 1 kg · MRP ₹89")
     - `badge`: discount or delivery time if any (e.g., "10 mins")
+    - `url`: product page URL from BigBasket (extract from the `<a>` tag wrapping the product card, e.g., "https://www.bigbasket.com/pd/40015040/capsicum-green/")
   - `show_quantity`: true
   - `multi_select`: true
   - `allow_custom`: true (so user can type more items to search)

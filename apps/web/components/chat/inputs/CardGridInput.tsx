@@ -11,6 +11,7 @@ interface CardItem {
   image?: string;
   subtitle?: string;
   badge?: string;
+  url?: string;
 }
 
 interface CardGridInputProps {
@@ -193,16 +194,36 @@ export function CardGridInput({
                     </span>
                   )}
 
-                  {/* Price */}
-                  {parsed.price ? (
-                    <span className="mt-1 text-[15px] font-bold text-primary">
-                      {parsed.price}
-                    </span>
-                  ) : card.subtitle && (
-                    <span className="mt-1 text-[11px] font-medium text-primary/70">
-                      {card.subtitle}
-                    </span>
-                  )}
+                  {/* Price + View link */}
+                  <div className="mt-1 flex items-center justify-between gap-1">
+                    {parsed.price ? (
+                      <span className="text-[15px] font-bold text-primary">
+                        {parsed.price}
+                      </span>
+                    ) : card.subtitle ? (
+                      <span className="text-[11px] font-medium text-primary/70">
+                        {card.subtitle}
+                      </span>
+                    ) : <span />}
+
+                    {card.url && (
+                      <a
+                        href={card.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white/70"
+                        title="View product page"
+                      >
+                        View
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
 
                   {/* Quantity stepper */}
                   {showQuantity && isSelected && (

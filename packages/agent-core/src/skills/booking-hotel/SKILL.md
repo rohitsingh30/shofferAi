@@ -103,8 +103,9 @@ Only call ask_user if destination OR dates are truly missing (not inferable).
 - Extract room options: type, bed config, price, inclusions, cancellation policy.
 - Use `ask_user` with `input_type: "card_grid"` for room selection. Format each room as a card with room type, bed config, price, and inclusions:
   ```json
-  {"input_type": "card_grid", "cards": [{"id": "1", "label": "Deluxe Double Room", "subtitle": "₹4,500/night · King bed · Breakfast included", "badge": "Free cancellation"}]}
+  {"input_type": "card_grid", "cards": [{"id": "1", "label": "Deluxe Double Room", "subtitle": "₹4,500/night · King bed · Breakfast included", "badge": "Free cancellation", "url": "https://www.booking.com/hotel/..."}]}
   ```
+  Include `url` with the hotel/room page link so users can view details directly.
 
 ### 7. Start Booking
 - Click "I'll reserve" button for the selected room.

@@ -161,6 +161,7 @@ const AGENT_TOOLS: Tool[] = [
               image: { type: 'string' },
               subtitle: { type: 'string' },
               badge: { type: 'string' },
+              url: { type: 'string', description: 'Product page URL — shown as a clickable link on the card' },
             },
             required: ['id', 'label'],
           },

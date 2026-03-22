@@ -98,6 +98,7 @@ Based on what the user selected (category or search term):
     - `image`: REAL product image URL from `cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=270/...`
     - `subtitle`: price and weight (e.g., "₹32 · 500 ml")
     - `badge`: discount if any (e.g., "10% OFF")
+    - `url`: product page URL from Blinkit (extract the `href` from the `<a>` tag wrapping the product card, e.g., "https://blinkit.com/prn/amul-taaza-toned-fresh-milk/prid/491228")
   - `show_quantity`: true
   - `multi_select`: true
   - `allow_custom`: true (so user can type more items to search)
