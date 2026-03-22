@@ -30,8 +30,13 @@ export function ProductCardInput({ product, onSubmit }: ProductCardInputProps) {
 
   const handlePayNow = () => {
     // Only add if not already in cart (carousel selection may have added it)
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
     const alreadyInCart = items.some(
-      (item) => item.id === product.id || item.name === product.name,
+      (item) =>
+        item.id === product.id ||
+        item.name === product.name ||
+        normalize(item.name).includes(normalize(product.name)) ||
+        normalize(product.name).includes(normalize(item.name)),
     );
     if (!alreadyInCart) {
       addItem(product);
