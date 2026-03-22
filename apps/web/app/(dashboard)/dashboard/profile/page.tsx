@@ -11,6 +11,7 @@ interface Address {
   city: string;
   state: string;
   pincode: string;
+  contactNumber?: string;
   isDefault?: boolean;
 }
 
@@ -40,6 +41,7 @@ const emptyAddressForm: Omit<Address, 'id'> = {
   city: '',
   state: '',
   pincode: '',
+  contactNumber: '',
 };
 
 function usePincodeLookup(
@@ -134,6 +136,7 @@ export default function ProfilePage() {
       city: addressForm.city.trim(),
       state: addressForm.state.trim(),
       pincode: addressForm.pincode.trim(),
+      contactNumber: addressForm.contactNumber?.trim() || undefined,
     };
     const updatedAddresses = [...(profile?.addresses || []), newAddress];
     await fetch('/api/profile', {
@@ -223,61 +226,11 @@ export default function ProfilePage() {
           {/* Profile Details */}
           <section className="rounded-xl border border-border bg-card p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Personal Details</h2>
-              {!editingProfile && (
-                <button
-                  onClick={() => {
-                    setEditPhone(profile?.phone || '');
-                    setEditingProfile(true);
-                  }}
-                  className="rounded-lg px-3 py-1.5 text-sm text-primary hover:bg-primary/10 transition-colors"
-                >
-                  Edit
-                </button>
-              )}
+              <h2 className="text-lg font-semibold">Addresses</h2>
             </div>
 
-            {editingProfile ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-1 block text-sm text-muted-foreground">Phone Number</label>
-                  <input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveProfile}
-                    disabled={savingProfile}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    {savingProfile ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => setEditingProfile(false)}
-                    className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              profile && (
+            {profile && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-lg bg-background/50 px-4 py-3">
-                    <svg className="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                    </svg>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Phone</p>
-                      <p className="text-sm font-medium">{profile.phone || 'Not set'}</p>
-                    </div>
-                  </div>
-
                   <div className="rounded-lg bg-background/50 px-4 py-3">
                     <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -318,6 +271,11 @@ export default function ProfilePage() {
                               <p className="text-xs text-muted-foreground">
                                 {[a.city, a.state, a.pincode].filter(Boolean).join(', ')}
                               </p>
+                              {a.contactNumber && (
+                                <p className="text-xs text-muted-foreground">
+                                  📞 {a.contactNumber}
+                                </p>
+                              )}
                             </div>
                             <button
                               onClick={() => handleDeleteAddress(a.id, i)}
@@ -385,6 +343,13 @@ export default function ProfilePage() {
                             className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                         </div>
+                        <input
+                          type="tel"
+                          value={addressForm.contactNumber || ''}
+                          onChange={(e) => setAddressForm({ ...addressForm, contactNumber: e.target.value })}
+                          placeholder="Phone number for this address"
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
                         <div className="flex gap-2 pt-1">
                           <button
                             type="submit"
@@ -405,7 +370,6 @@ export default function ProfilePage() {
                     )}
                   </div>
                 </div>
-              )
             )}
           </section>
 
