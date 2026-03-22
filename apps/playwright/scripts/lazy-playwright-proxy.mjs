@@ -135,8 +135,42 @@ const SUPPRESSED_NOTIFICATIONS = new Set([
   'notifications/tools/list_changed',
 ]);
 
+// Error patterns that indicate Chrome/CDP is dead — child is alive but useless.
+const CDP_DEAD_PATTERNS = [
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'connectOverCDP',
+  'Target closed',
+  'Session closed',
+  'Browser has been closed',
+  'browser has disconnected',
+];
+
+function isCdpDead(msg) {
+  if (!msg.error) return false;
+  const text = JSON.stringify(msg.error);
+  return CDP_DEAD_PATTERNS.some(p => text.includes(p));
+}
+
+function killChild() {
+  if (!child) return;
+  log('🔄 Killing dead child — fresh Chrome on next call');
+  try { child.kill(); } catch {}
+  child = null; childReady = false; childInitPromise = null;
+  for (const [, p] of pending) p.reject(new Error('Child recycled'));
+  pending.clear();
+}
+
 function handleChild(msg) {
   if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+    // Detect dead Chrome: child alive but CDP gone → auto-recycle
+    if (isCdpDead(msg)) {
+      log('💀 CDP connection dead (Chrome crashed?) — recycling child');
+      const p = pending.get(msg.id);
+      if (p) { pending.delete(msg.id); p.resolve(msg); }
+      killChild();
+      return;
+    }
     const p = pending.get(msg.id);
     if (p) { pending.delete(msg.id); p.resolve(msg); }
     return;
@@ -214,7 +248,7 @@ function ensureChild() {
 
 // ─── Forward request to child ────────────────────────────────────────
 
-async function forward(parentMsg) {
+async function forward(parentMsg, _retry = false) {
   try {
     await ensureChild();
     const cid = nextId++;
@@ -222,12 +256,24 @@ async function forward(parentMsg) {
 
     pending.set(cid, {
       resolve: (r) => {
+        // If CDP is dead and this is the first attempt, auto-retry with fresh Chrome
+        if (isCdpDead(r) && !_retry) {
+          log('🔁 Auto-retrying with fresh Chrome...');
+          forward(parentMsg, true).catch(() => {});
+          return;
+        }
         const resp = { jsonrpc: '2.0', id: pid };
         if (r.result !== undefined) resp.result = r.result;
         if (r.error !== undefined) resp.error = r.error;
         sendToParent(resp);
       },
       reject: (err) => {
+        // Child died mid-request — retry once with fresh spawn
+        if (!_retry) {
+          log('🔁 Child died mid-request — retrying with fresh Chrome...');
+          forward(parentMsg, true).catch(() => {});
+          return;
+        }
         sendToParent({ jsonrpc: '2.0', id: pid, error: { code: -32603, message: err.message } });
       }
     });
