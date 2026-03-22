@@ -37,3 +37,5 @@ sequenceDiagram
     end
 
     Note over Session: JWT contains: userId, email, name<br/>Used by API routes via getServerSession()
+
+    Note over User,Session: ─── This covers ShofferAI USER auth (NextAuth) ───<br/>Separate from Chrome-Debug Profile 3 session persistence,<br/>which authenticates the OPERATOR's accounts on target sites<br/>(Booking.com, Blinkit, etc.)<br/>See DEPLOYMENT.md → Profile 3 Session Management

@@ -4,6 +4,26 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-22 — P0 Website Session Persistence + Health Check Script
+
+**Goal**: Ensure all P0 websites are signed in on Chrome-Debug Profile 3 so the agent can execute tasks immediately without OTP/login flows.
+
+**What was done**:
+- Identified 16 P0 websites (12 signed in, 4 skipped due to WAF/credential issues)
+- **Critical discovery**: Sign-ins via Playwright MCP are WASTED — they happen in temp copies that get deleted. Must sign in via the BASE Chrome-Debug profile directly
+- Signed into all 12 sites via base profile: Blinkit, Swiggy, Zomato, Booking.com, Amazon, Flipkart, BigBasket, Zepto, JioMart, Myntra, Nykaa, Croma
+- Built `apps/playwright/scripts/check-p0-sessions.ts` — health check script that copies profile (like ChromePool), checks all 12 sites, reports status
+- E2E verified: sent BigBasket order via prod chat → ChromePool launched Chrome → BigBasket signed in → no OTP prompt
+- Updated docs: PLAYWRIGHT-MCP-CHROME.md, ARCHITECTURE.md, DEPLOYMENT.md, REPEATING-MISTAKES.md (Rule 38), auth-flow.mmd
+
+**Key decisions**:
+1. Sign-ins happen in BASE profile only (not Playwright MCP temp copies) — Rule 38
+2. Health check script simulates ChromePool's exact copy mechanism for realistic testing
+3. Blinkit uses `gr_1_accessToken` cookie — needs longer SPA hydration wait in health check
+4. Skipped: IRCTC (username/password), MakeMyTrip (Akamai WAF), Ajio (WAF), Snapdeal (low priority)
+
+**Files changed**: `apps/playwright/scripts/check-p0-sessions.ts` (new), `docs/PLAYWRIGHT-MCP-CHROME.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`, `docs/REPEATING-MISTAKES.md`, `docs/diagrams/auth-flow.mmd`, `docs/SESSION-LOG.md`
+
 ## 2026-03-22 — Relay phantom connection root cause fix (draining instance)
 
 **Goal**: Diagnose and permanently fix the relay phantom connection bug — the laptop relay connects to a draining Cloud Run instance after deploys, causing all tasks to fail.

@@ -145,6 +145,25 @@ Everything browser-related. **This is where the actual web tasks happen.**
 >
 > **⚠️ Lazy launch:** For Copilot CLI, `.mcp.json` uses `lazy-playwright-proxy.mjs` which defers Chrome until the first browser tool call. This means `gh copilot` starts instantly without Chrome. The proxy spawns `playwright-mcp-with-chrome.sh` on demand.
 
+### Profile 3 Session Management
+
+Profile 3 is pre-authenticated on **12 P0 sites**: Blinkit, Swiggy, Zomato, Booking.com, Amazon, Flipkart, BigBasket, Zepto, JioMart, Myntra, Nykaa, Croma.
+
+```bash
+# Verify all sessions are still valid (copies profile, checks all 12 sites)
+npx tsx apps/playwright/scripts/check-p0-sessions.ts
+
+# If a site's session has expired, re-authenticate in the BASE profile:
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug" \
+  --profile-directory="Profile 3" \
+  --no-first-run --disable-sync \
+  "https://example.com"   # the expired site
+# Sign in → ⌘Q → cookies flush → ChromePool inherits
+```
+
+> ⚠️ **NEVER sign into websites via Playwright MCP or automated browsers.** Those are temp copies — sign-ins don't persist back to the base profile. See `REPEATING-MISTAKES.md` Rule 38.
+
 ---
 
 ## How They Connect

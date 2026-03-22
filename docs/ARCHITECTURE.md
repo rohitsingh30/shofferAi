@@ -792,6 +792,14 @@ ChromePool launches Chrome lazily per task:
 
 **Profile 3** = `rsinghtomar3011@gmail.com` (Booking.com Genius Level 1). Chrome encrypts cookies via macOS Keychain (per-user, not per-dir) — cloned dirs preserve all signed-in sessions AS LONG AS Chrome is launched without `--use-mock-keychain`.
 
+### P0 Site Session Persistence
+
+Profile 3 is pre-authenticated on **12 P0 websites**: Blinkit, Swiggy, Zomato, Booking.com, Amazon, Flipkart, BigBasket, Zepto, JioMart, Myntra, Nykaa, Croma. Sessions verified to survive ChromePool profile copies (E2E tested).
+
+**Health check:** `npx tsx apps/playwright/scripts/check-p0-sessions.ts` — launches a temp Chrome with a profile copy (exactly like ChromePool), navigates to all 12 sites, checks login status.
+
+⚠️ **CRITICAL:** Sign-ins must happen in the **BASE** Chrome-Debug profile (`~/Library/Application Support/Google/Chrome-Debug/Profile 3/`), NOT in Playwright MCP temp copies. Temp copies are destroyed when the browser closes — sign-in changes are lost. See `REPEATING-MISTAKES.md` Rule 38.
+
 ---
 
 ## 11. Security

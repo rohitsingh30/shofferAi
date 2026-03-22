@@ -690,3 +690,36 @@ launchctl list | grep shofferai
 ---
 
 *Last updated: 2026-03-22*
+
+---
+
+### Rule 38 — Profile 3 Sign-In Persistence: BASE Profile Only
+
+**What happens:** Developer signs into websites (Blinkit, BigBasket, etc.) using Playwright MCP or the health check browser. The sign-in appears to work — the page shows the account. But next time ChromePool launches a task, the site is logged out.
+
+**Why it happens:** Playwright MCP (`playwright-mcp-with-chrome.sh`) and ChromePool both create **temporary copies** of Chrome-Debug Profile 3. Sign-ins in these copies write cookies to the temp directory — which is **deleted** when the browser closes. The base profile in `~/Library/Application Support/Google/Chrome-Debug/Profile 3/` is never touched.
+
+```
+BASE Profile 3 (permanent)
+  └─ ChromePool copies to → /tmp/shofferai-chrome-XXXX/ (temporary)
+       └─ Sign-in here → cookies saved to temp dir → DELETED on close ❌
+
+BASE Profile 3 (permanent)
+  └─ Sign-in here → cookies saved permanently → ChromePool inherits ✅
+```
+
+**Rule:** NEVER sign into websites via Playwright MCP, health check scripts, or any automated browser. Sign-ins MUST happen in the BASE Chrome-Debug profile:
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug" \
+  --profile-directory="Profile 3" \
+  --no-first-run --disable-sync \
+  "https://www.bigbasket.com"
+# Sign in → ⌘Q to close → cookies flush to disk → ChromePool inherits
+```
+
+**Verified P0 sites (12/12 sticky through ChromePool copies):**
+Blinkit, Swiggy, Zomato, Booking.com, Amazon, Flipkart, BigBasket, Zepto, JioMart, Myntra, Nykaa, Croma
+
+**Health check:** `npx tsx apps/playwright/scripts/check-p0-sessions.ts`

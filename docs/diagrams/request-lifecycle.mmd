@@ -38,3 +38,5 @@ sequenceDiagram
     Agent-->>UI: SSE: {type: "complete", summary: "Booking confirmed!"}
     Agent->>SMCP: releaseSession(taskId)
     SMCP->>Relay: SessionEndRequest → release Chrome slot
+
+    Note over Laptop,Chrome: Chrome launched with Profile 3 (pre-authenticated on 12 P0 sites).<br/>Sessions inherited from BASE profile copy — agent browses signed-in.

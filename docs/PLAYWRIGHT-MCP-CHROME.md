@@ -108,11 +108,57 @@ The `.mcp.json` config includes `"timeout": 120000` (120s) as belt-and-suspender
 1. **NEVER revert to singleton** — the sharing bug will return
 2. **NEVER hardcode CDP ports** — always `--remote-debugging-port=0`, parse from stderr
 3. **NEVER let Playwright launch Chrome** — always launch manually to avoid `--use-mock-keychain`
-4. **ALWAYS use Profile 3** — `rsinghtomar3011@gmail.com`, pre-authenticated on all sites
+4. **ALWAYS use Profile 3** — `rsinghtomar3011@gmail.com`, pre-authenticated on 12 P0 sites (see below)
 5. **ALWAYS include `--output-dir /tmp/playwright-mcp-output`** in Playwright MCP launch
 6. **NEVER put `playwright` in `~/.copilot/mcp-config.json`** — project `.mcp.json` is the only source; duplicates cause 2 Chrome windows
 7. **NEVER point `.mcp.json` directly to `playwright-mcp-with-chrome.sh`** — always use `lazy-playwright-proxy.mjs` to avoid Chrome on every session
 8. **NEVER remove the `tools/list_changed` suppression** from the proxy — it's a critical workaround for copilot-cli#1378
+9. **NEVER sign into websites via Playwright MCP** — sign-ins in temp copies don't persist. Use the BASE Chrome-Debug profile directly (see below)
+
+## Profile 3 — Pre-Authenticated P0 Sites
+
+Profile 3 (`rsinghtomar3011@gmail.com`) is pre-authenticated on 12 P0 websites. ChromePool copies this profile for every task — all tasks inherit these sessions automatically.
+
+| Site | Login Method | Session Indicator |
+|------|-------------|-------------------|
+| Blinkit | Phone OTP (8109137158) | `gr_1_accessToken` cookie |
+| Swiggy | Phone OTP | "Rohit Singh Tomar" |
+| Zomato | Phone OTP | "Rohit" in header |
+| Booking.com | Google OAuth | "Genius Level 1" |
+| Amazon | Email/password | "Hello, rohit" |
+| Flipkart | Phone OTP | "Rohit Singh" |
+| BigBasket | Phone OTP | Basket items visible |
+| Zepto | Phone OTP | Profile → /account |
+| JioMart | Phone OTP (Reliance Retail) | "Hello Rohit!" |
+| Myntra | Phone OTP (4-digit) | "Profile" button |
+| Nykaa | Phone OTP | Profile icon |
+| Croma | Phone OTP | /my-account link |
+
+### Health Check
+
+```bash
+# Verify all P0 sessions survive ChromePool profile copy
+npx tsx apps/playwright/scripts/check-p0-sessions.ts
+
+# JSON output for automation
+npx tsx apps/playwright/scripts/check-p0-sessions.ts --json
+
+# Fix mode — opens failed sites in Chrome for manual re-login
+npx tsx apps/playwright/scripts/check-p0-sessions.ts --fix
+```
+
+### Re-authenticating Expired Sessions
+
+⚠️ **Sign-ins MUST happen in the BASE profile** — NOT via Playwright MCP (temp copies don't persist):
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --user-data-dir="$HOME/Library/Application Support/Google/Chrome-Debug" \
+  --profile-directory="Profile 3" \
+  --no-first-run --disable-sync \
+  "https://www.bigbasket.com"   # Replace with the site that needs re-auth
+# Sign in → ⌘Q to flush cookies → ChromePool inherits on next task
+```
 
 ## Gotcha: Duplicate MCP Configs = Multiple Chrome Windows
 
