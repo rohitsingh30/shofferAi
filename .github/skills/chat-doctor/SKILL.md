@@ -1,11 +1,20 @@
 ---
-name: relay-doctor
-description: Diagnose relay connection drops, chat↔relay failures, and WebSocket flapping. Deep investigation with enhanced logs and root cause analysis.
+name: chat-doctor
+description: Diagnose chat failures — DB connection issues, relay drops, WebSocket flapping, stuck tasks, and Cloud SQL pool exhaustion. Deep investigation with auto-recovery.
 ---
 
-Investigate WHY the relay connection dropped or why the chat interface can't reach the running relay. This is a **deep diagnostic** skill — not just "is it up?" but "what happened and why?"
+Investigate WHY the chat interface failed. This is a **full-stack diagnostic** skill — it covers the entire path from user message → Cloud Run → database → relay → laptop → browser and back.
 
-**IMPORTANT**: Never start, stop, or restart the relay — the operator manages it manually. This skill diagnoses only.
+**IMPORTANT**: Never start, stop, or restart the relay — the operator manages it manually. This skill diagnoses and auto-recovers where safe (e.g., Cloud SQL restart).
+
+## Scope (extends relay-doctor)
+
+| Layer | What it checks |
+|-------|---------------|
+| **Database** | Cloud SQL connectivity, connection pool exhaustion, Prisma init errors |
+| **Relay** | WS connection, phantom detection, flapping, deploy heal |
+| **Chat** | SSE stream health, stuck tasks, message filtering, input delivery |
+| **Cloud Run** | Instance health, revision traffic, SIGTERM draining |
 
 ## Architecture Summary (read this first)
 
@@ -42,6 +51,12 @@ Laptop (relay-outbound.ts)                    Cloud Run (custom-server.js + rela
 | Chat hangs after handoff, no progress | WS open but backend dead (phantom LB connection) |
 | "Laptop disconnected (grace period expired)" | Laptop relay crashed or network drop, didn't reconnect within 30s |
 | Relay connected per `lsof` but prod says "not connected" | **PHANTOM CONNECTION** — TCP alive at LB but no real backend |
+| **"Something went wrong" on every chat** | **DB connection pool exhaustion** — Cloud SQL out of slots |
+| **PrismaClientInitializationError in logs** | **Cloud SQL connection pool full** — old revision leaked connections during deploy |
+| **Task created but no messages appear** | SSE stream broke, or message rewriter suppressed everything, or task stuck |
+| **"received task message but no handler set"** | Task handler lost during deploy — old task on new instance |
+| **Cart bar missing after product selection** | Frontend bug — `JSON.parse` returned number not string (fixed in ec7f03b) |
+| Relay connected per `lsof` but prod says "not connected" | **PHANTOM CONNECTION** — TCP alive at LB but no real backend |
 
 ## Known Failure Modes (from real incidents)
 
@@ -71,9 +86,57 @@ Laptop (relay-outbound.ts)                    Cloud Run (custom-server.js + rela
 **Why**: Close code 1011 (from earlySocket drop) doesn't reset backoff. Only code 1001 (server going away) resets to 1s.
 **Detection**: Look for increasing reconnect delays in relay logs: `"Scheduling reconnect" { delay: 16000 }`, `{ delay: 30000 }`.
 
+### FM6: Cloud SQL Connection Pool Exhaustion (DB FAILURE)
+**What**: Every chat request fails with `PrismaClientInitializationError` and `FATAL: remaining connection slots are reserved for non-replication superuser connections`. The app is completely broken — no tasks created, no messages saved.
+**Why**: During deploy, the OLD Cloud Run revision's Prisma client holds connections open. The NEW revision starts and tries to open its own pool. Cloud SQL `db-f1-micro` has only ~25 connection slots total. If old + new exceed this, all new connections are rejected.
+**Detection**: Cloud Run logs show `PrismaClientInitializationError` and `Too many database connections opened`. All API routes return 500.
+**Auto-recovery**: Restart Cloud SQL instance to kill stale connections:
+```bash
+gcloud sql instances restart shofferai-db --quiet
+```
+This kills ALL connections. The Prisma client auto-reconnects on next request. Takes ~30s.
+**Prevention**: `custom-server.js` SIGTERM handler now calls `prisma.$disconnect()` before shutdown (added in this fix).
+
+### FM7: Stuck Task — No Messages After Input
+**What**: User selects from carousel/card_grid, carousel disappears, ThinkingIndicator spins forever, no new messages arrive. Task stays in `running` state.
+**Why**: Multiple possible causes:
+  1. Relay wasn't connected when `task_input_response` was sent
+  2. Laptop agent crashed mid-task
+  3. Message rewriter suppressed all agent messages
+  4. DB connection failed so messages weren't saved
+**Detection**: Check task in DB — if last message is user's input_response with no subsequent assistant messages, and task status is still `running`, the agent stalled.
+
 ## Instructions
 
-### Step 1: Capture Current State Snapshot
+### Step 0: Quick Health Check (START HERE)
+
+Run this FIRST to triage which layer is broken:
+
+```bash
+echo "=== QUICK HEALTH CHECK ==="
+echo -n "HTTP: "
+curl -s --max-time 5 -o /dev/null -w '%{http_code} (%{time_total}s)' https://shofferai-27188185100.asia-south1.run.app 2>/dev/null
+echo ""
+
+echo -n "DB:   "
+curl -s --max-time 5 -H "Authorization: Bearer $(grep RELAY_AUTH_TOKEN /Users/rohit/shofferAi/.env 2>/dev/null | cut -d= -f2)" \
+  "https://shofferai-27188185100.asia-south1.run.app/api/health/db" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('✓ OK' if d.get('ok') else '✗ FAILED: ' + d.get('error','unknown'))" 2>/dev/null || echo "✗ unreachable"
+
+echo -n "Relay: "
+curl -s --max-time 5 -H "Authorization: Bearer $(grep RELAY_AUTH_TOKEN /Users/rohit/shofferAi/.env 2>/dev/null | cut -d= -f2)" \
+  "https://shofferai-27188185100.asia-south1.run.app/api/admin/relay-status" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('✓ connected' if d.get('connected') else '✗ NOT connected')" 2>/dev/null || echo "✗ unreachable"
+
+echo -n "Cloud SQL: "
+gcloud sql instances describe shofferai-db --format="value(state)" 2>/dev/null || echo "✗ can't check"
+```
+
+**Triage**:
+- HTTP ✗ → Cloud Run instance down
+- DB ✗ → Jump to **Step 1B: Database Recovery**
+- Relay ✗ → Jump to **Step 2: Phantom Connection Test**
+- All ✓ but tasks fail → Jump to **Step 7: Stuck Task Analysis**
+
+### Step 1A: Capture Current State Snapshot
 
 Run ALL of these in parallel to get a full picture:
 
@@ -114,6 +177,46 @@ echo -n "HTTP: "
 curl -s --max-time 5 -o /dev/null -w '%{http_code} (%{time_total}s)' https://shofferai-27188185100.asia-south1.run.app 2>/dev/null
 echo ""
 ```
+
+### Step 1B: Database Recovery (if DB check failed)
+
+Cloud SQL `db-f1-micro` has ~25 connection slots. During deploys, old + new revisions can exhaust the pool.
+
+```bash
+echo "=== DATABASE DIAGNOSTICS ==="
+
+echo "1. Cloud SQL instance state:"
+gcloud sql instances describe shofferai-db --format="value(state)" 2>/dev/null
+
+echo ""
+echo "2. Check Cloud Run logs for Prisma errors:"
+gcloud logging read "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"shofferai\" AND textPayload=~\"PrismaClient|Too many database connections|connection slots\"" --limit=5 --format="value(timestamp,textPayload)" --freshness=30m 2>/dev/null
+
+echo ""
+echo "3. Active revision:"
+gcloud run services describe shofferai --region asia-south1 --format="value(status.traffic[0].revisionName)" 2>/dev/null
+```
+
+**If you see `Too many database connections` or `PrismaClientInitializationError`**:
+
+```bash
+echo "=== AUTO-RECOVERY: Restarting Cloud SQL ==="
+echo "This kills ALL connections. Prisma auto-reconnects on next request. Takes ~30s."
+gcloud sql instances restart shofferai-db --quiet 2>&1
+echo ""
+echo "Waiting 15s for Cloud SQL to be ready..."
+sleep 15
+
+echo ""
+echo "=== Verifying DB connectivity ==="
+curl -s --max-time 10 -H "Authorization: Bearer $(grep RELAY_AUTH_TOKEN /Users/rohit/shofferAi/.env 2>/dev/null | cut -d= -f2)" \
+  "https://shofferai-27188185100.asia-south1.run.app/api/health/db" 2>/dev/null | python3 -m json.tool 2>/dev/null
+```
+
+If DB is still down after restart, check:
+- Cloud SQL instance state (should be RUNNABLE)
+- DATABASE_URL env var on Cloud Run: `gcloud run services describe shofferai --region asia-south1 --format="value(spec.template.spec.containers[0].env)" | grep DATABASE`
+- Cloud SQL authorized networks or IAM permissions
 
 ### Step 2: Phantom Connection Test (MOST IMPORTANT)
 
@@ -261,10 +364,16 @@ Based on ALL the data collected above, produce this diagnosis:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RELAY CONNECTION DIAGNOSIS
+CHAT DOCTOR DIAGNOSIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🔌 Connection State
+🗄️ Database
+  Cloud SQL instance:       ✓ RUNNABLE | ✗ STOPPED/MAINTENANCE
+  DB health check:          ✓ OK | ✗ FAILED (connection pool exhausted / unreachable)
+  Prisma errors in logs:    ✗ None | ⚠️ PrismaClientInitializationError detected
+  Auto-recovery applied:    ✓ Cloud SQL restarted | ✗ Not needed | ✗ Failed
+
+🔌 Relay
   Laptop relay process:     ✓ Running (PID xxx, uptime Xh) | ✗ Not running
   Relay mode:               Outbound (RELAY_CLOUD_URL set) | Server (local)
   WS to Cloud Run:          ✓ ESTABLISHED (FD xx → addr:443) | ✗ No connection
@@ -274,7 +383,12 @@ RELAY CONNECTION DIAGNOSIS
   Phantom connection test:  ✓ Cloud Run has relay | ⚠️ PHANTOM — TCP up, bridge empty
   Duplicate relays:         ✗ None | ⚠️ N instances (FLAPPING!)
 
-🔍 Root Cause: <FM1|FM2|FM3|FM4|FM5 or other>
+💬 Chat
+  Task creation:            ✓ Working | ✗ DB errors
+  SSE stream:               ✓ Open | ✗ Broken
+  Message delivery:         ✓ Messages flowing | ✗ Stuck/filtered
+
+🔍 Root Cause: <FM1|FM2|FM3|FM4|FM5|FM6|FM7 or other>
   <Description with specific evidence from steps above>
 
 🕐 Timeline
@@ -291,36 +405,45 @@ RELAY CONNECTION DIAGNOSIS
 ## Root Cause Decision Tree
 
 ```
-Is laptop relay process running?
-├── NO → "Relay not started or crashed"
-│   Operator: run start-laptop.sh
+Does DB health check pass? (Step 0)
+├── NO → FM6: Cloud SQL connection pool exhaustion
+│   Auto-recovery: gcloud sql instances restart shofferai-db --quiet
+│   Prevention: SIGTERM handler now calls prisma.$disconnect()
 │
-├── YES → Phantom connection test (Step 2)?
-│   ├── PHANTOM (TCP up, Cloud Run says "not connected")
-│   │   └── Was there a recent deploy?
-│   │       ├── YES → FM2: Draining instance still alive, sending heartbeats
-│   │       │   Operator: restart relay. Code fix: see Long-Term Fixes below.
-│   │       └── NO → FM1: Cloud Run replaced instance silently (maintenance/OOM)
-│   │           Stale check should have caught this in 25s. If it didn't,
-│   │           the old instance was still alive and sending pings (FM2 variant).
-│   │           Operator: restart relay.
+├── YES → Is laptop relay process running?
+│   ├── NO → "Relay not started or crashed"
+│   │   Operator: run start-laptop.sh
 │   │
-│   ├── GENUINE DISCONNECT (no TCP, Cloud Run says "not connected")
-│   │   └── Check relay logs for pattern:
-│   │       ├── "auth failed / token mismatch" → RELAY_AUTH_TOKEN mismatch
-│   │       ├── "RelayBridge not initialized after 30s" → FM3: Lazy singleton race
-│   │       ├── Reconnect loop with growing delays → FM5: Backoff spiral
-│   │       ├── "no data for 20s" → Network drop
-│   │       └── "grace period expired" → Laptop was offline > 30s
+│   ├── YES → Phantom connection test (Step 2)?
+│   │   ├── PHANTOM (TCP up, Cloud Run says "not connected")
+│   │   │   └── Was there a recent deploy?
+│   │   │       ├── YES → FM2: Draining instance still alive, sending heartbeats
+│   │   │       │   Operator: restart relay. Code fix: see Long-Term Fixes below.
+│   │   │       └── NO → FM1: Cloud Run replaced instance silently (maintenance/OOM)
+│   │   │           Stale check should have caught this in 25s. If it didn't,
+│   │   │           the old instance was still alive and sending pings (FM2 variant).
+│   │   │           Operator: restart relay.
+│   │   │
+│   │   ├── GENUINE DISCONNECT (no TCP, Cloud Run says "not connected")
+│   │   │   └── Check relay logs for pattern:
+│   │   │       ├── "auth failed / token mismatch" → RELAY_AUTH_TOKEN mismatch
+│   │   │       ├── "RelayBridge not initialized after 30s" → FM3: Lazy singleton race
+│   │   │       ├── Reconnect loop with growing delays → FM5: Backoff spiral
+│   │   │       ├── "no data for 20s" → Network drop
+│   │   │       └── "grace period expired" → Laptop was offline > 30s
+│   │   │
+│   │   └── CONNECTED (Cloud Run confirms relay present)
+│   │       └── If tasks still fail:
+│   │           ├── Check Chrome pool — are slots available?
+│   │           ├── Check tool list — did fetchTools() succeed?
+│   │           ├── Check execute route — is handoff reaching the bridge?
+│   │           └── Check DB — "received task message but no handler" → FM7
 │   │
-│   └── CONNECTED (Cloud Run confirms relay present)
-│       └── If tasks still fail:
-│           ├── Check Chrome pool — are slots available?
-│           ├── Check tool list — did fetchTools() succeed?
-│           └── Check execute route — is handoff reaching the bridge?
+│   └── MULTIPLE RELAY INSTANCES → "WS flapping"
+│       Operator: kill all, restart one.
 │
-└── MULTIPLE RELAY INSTANCES → "WS flapping"
-    Operator: kill all, restart one.
+└── ALL GREEN but tasks fail → FM7: Stuck Task
+    Check task in DB, check message rewriter, check SSE stream
 ```
 
 ## Key Timeouts Reference

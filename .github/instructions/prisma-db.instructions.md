@@ -43,6 +43,16 @@ DATABASE_URL="postgresql://postgres:<password>@127.0.0.1:5433/shofferai" npx pri
 - Use Prisma Client for all DB access — no raw SQL unless absolutely necessary
 - Connection pooling handled by Prisma in production
 
+## Connection Pool & Cloud SQL
+
+- Cloud SQL instance `db-f1-micro` has ~25 connection slots total
+- Prisma default pool: 10 connections per instance
+- **During deploys**: old + new Cloud Run revisions can exhaust the pool → `PrismaClientInitializationError`
+- **Prevention**: `custom-server.js` SIGTERM handler calls `prisma.$disconnect()` before shutdown
+- **Health check**: `GET /api/health/db` — returns `{ ok: true }` or `{ ok: false, error: "..." }`
+- **Recovery**: `gcloud sql instances restart shofferai-db --quiet` kills all connections (~30s)
+- **Diagnosis**: Use the `chat-doctor` skill for full DB/relay/chat diagnostics
+
 ## Docker
 
 - `prisma generate` runs during Docker build (`RUN npx prisma generate`)

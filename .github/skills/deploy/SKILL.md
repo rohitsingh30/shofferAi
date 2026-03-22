@@ -75,13 +75,21 @@ After successful deploy:
 
 2. **Health check** — Run `curl -s -o /dev/null -w '%{http_code}' <SERVICE_URL>` to verify the app responds with 200.
 
-3. **Report deployment summary**:
+3. **DB health check** — Run `curl -s <SERVICE_URL>/api/health/db` to verify database connectivity. If it returns `{ "ok": false }`, Cloud SQL connection pool may be exhausted from the deploy. Auto-recover with:
+   ```bash
+   gcloud sql instances restart shofferai-db --quiet
+   sleep 15
+   curl -s <SERVICE_URL>/api/health/db  # should return { "ok": true }
+   ```
+
+4. **Report deployment summary**:
 ```
 Deploy complete!
   Service: shofferai
   Region:  asia-south1
   URL:     <SERVICE_URL>
-  Status:  ✓ Live (HTTP 200)
+  HTTP:    ✓ 200
+  DB:      ✓ OK (or: ✗ FIXED — Cloud SQL restarted)
 ```
 
 ### Step 5: Verify with Playwright (Optional)

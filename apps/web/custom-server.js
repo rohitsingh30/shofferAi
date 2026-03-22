@@ -216,6 +216,14 @@ process.on('SIGTERM', () => {
   // reconnecting to this dying instance during the 1-4s reconnect window.
   draining = true;
 
+  // Disconnect Prisma to free Cloud SQL connection slots.
+  // Without this, the dying instance holds connections open until Cloud Run
+  // kills it (up to 3600s), exhausting the db-f1-micro's ~25 slot limit.
+  import('./lib/prisma.js')
+    .then(({ prisma }) => prisma.$disconnect())
+    .then(() => console.log('[server] Prisma disconnected'))
+    .catch((err) => console.error('[server] Prisma disconnect failed:', err));
+
   const bridge = globalThis.__relayBridge;
   if (bridge && typeof bridge.gracefulClose === 'function') {
     bridge.gracefulClose('Cloud Run deploying new revision');
