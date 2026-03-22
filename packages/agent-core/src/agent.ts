@@ -942,14 +942,13 @@ export class AgentExecutor {
       }
 
       // ── Layout enforcement ─────────────────────────────────────────
-      // If the matched skill defines layoutSections in frontmatter and
-      // the LLM used a non-layout input_type on its first ask_user,
-      // upgrade to a layout call with the skill's structured sections.
-      // This guarantees the multi-section widget appears regardless of
-      // LLM compliance.
+      // If the matched skill defines layoutSections in frontmatter,
+      // ALWAYS enforce them on the first ask_user — even if the LLM
+      // already used input_type "layout". The frontmatter sections are
+      // authoritative and produce clean cards (no image fields on
+      // category pickers), preventing the image-validation bounce.
       const inputType = args.input_type as string;
       if (
-        inputType !== 'layout' &&
         this.askUserCount === 1 &&
         this.matchedSkill?.layoutSections?.length
       ) {
@@ -1012,14 +1011,20 @@ export class AgentExecutor {
           return { userResponse: BOUNCE_MSG_CARDS };
         }
       }
-      // Validate card_grids/carousels nested inside layout sections
+      // Layout sections are pre-browser setup forms (address, cuisine picker, etc.).
+      // Category carousels use emoji labels, not product images.
+      // Instead of bouncing (which tells the LLM to screenshot a non-existent browser),
+      // strip non-URL image fields so the carousel renders in label-only mode.
       if (effectiveInputType === 'layout') {
         const sections = args.sections as Array<{ type?: string; cards?: Array<{ id: string; image?: string }> }> | undefined;
         for (const section of sections ?? []) {
           if ((section.type === 'card_grid' || section.type === 'carousel') && cardsLackImages(section.cards)) {
-            logger.warn(`ask_user layout section type=${section.type} missing image URLs — bouncing back to LLM`);
-            this.askUserCount--;
-            return { userResponse: BOUNCE_MSG_CARDS };
+            logger.info(`ask_user layout section type=${section.type} has non-URL images — stripping to label-only mode`);
+            for (const card of section.cards ?? []) {
+              if (card.image && !card.image.startsWith('http')) {
+                delete card.image;
+              }
+            }
           }
         }
       }

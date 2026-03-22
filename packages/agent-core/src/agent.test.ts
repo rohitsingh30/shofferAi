@@ -356,4 +356,233 @@ describe('AgentExecutor', () => {
     await agent.execute('second', callbacks);
     expect(callbacks.onComplete).toHaveBeenCalledTimes(2);
   });
+
+  // ── Layout enforcement & image validation tests ─────────────────
+
+  it('enforces frontmatter layout even when LLM already uses input_type layout', async () => {
+    const zomatoSkill = {
+      name: 'zomato-food',
+      description: 'Order food from Zomato',
+      triggers: ['zomato'],
+      siteUrl: 'https://www.zomato.com',
+      requiresAuth: true,
+      params: [],
+      instructions: '# Zomato',
+      layoutQuestion: "Let's set up your Zomato order! 🍛",
+      layoutSections: [
+        { id: 'address', label: 'Delivery Address', type: 'address', required: true },
+        { id: 'cuisine', label: 'What are you craving?', type: 'carousel', required: true, options: '🥘 Biryani|🍕 Pizza|🍔 Burger' },
+      ],
+    };
+    const { agent, llm } = createAgent({ skills: [zomatoSkill] });
+
+    // LLM sends ask_user with input_type "layout" but with emoji image fields
+    llm.chat.mockResolvedValueOnce({
+      content: [{
+        type: 'tool_use',
+        id: 'tool-layout',
+        name: 'ask_user',
+        input: {
+          question: "Let's order!",
+          input_type: 'layout',
+          sections: [
+            { name: 'address', label: 'Delivery Address', type: 'address' },
+            {
+              name: 'cuisine', label: 'Pick cuisine', type: 'carousel',
+              cards: [
+                { id: 'biryani', label: 'Biryani', image: '🥘' },
+                { id: 'pizza', label: 'Pizza', image: '🍕' },
+              ],
+            },
+          ],
+        },
+      }],
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    llm.chat.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Great choices!' }],
+      stopReason: 'end_turn',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    await agent.execute('order butter chicken from zomato', callbacks);
+
+    // Should show the layout to user (onInputRequired), NOT bounce
+    expect(callbacks.onInputRequired).toHaveBeenCalledTimes(1);
+    const call = (callbacks.onInputRequired as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.inputType).toBe('layout');
+    // Frontmatter sections should override LLM's sections
+    const sections = call.sections;
+    expect(sections).toBeDefined();
+    // Cuisine carousel cards should come from frontmatter (no image fields)
+    const cuisineSection = sections.find((s: any) => s.name === 'cuisine');
+    expect(cuisineSection).toBeDefined();
+    expect(cuisineSection.cards).toBeDefined();
+    expect(cuisineSection.cards.length).toBe(3); // Biryani, Pizza, Burger from frontmatter
+    // Cards from frontmatter have no image field
+    for (const card of cuisineSection.cards) {
+      expect(card.image).toBeUndefined();
+    }
+  });
+
+  it('strips non-URL images from layout carousel cards instead of bouncing', async () => {
+    const { agent, llm } = createAgent();
+
+    // Skill WITHOUT layoutSections — so enforcement won't fire
+    agent.matchedSkill = {
+      name: 'test-skill',
+      description: 'Test',
+      triggers: ['test'],
+      siteUrl: 'https://test.com',
+      requiresAuth: false,
+      params: [],
+      instructions: '# Test',
+    };
+
+    // Force askUserCount past 1 so layout enforcement doesn't trigger
+    // We'll test the stripping logic directly on a layout call
+    // First ask_user (gets counted as 1, no layout enforcement since no layoutSections)
+    llm.chat.mockResolvedValueOnce({
+      content: [{
+        type: 'tool_use',
+        id: 'tool-first',
+        name: 'ask_user',
+        input: { question: 'What address?', input_type: 'text' },
+      }],
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    // Second ask_user with layout containing bad image fields
+    llm.chat.mockResolvedValueOnce({
+      content: [{
+        type: 'tool_use',
+        id: 'tool-layout',
+        name: 'ask_user',
+        input: {
+          question: 'Pick options',
+          input_type: 'layout',
+          sections: [
+            {
+              name: 'items', label: 'Items', type: 'carousel',
+              cards: [
+                { id: 'a', label: 'Item A', image: '🍕' },
+                { id: 'b', label: 'Item B', image: 'not-a-url' },
+              ],
+            },
+          ],
+        },
+      }],
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    llm.chat.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Done' }],
+      stopReason: 'end_turn',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    await agent.execute('test order', callbacks);
+
+    // Should have been called twice (both ask_user calls went through, neither bounced)
+    expect(callbacks.onInputRequired).toHaveBeenCalledTimes(2);
+    const secondCall = (callbacks.onInputRequired as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    expect(secondCall.inputType).toBe('layout');
+    // Non-URL images should have been stripped
+    const carouselSection = secondCall.sections.find((s: any) => s.name === 'items');
+    for (const card of carouselSection.cards) {
+      expect(card.image).toBeUndefined();
+    }
+  });
+
+  it('still bounces standalone carousel with non-URL images (product listings)', async () => {
+    const { agent, llm } = createAgent();
+
+    // LLM sends a standalone carousel (not layout) with emoji images
+    llm.chat.mockResolvedValueOnce({
+      content: [{
+        type: 'tool_use',
+        id: 'tool-carousel',
+        name: 'ask_user',
+        input: {
+          question: 'Pick a restaurant',
+          input_type: 'carousel',
+          cards: [
+            { id: '1', label: 'Restaurant A', image: '🍕' },
+            { id: '2', label: 'Restaurant B', image: 'emoji' },
+          ],
+        },
+      }],
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    // After bounce, LLM gives up
+    llm.chat.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Let me try again' }],
+      stopReason: 'end_turn',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    await agent.execute('find restaurants', callbacks);
+
+    // Should NOT have shown to user — bounced back to LLM
+    expect(callbacks.onInputRequired).not.toHaveBeenCalled();
+    // LLM should have received the bounce system message in a tool_result
+    expect(llm.chat).toHaveBeenCalledTimes(2);
+    const secondCallArg = llm.chat.mock.calls[1][0];
+    const messages = secondCallArg.messages;
+    // Tool result is stored as role: 'user' with content[].type: 'tool_result'
+    const toolResultMsg = messages.find((m: any) =>
+      m.role === 'user' && Array.isArray(m.content) &&
+      m.content.some((c: any) => c.type === 'tool_result')
+    );
+    expect(toolResultMsg).toBeDefined();
+    const toolResultContent = toolResultMsg.content.find((c: any) => c.type === 'tool_result');
+    expect(toolResultContent.content).toContain('missing image URLs');
+  });
+
+  it('allows layout carousel cards with no image field at all (label-only)', async () => {
+    const { agent, llm } = createAgent();
+
+    // LLM sends layout with clean label-only cards (no image field)
+    llm.chat.mockResolvedValueOnce({
+      content: [{
+        type: 'tool_use',
+        id: 'tool-layout',
+        name: 'ask_user',
+        input: {
+          question: 'Setup',
+          input_type: 'layout',
+          sections: [
+            {
+              name: 'category', label: 'Category', type: 'carousel',
+              cards: [
+                { id: 'a', label: '🥘 Biryani' },
+                { id: 'b', label: '🍕 Pizza' },
+              ],
+            },
+          ],
+        },
+      }],
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    llm.chat.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Done' }],
+      stopReason: 'end_turn',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    await agent.execute('order food', callbacks);
+
+    // Should pass through without any issues
+    expect(callbacks.onInputRequired).toHaveBeenCalledTimes(1);
+    const call = (callbacks.onInputRequired as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.inputType).toBe('layout');
+  });
 });
