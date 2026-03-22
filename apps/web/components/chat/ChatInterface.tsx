@@ -536,6 +536,8 @@ function ChatInterfaceInner() {
           );
         } else if (typeof parsed === 'string' && parsed) {
           selectedIds = [{ id: parsed, qty: 1 }];
+        } else if (typeof parsed === 'number') {
+          selectedIds = [{ id: String(parsed), qty: 1 }];
         }
 
         if (selectedIds.length > 0) {
@@ -553,6 +555,36 @@ function ChatInterfaceInner() {
       } catch {
         // parse error — ignore
       }
+    }
+
+    // Persist the question + selection as chat messages so the conversation
+    // doesn't feel empty after the transient InputPrompt disappears.
+    if (pendingInput.question) {
+      const ts = Date.now();
+      // Resolve user-friendly label for the selection
+      let selectionLabel = value;
+      if (pendingInput.cards?.length) {
+        const card = pendingInput.cards.find((c) => c.id === String(value));
+        if (card) selectionLabel = card.label;
+      } else if (pendingInput.options?.length) {
+        const idx = parseInt(value, 10);
+        if (!isNaN(idx) && pendingInput.options[idx - 1]) {
+          selectionLabel = pendingInput.options[idx - 1];
+        }
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg-q-${ts}`,
+          role: 'assistant',
+          content: pendingInput!.question,
+        },
+        {
+          id: `msg-a-${ts}`,
+          role: 'user',
+          content: selectionLabel,
+        },
+      ]);
     }
 
     try {
