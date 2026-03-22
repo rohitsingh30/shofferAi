@@ -41,7 +41,7 @@ Ask the user for ONE piece of missing info. **Always use the richest input type 
 | Counts (adults, rooms, qty) | \`stepper\` | Numeric values with +/- controls. Pass \`counters\`. |
 | Budget / price range | \`slider\` | Price filters. Pass \`min\`, \`max\`, \`presets\`. |
 | Open-ended answer | \`freetext\` | ONLY when answer is truly unpredictable (special instructions, names). |
-| Multi-section form | \`layout\` | Combine multiple widgets (rare — prefer one question at a time). |
+| Multi-section form | \`layout\` | Combine multiple widgets into one form. Use when the skill specifies it. |
 | Final product display | \`product_card\` | Show a selected product with full details (image, price, specs, offers) + Add to Cart button. |
 
 **Carousel cards format** (for product results):

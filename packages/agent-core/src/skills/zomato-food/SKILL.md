@@ -30,13 +30,33 @@ Chrome profile: rsinghtomar3011@gmail.com.
 ### Step 0: Confirm delivery address & order preferences
 **ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode, phone). The user must pick a saved address or enter a full one. The address widget collects flat/building, street, city, pincode, AND contact phone — all critical for delivery.
 
-Before opening the browser, call `ask_user` with `input_type: "layout"` and sections:
+**REQUIRED — use `input_type: "layout"` (NOT separate ask_user calls).** Call `ask_user` with `input_type: "layout"` and these sections:
 1. **address** (type: "address", required): Confirm delivery address. Show saved addresses. If the user mentioned an area, pre-fill it:
    ```json
    {"saved": <use the saved addresses from the system prompt>}
    ```
 2. **cuisine** (type: "carousel", required): Show cuisine options as scrollable cards (🥘 Biryani, 🍕 Pizza, 🍔 Burger, 🍱 Thali, 🥡 Chinese, 🥞 South Indian, 🌯 Rolls, 🍰 Dessert). Allow typing specific restaurant/dish.
 3. **dietary** (type: "chip_bar", collapsed): Dietary preferences — 🟢 Veg only, 🔴 Non-veg OK, Jain, No onion, No garlic.
+
+Example `ask_user` call (adapt saved addresses from system prompt):
+```json
+{
+  "input_type": "layout",
+  "question": "Let's set up your Zomato order!",
+  "sections": [
+    {"id": "address", "label": "Delivery Address", "type": "address", "required": true, "saved": []},
+    {"id": "cuisine", "label": "What are you craving?", "type": "carousel", "required": true,
+     "cards": [
+       {"id": "biryani", "label": "🥘 Biryani"}, {"id": "pizza", "label": "🍕 Pizza"},
+       {"id": "burger", "label": "🍔 Burger"}, {"id": "thali", "label": "🍱 Thali"},
+       {"id": "chinese", "label": "🥡 Chinese"}, {"id": "south-indian", "label": "🥞 South Indian"},
+       {"id": "rolls", "label": "🌯 Rolls"}, {"id": "dessert", "label": "🍰 Dessert"}
+     ]},
+    {"id": "dietary", "label": "Dietary Preferences", "type": "chip_bar", "collapsed": true,
+     "options": ["🟢 Veg only", "🔴 Non-veg OK", "Jain", "No onion", "No garlic"]}
+  ]
+}
+```
 
 - **Only skip the address picker** if the user provided a FULL address with building/flat, street, city, pincode, AND phone number (e.g. "E111, Ridgewood Estate, DLF Garden City, Pune 411032").
 
