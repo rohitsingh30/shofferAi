@@ -203,9 +203,8 @@ export function buildSystemPrompt(
         }
       }
       if (hasExtracted) {
-        const allExtracted = activeSkill.params
-          .filter(p => p.required)
-          .every(p => extractedParams?.[p.name]);
+        const requiredParams = activeSkill.params.filter(p => p.required);
+        const allExtracted = requiredParams.length > 0 && requiredParams.every(p => extractedParams?.[p.name]);
         if (allExtracted) {
           skillSection += `\n**ALL required params are extracted. SKIP ask_user entirely — proceed directly to browser handoff.**\n`;
         } else {

@@ -23,7 +23,7 @@ params:
     required: false
     hint: List of items to order (e.g. "rice 5kg, dal, cooking oil") — optional, user can browse visually
   - name: address
-    required: false
+    required: true
     hint: Delivery address or area name
   - name: payment_method
     required: false

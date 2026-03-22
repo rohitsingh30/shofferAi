@@ -24,7 +24,7 @@ params:
     required: false
     hint: Occasion for puja (e.g. "Diwali", "Ganesh Chaturthi", "Navratri", "daily puja", "housewarming")
   - name: delivery_address
-    required: false
+    required: true
     hint: Delivery address or saved address label
   - name: delivery_slot
     required: false
