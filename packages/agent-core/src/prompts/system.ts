@@ -139,8 +139,19 @@ export function buildSystemPrompt(
   activeSkill?: SkillMetadata,
   lessons?: LessonEntry[],
   extractedParams?: Record<string, string>,
+  previousContext?: string,
 ): string {
   const parts = [SYSTEM_PROMPT];
+
+  // Previous conversation context — gives the agent memory across tasks
+  if (previousContext) {
+    parts.push(
+      `## RECENT CONVERSATION CONTEXT\n` +
+      `The user has been chatting with you recently. Here is what happened in their previous tasks. ` +
+      `Use this to understand references like "show me other options", "go back", "the same thing", etc.\n\n` +
+      previousContext
+    );
+  }
 
   // User context
   parts.push('\n## USER CONTEXT');

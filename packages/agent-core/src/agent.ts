@@ -488,7 +488,9 @@ export class AgentExecutor {
     this.claude = config.llmClient || createLLMClient();
     this.conversation = new ConversationManager();
     this.allSkills = config.skills || loadSkills();
-    this.systemPrompt = buildSystemPrompt(config.userContext, this.allSkills);
+    this.systemPrompt = buildSystemPrompt(
+      config.userContext, this.allSkills, undefined, undefined, undefined, config.previousContext,
+    );
     this.mcpHost = config.mcpHost;
     this.injector = config.credentialInjector;
     this.maxIterations = config.maxIterations || 25;
@@ -518,7 +520,7 @@ export class AgentExecutor {
             logger.warn('Failed to load lessons', { error: err });
           }
         }
-        this.systemPrompt = buildSystemPrompt(this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons);
+        this.systemPrompt = buildSystemPrompt(this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons, undefined, this.config.previousContext);
         logger.info('Skill matched', { skillName: this.matchedSkill.name });
 
         // Pre-extract params from user message so the LLM never re-asks for known values
@@ -530,7 +532,7 @@ export class AgentExecutor {
             if (Object.keys(extractedParams).length > 0) {
               // Rebuild system prompt with extracted params injected as facts
               this.systemPrompt = buildSystemPrompt(
-                this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons, extractedParams,
+                this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons, extractedParams, this.config.previousContext,
               );
               logger.info('Rebuilt prompt with extracted params', { params: extractedParams });
             }

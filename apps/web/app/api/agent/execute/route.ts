@@ -70,10 +70,11 @@ export async function POST(request: Request) {
   track({ event: 'task_created', category: 'task', userId, taskId, metadata: { message: message.slice(0, 200) } });
   const taskTimer = trackTimed({ event: 'task_execution', category: 'task', userId, taskId });
 
-  // Get user context
-  const [profile, credentials] = await Promise.all([
+  // Get user context + previous conversation context (parallel)
+  const [profile, credentials, previousCtx] = await Promise.all([
     prisma.profile.findUnique({ where: { userId } }),
     vault.list(userId),
+    workflowEngine.loadPreviousContext(userId, { excludeTaskId: taskId }),
   ]);
 
   lat.endPhase('task_setup');
@@ -165,7 +166,24 @@ export async function POST(request: Request) {
         // ─── Phase: skill_match ──────────────────────────────────────
         lat.startPhase('skill_match');
         // Match a skill for the user's request
-        const matchedSkill = matchSkill(skills, message);
+        let matchedSkill = matchSkill(skills, message);
+
+        // Skill continuity fallback: if no skill matched, use the previous task's skill
+        if (!matchedSkill && previousCtx.lastSkillId) {
+          const fallbackSkill = skills.find(s => s.name === previousCtx.lastSkillId);
+          if (fallbackSkill) {
+            matchedSkill = fallbackSkill;
+            console.log('[execute] taskId=%s skill fallback from previous task: %s', taskId, fallbackSkill.name);
+          }
+        }
+
+        // Persist matched skill for future context lookups
+        if (matchedSkill) {
+          workflowEngine.setTaskSkill(taskId, matchedSkill.name).catch((err) =>
+            console.warn('[execute] Failed to persist matchedSkillId:', err)
+          );
+        }
+
         lat.endPhase('skill_match', { skillName: matchedSkill?.name || 'none' });
         console.log('[execute] taskId=%s matched skill: %s', taskId, matchedSkill?.name || 'none');
 
@@ -183,6 +201,7 @@ export async function POST(request: Request) {
           lessonStore,
           trackEvent: track,
           taskId,
+          previousContext: previousCtx.contextText || undefined,
           userContext: {
             name: authUser.name || undefined,
             email: authUser.email || undefined,

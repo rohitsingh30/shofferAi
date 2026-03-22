@@ -124,4 +124,75 @@ export class WorkflowEngine {
       },
     });
   }
+
+  /**
+   * Load recent task context for a user — gives the agent memory across tasks.
+   * Returns a compact string summarising the last few tasks' conversation,
+   * plus the most recent matched skill ID for fallback skill matching.
+   */
+  async loadPreviousContext(
+    userId: string,
+    options?: { maxTasks?: number; windowMinutes?: number; excludeTaskId?: string }
+  ): Promise<{ contextText: string; lastSkillId: string | null }> {
+    const maxTasks = options?.maxTasks ?? 3;
+    const windowMinutes = options?.windowMinutes ?? 60;
+    const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000);
+
+    const recentTasks = await this.prisma.task.findMany({
+      where: {
+        userId,
+        createdAt: { gte: cutoff },
+        status: { in: ['completed', 'failed', 'running'] },
+        ...(options?.excludeTaskId ? { id: { not: options.excludeTaskId } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: maxTasks,
+      include: {
+        messages: {
+          where: { role: { in: ['user', 'assistant'] } },
+          orderBy: { createdAt: 'asc' },
+          take: 10, // max 10 messages per task
+        },
+      },
+    });
+
+    if (recentTasks.length === 0) {
+      return { contextText: '', lastSkillId: null };
+    }
+
+    // Build compact context — newest task first
+    const parts: string[] = [];
+    let lastSkillId: string | null = null;
+
+    for (const task of recentTasks) {
+      if (!lastSkillId && task.matchedSkillId) {
+        lastSkillId = task.matchedSkillId;
+      }
+
+      const msgs = task.messages
+        .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`)
+        .join('\n');
+
+      if (msgs) {
+        const skillTag = task.matchedSkillId ? ` [skill: ${task.matchedSkillId}]` : '';
+        parts.push(`--- Task: "${task.description.slice(0, 100)}"${skillTag} (${task.status}) ---\n${msgs}`);
+      }
+    }
+
+    // Truncate total context to ~2000 chars to stay within token budget
+    let contextText = parts.join('\n\n');
+    if (contextText.length > 2000) {
+      contextText = contextText.slice(0, 2000) + '\n... (truncated)';
+    }
+
+    return { contextText, lastSkillId };
+  }
+
+  /** Store the matched skill ID on a task (for future context lookups). */
+  async setTaskSkill(taskId: string, skillId: string): Promise<void> {
+    await this.prisma.task.update({
+      where: { id: taskId },
+      data: { matchedSkillId: skillId },
+    });
+  }
 }

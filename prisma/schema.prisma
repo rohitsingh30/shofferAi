@@ -89,20 +89,21 @@ model Credential {
 }
 
 model Task {
-  id           String    @id @default(cuid())
-  userId       String
-  description  String
-  workflowType String?
-  status       String    @default("pending")
-  result       String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  completedAt  DateTime?
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  steps        TaskStep[]
-  messages     Message[]
-  payments     Payment[]
-  orders       Order[]
+  id             String    @id @default(cuid())
+  userId         String
+  description    String
+  workflowType   String?
+  matchedSkillId String?
+  status         String    @default("pending")
+  result         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  completedAt    DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps          TaskStep[]
+  messages       Message[]
+  payments       Payment[]
+  orders         Order[]
 
   @@index([userId])
 }
