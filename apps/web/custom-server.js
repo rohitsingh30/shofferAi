@@ -75,7 +75,7 @@ const httpServer = createServer((req, res) => {
 
   // Serve _next/static/* from .next/static/
   if (pathname.startsWith('/_next/static/')) {
-    const relPath = pathname.slice('/_next/static/'.length);
+    const relPath = decodeURIComponent(pathname.slice('/_next/static/'.length));
     const filePath = path.join(STATIC_DIR, relPath);
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
       return serveStaticFile(filePath, res);
