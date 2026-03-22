@@ -34,6 +34,31 @@ export default function OnboardingPage() {
     pincode: '',
   });
   const [loading, setLoading] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // Pre-populate from existing profile so onboarding never wipes saved data
+  useEffect(() => {
+    fetch('/api/profile')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        if (data.phone) setPhone(data.phone);
+        if (Array.isArray(data.addresses) && data.addresses.length > 0) {
+          const a = data.addresses[0];
+          setAddress((prev) => ({
+            ...prev,
+            label: a.label || prev.label,
+            line1: a.line1 || '',
+            line2: a.line2 || '',
+            city: a.city || '',
+            state: a.state || '',
+            pincode: a.pincode || '',
+          }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setProfileLoaded(true));
+  }, []);
 
   const handlePincodeResult = useCallback((city: string, state: string) => {
     setAddress((prev) => ({
@@ -48,15 +73,17 @@ export default function OnboardingPage() {
   const handleComplete = async () => {
     setLoading(true);
     try {
+      // Only include fields the user actually filled in — never send
+      // empty arrays that would overwrite agent-saved addresses.
+      const body: Record<string, unknown> = {};
+      if (phone) body.phone = phone;
+      if (address.line1) {
+        body.addresses = [{ ...address, id: crypto.randomUUID(), isDefault: true }];
+      }
       await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone,
-          addresses: address.line1
-            ? [{ ...address, id: crypto.randomUUID(), isDefault: true }]
-            : [],
-        }),
+        body: JSON.stringify(body),
       });
       router.push('/dashboard');
     } catch {

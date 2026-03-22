@@ -61,6 +61,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account }) {
       track({ event: 'user_login', category: 'auth', userId: user.id, metadata: { provider: account?.provider || 'credentials' } });
     },
+    // Google OAuth bypasses register/route.ts, so Profile isn't created.
+    // Ensure every new OAuth user gets an empty Profile (matching credentials flow).
+    async createUser({ user }) {
+      if (user.id) {
+        await prisma.profile.upsert({
+          where: { userId: user.id },
+          update: {},
+          create: { userId: user.id },
+        });
+      }
+    },
   },
   callbacks: {
     async jwt({ token, user }) {
