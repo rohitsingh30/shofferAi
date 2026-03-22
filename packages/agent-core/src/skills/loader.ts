@@ -45,7 +45,9 @@ function parseFrontmatter(content: string): { meta: Record<string, unknown>; bod
         meta[currentKey] = val === 'true';
         currentArray = null;
       } else {
-        meta[currentKey] = val;
+        // Strip surrounding quotes (YAML allows "..." or '...' for strings)
+        const unquoted = val.replace(/^["'](.*)["']$/, '$1');
+        meta[currentKey] = unquoted;
         currentArray = null;
       }
       continue;
