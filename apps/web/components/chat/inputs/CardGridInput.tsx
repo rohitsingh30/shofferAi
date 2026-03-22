@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useImagePreloader } from './useImagePreloader';
 import { CardGridSkeleton } from './CardSkeletons';
+import { CardPlaceholder } from './CardPlaceholder';
 
 interface CardItem {
   id: string;
@@ -174,9 +175,7 @@ export function CardGridInput({
                       className="h-full w-full rounded-lg object-contain transition-transform duration-200 group-hover:scale-105"
                     />
                   ) : (
-                    <span className="text-5xl leading-none transition-transform duration-200 group-hover:scale-110">
-                      {card.emoji ?? '📦'}
-                    </span>
+                    <CardPlaceholder id={card.id} label={card.label} size="lg" />
                   )}
                 </div>
 
@@ -347,9 +346,13 @@ export function CardGridInput({
                 </span>
               )}
 
-              <span className="text-2xl leading-none">
-                {card.emoji ?? '📦'}
-              </span>
+              {card.emoji ? (
+                <span className="text-2xl leading-none">
+                  {card.emoji}
+                </span>
+              ) : (
+                <CardPlaceholder id={card.id} label={card.label} size="sm" />
+              )}
 
               <span className="text-center text-sm text-foreground/80">
                 {card.label}

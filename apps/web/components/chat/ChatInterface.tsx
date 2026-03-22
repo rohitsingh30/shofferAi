@@ -213,6 +213,31 @@ function ChatInterfaceInner() {
           }
         }
 
+        if (status === 'price_check') {
+          try {
+            const priceData = JSON.parse(action);
+            if (priceData._type === 'price_comparison') {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `price-cmp-${Date.now()}`,
+                  role: 'assistant',
+                  content: '',
+                  priceComparison: {
+                    productName: priceData.productName,
+                    currentStore: priceData.currentStore,
+                    currentPrice: priceData.currentPrice,
+                    stores: priceData.stores,
+                  },
+                },
+              ]);
+              break;
+            }
+          } catch {
+            // Not JSON, treat as normal step
+          }
+        }
+
         if (status === 'order_placed' || status === 'order_failed' || status === 'order_status') {
           try {
             const orderData = JSON.parse(action);

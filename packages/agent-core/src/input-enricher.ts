@@ -32,7 +32,7 @@ RESPOND WITH ONLY valid JSON — no markdown, no explanation, no backticks.
 
 Rules:
 1. If the context describes a SINGLE product the user should confirm, return a product_card:
-   {"inputType":"product_card","question":"<clean question>","product":{"id":"<slug>","name":"<full name>","image":"","price":<number>,"mrp":<number or null>,"discount":"<X% off or null>","rating":<number or null>,"ratingCount":"<e.g. 4.2L or null>","delivery":"<date or null>","deliveryFree":<bool>,"specs":["spec1","spec2"],"offers":["offer1"],"color":"<if mentioned>","store":"<site name>"}}
+   {"inputType":"product_card","question":"<clean question>","product":{"id":"<slug>","name":"<full name>","image":"","url":"<product page URL if mentioned, or null>","price":<number>,"mrp":<number or null>,"discount":"<X% off or null>","rating":<number or null>,"ratingCount":"<e.g. 4.2L or null>","delivery":"<date or null>","deliveryFree":<bool>,"specs":["spec1","spec2"],"offers":["offer1"],"color":"<if mentioned>","store":"<site name>"}}
 
 2. If the context describes MULTIPLE products to choose from, return a carousel:
    {"inputType":"carousel","question":"<clean question>","cards":[{"id":"1","label":"<name>","subtitle":"<price + key detail>","image":"","badge":"⭐ <rating>"},{"id":"2",...}]}

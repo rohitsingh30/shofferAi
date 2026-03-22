@@ -498,10 +498,10 @@ describe('AgentExecutor', () => {
     }
   });
 
-  it('still bounces standalone carousel with non-URL images (product listings)', async () => {
+  it('strips non-URL images from standalone carousel (graceful degradation)', async () => {
     const { agent, llm } = createAgent();
 
-    // LLM sends a standalone carousel (not layout) with emoji images
+    // LLM sends a standalone carousel with emoji images
     llm.chat.mockResolvedValueOnce({
       content: [{
         type: 'tool_use',
@@ -520,29 +520,22 @@ describe('AgentExecutor', () => {
       usage: { inputTokens: 10, outputTokens: 5 },
     });
 
-    // After bounce, LLM gives up
     llm.chat.mockResolvedValueOnce({
-      content: [{ type: 'text', text: 'Let me try again' }],
+      content: [{ type: 'text', text: 'Great choice!' }],
       stopReason: 'end_turn',
       usage: { inputTokens: 10, outputTokens: 5 },
     });
 
     await agent.execute('find restaurants', callbacks);
 
-    // Should NOT have shown to user — bounced back to LLM
-    expect(callbacks.onInputRequired).not.toHaveBeenCalled();
-    // LLM should have received the bounce system message in a tool_result
-    expect(llm.chat).toHaveBeenCalledTimes(2);
-    const secondCallArg = llm.chat.mock.calls[1][0];
-    const messages = secondCallArg.messages;
-    // Tool result is stored as role: 'user' with content[].type: 'tool_result'
-    const toolResultMsg = messages.find((m: any) =>
-      m.role === 'user' && Array.isArray(m.content) &&
-      m.content.some((c: any) => c.type === 'tool_result')
-    );
-    expect(toolResultMsg).toBeDefined();
-    const toolResultContent = toolResultMsg.content.find((c: any) => c.type === 'tool_result');
-    expect(toolResultContent.content).toContain('missing image URLs');
+    // Should show to user with images stripped (no bounce)
+    expect(callbacks.onInputRequired).toHaveBeenCalledTimes(1);
+    const call = (callbacks.onInputRequired as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.question).toBe('Pick a restaurant');
+    // Cards should have images stripped
+    for (const card of call.cards) {
+      expect(card.image).toBeUndefined();
+    }
   });
 
   it('allows layout carousel cards with no image field at all (label-only)', async () => {

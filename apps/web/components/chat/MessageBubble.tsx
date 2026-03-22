@@ -4,6 +4,8 @@ import { OrderConfirmation } from './OrderConfirmation';
 import { OrderPlaced } from './OrderPlaced';
 import { OrderFailed } from './OrderFailed';
 import { OrderStatusUpdate } from './OrderStatusUpdate';
+import { PriceComparisonCard } from './PriceComparisonCard';
+import type { PriceComparisonData } from '@shofferai/shared';
 
 export interface Message {
   id: string;
@@ -13,6 +15,7 @@ export interface Message {
   orderPlaced?: { orderNumber: string; targetSite: string; targetOrderId?: string; targetOrderUrl?: string; targetTrackingUrl?: string; estimatedDelivery?: string };
   orderFailed?: { orderNumber: string; reason: string; refundAmountCents?: number };
   orderStatus?: { orderNumber: string; status: string; message: string; targetTrackingUrl?: string; targetSite?: string };
+  priceComparison?: PriceComparisonData;
 }
 
 export function MessageBubble({ message }: { message: Message }) {
@@ -40,6 +43,9 @@ export function MessageBubble({ message }: { message: Message }) {
   }
   if (message.orderStatus) {
     return <OrderStatusUpdate {...message.orderStatus} />;
+  }
+  if (message.priceComparison) {
+    return <PriceComparisonCard data={message.priceComparison} />;
   }
 
   return (

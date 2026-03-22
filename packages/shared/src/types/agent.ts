@@ -93,6 +93,21 @@ export interface ProductCardData {
   store: string;
 }
 
+/** Price comparison data from multiple stores */
+export interface PriceComparisonStore {
+  store: string;
+  price: number;
+  url?: string;
+  available: boolean;
+}
+
+export interface PriceComparisonData {
+  productName: string;
+  currentStore: string;
+  currentPrice: number;
+  stores: PriceComparisonStore[];
+}
+
 export interface CounterConfig {
   label: string;
   min?: number;

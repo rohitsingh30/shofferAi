@@ -109,6 +109,8 @@ export interface AgentConfig {
   /** Called by ScriptPlayer when a script requests to save an address to the user's profile */
   onSaveAddress?: (userId: string, address: Record<string, unknown>) => Promise<{ saved: boolean; addressCount?: number; error?: string }>;
   maxIterations?: number;
+  /** Compact summary of the user's recent tasks — injected into system prompt for cross-task memory */
+  previousContext?: string;
 }
 
 // Tools available to the LLM — NO Playwright tools, only high-level actions.
@@ -338,6 +340,43 @@ const AGENT_TOOLS: Tool[] = [
         },
       },
       required: ['items', 'total'],
+    },
+  },
+  {
+    name: 'report_price_comparison',
+    description:
+      'Report price comparison results for a product across multiple stores. Call this after searching for the same or similar product on other e-commerce sites (e.g. Amazon, Flipkart, Meesho) to show the user which store has the best deal.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        product_name: {
+          type: 'string',
+          description: 'Name of the product being compared',
+        },
+        current_store: {
+          type: 'string',
+          description: 'Store where the user is currently shopping (e.g. "Flipkart")',
+        },
+        current_price: {
+          type: 'number',
+          description: 'Current price on the store the user selected (e.g. 1599)',
+        },
+        stores: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              store: { type: 'string', description: 'Store name (e.g. "Amazon", "Meesho")' },
+              price: { type: 'number', description: 'Price as a number (e.g. 1499)' },
+              url: { type: 'string', description: 'Product URL on this store' },
+              available: { type: 'boolean', description: 'Whether the product is available on this store' },
+            },
+            required: ['store', 'price', 'available'],
+          },
+          description: 'Prices from other stores',
+        },
+      },
+      required: ['product_name', 'current_store', 'current_price', 'stores'],
     },
   },
   {
@@ -1023,7 +1062,6 @@ export class AgentExecutor {
       // ── Image validation for visual widgets ──────────────────────────
       // Re-read inputType after possible layout enforcement above
       const effectiveInputType = args.input_type as string;
-      const BOUNCE_MSG_CARDS = '[SYSTEM: Your carousel cards are missing image URLs. Take a browser_snapshot of the current page, extract the real product image URLs (src of <img> elements in each product card), then re-call ask_user with the image field set to the actual https:// URL for each card. Do NOT use emoji or placeholder text — use the real image URL from the page.]';
       const BOUNCE_MSG_PRODUCT = '[SYSTEM: Your product_card is missing an image URL. Take a browser_snapshot, extract the real product image URL (https://...) from the product page, then re-call ask_user with product.image set to the actual URL.]';
 
       // Only bounce cards that HAVE an image field but it's not a URL.
@@ -1034,9 +1072,15 @@ export class AgentExecutor {
       if (effectiveInputType === 'carousel' || effectiveInputType === 'card_grid') {
         const cards = args.cards as Array<{ id: string; image?: string }> | undefined;
         if (cardsLackImages(cards)) {
-          logger.warn('ask_user carousel/card_grid missing image URLs — bouncing back to LLM');
-          this.askUserCount--;
-          return { userResponse: BOUNCE_MSG_CARDS };
+          // Strip non-URL images instead of bouncing — the UI renders a clean
+          // initial-letter placeholder when images are missing. Bouncing caused
+          // the LLM to loop or leak internal reasoning to the user.
+          logger.info('ask_user carousel/card_grid has non-URL images — stripping to placeholder mode');
+          for (const card of cards ?? []) {
+            if (card.image && !card.image.startsWith('http')) {
+              delete card.image;
+            }
+          }
         }
       }
       // Layout sections are pre-browser setup forms (address, cuisine picker, etc.).
@@ -1142,6 +1186,18 @@ export class AgentExecutor {
         status: 'cart_update',
       });
       return { acknowledged: true, itemCount: items.length };
+    }
+
+    if (name === 'report_price_comparison') {
+      const productName = args.product_name as string;
+      const currentStore = args.current_store as string;
+      const currentPrice = args.current_price as number;
+      const stores = args.stores as Array<{ store: string; price: number; url?: string; available: boolean }>;
+      callbacks.onStepUpdate({
+        action: JSON.stringify({ _type: 'price_comparison', productName, currentStore, currentPrice, stores }),
+        status: 'price_check',
+      });
+      return { acknowledged: true, storeCount: stores.length };
     }
 
     if (name === 'update_order_status') {

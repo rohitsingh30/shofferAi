@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useImagePreloader } from './useImagePreloader';
 import { CardGridSkeleton } from './CardSkeletons';
+import { CardPlaceholder } from './CardPlaceholder';
 
 interface CardData {
   id: string;
@@ -200,9 +201,7 @@ export function CarouselInput({
                         className="h-full w-full rounded-lg object-contain transition-transform duration-200 group-hover:scale-105"
                       />
                     ) : (
-                      <span className="text-5xl leading-none transition-transform duration-200 group-hover:scale-110">
-                        {card.emoji ?? '📦'}
-                      </span>
+                      <CardPlaceholder id={card.id} label={card.label} size="lg" />
                     )}
                   </div>
 
@@ -358,7 +357,9 @@ export function CarouselInput({
                   />
                 ) : card.emoji ? (
                   <span className="text-3xl leading-none">{card.emoji}</span>
-                ) : null}
+                ) : (
+                  <CardPlaceholder id={card.id} label={card.label} size="sm" />
+                )}
 
                 <span className="text-xs font-medium text-white/90 text-center leading-tight line-clamp-2">
                   {card.label}

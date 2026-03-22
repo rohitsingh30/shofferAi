@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import type { ProductCardData } from '@shofferai/shared';
 import { useCart } from '../CartContext';
+import { useL2Cart } from '../L2CartContext';
 import { useImagePreloader } from './useImagePreloader';
 import { ProductCardSkeleton } from './CardSkeletons';
 
@@ -22,13 +23,21 @@ function formatPrice(amount: number): string {
 
 export function ProductCardInput({ product, onSubmit }: ProductCardInputProps) {
   const { addItem } = useCart();
+  const { openCart } = useL2Cart();
 
   const imageUrls = useMemo(() => [product.image], [product.image]);
   const { ready: imageReady, failed: imgFailed } = useImagePreloader(imageUrls);
 
-  const handleAddToCart = () => {
+  const handlePayNow = () => {
     addItem(product);
-    onSubmit('added_to_cart');
+    openCart();
+    onSubmit('proceed_to_pay');
+  };
+
+  const handleViewOnStore = () => {
+    if (product.url) {
+      window.open(product.url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   if (!imageReady) {
@@ -142,17 +151,52 @@ export function ProductCardInput({ product, onSubmit }: ProductCardInputProps) {
         </div>
       )}
 
-      {/* Add to Cart button */}
+      {/* Action buttons: Pay Now + View on Store */}
       <div className="border-t border-white/[0.06] p-3">
-        <button
-          onClick={handleAddToCart}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98]"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-          </svg>
-          Add to Cart
-        </button>
+        <div className="flex gap-2">
+          {/* Pay Now — primary action */}
+          <button
+            onClick={handlePayNow}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98]"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            Pay Now
+          </button>
+
+          {/* View on Store — secondary action, opens product in new tab */}
+          {product.url ? (
+            <button
+              onClick={handleViewOnStore}
+              className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-3 text-sm font-medium text-zinc-300 transition-all hover:bg-white/[0.08] hover:text-white active:scale-[0.98]"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+              </svg>
+              View on {product.store}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                const q = encodeURIComponent(product.name);
+                const storeUrls: Record<string, string> = {
+                  Flipkart: `https://www.flipkart.com/search?q=${q}`,
+                  Amazon: `https://www.amazon.in/s?k=${q}`,
+                  Myntra: `https://www.myntra.com/${q}`,
+                };
+                const url = storeUrls[product.store] || `https://www.google.com/search?q=${q}+${encodeURIComponent(product.store)}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }}
+              className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-3 text-sm font-medium text-zinc-300 transition-all hover:bg-white/[0.08] hover:text-white active:scale-[0.98]"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+              </svg>
+              View on {product.store}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
