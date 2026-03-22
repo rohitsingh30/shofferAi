@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 interface Address {
   id?: string;
   label: string;
+  name?: string;
   flatNo?: string;
   line1: string;
   line2?: string;
@@ -33,9 +34,11 @@ interface UserInfo {
   email: string;
 }
 
+const ADDRESS_LABELS = ['Home', 'Work', 'Office', 'Other'] as const;
+
 const emptyAddressForm: Omit<Address, 'id'> = {
   label: 'Home',
-  flatNo: '',
+  name: '',
   line1: '',
   line2: '',
   city: '',
@@ -129,8 +132,8 @@ export default function ProfilePage() {
     setSavingAddress(true);
     const newAddress: Address = {
       id: crypto.randomUUID(),
-      label: addressForm.label.trim() || 'Home',
-      flatNo: addressForm.flatNo?.trim() || undefined,
+      label: addressForm.label || 'Home',
+      name: addressForm.name?.trim() || undefined,
       line1: addressForm.line1.trim(),
       line2: addressForm.line2?.trim() || undefined,
       city: addressForm.city.trim(),
@@ -265,6 +268,9 @@ export default function ProfilePage() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium">
                           {a.label}
+                          {a.name && (
+                            <span className="ml-2 font-normal text-muted-foreground">· {a.name}</span>
+                          )}
                           {a.contactNumber && (
                             <span className="ml-2 font-normal text-muted-foreground">· {a.contactNumber}</span>
                           )}
@@ -288,23 +294,27 @@ export default function ProfilePage() {
             {showAddAddress && (
               <form onSubmit={handleAddAddress} className={`space-y-3 ${profile && profile.addresses.length > 0 ? 'mt-4 border-t border-border pt-4' : ''}`}>
                 <div className="grid grid-cols-4 gap-2">
-                  <input
+                  <select
                     value={addressForm.label}
                     onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
-                    placeholder="Label *"
                     className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
+                  >
+                    {ADDRESS_LABELS.map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
                   <input
-                    value={addressForm.flatNo || ''}
-                    onChange={(e) => setAddressForm({ ...addressForm, flatNo: e.target.value })}
-                    placeholder="Flat / House No."
+                    value={addressForm.name || ''}
+                    onChange={(e) => setAddressForm({ ...addressForm, name: e.target.value })}
+                    placeholder="Contact name"
                     className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <input
                     type="tel"
                     value={addressForm.contactNumber || ''}
                     onChange={(e) => setAddressForm({ ...addressForm, contactNumber: e.target.value })}
-                    placeholder="Phone"
+                    placeholder="Phone *"
+                    required
                     className="col-span-2 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>

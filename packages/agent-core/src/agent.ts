@@ -315,14 +315,16 @@ const AGENT_TOOLS: Tool[] = [
   {
     name: 'update_order_status',
     description:
-      'Update the order status after completing checkout on the target site. Call this after placing an order on a site like Flipkart, Blinkit, Swiggy, etc. Reports the target site order ID, delivery estimate, and order URL back to the user.',
+      'Update the order status. Call after placing an order, when delivery status changes ' +
+      '(shipped, out for delivery, delivered), or on checkout failure. ' +
+      'Reports target site order ID, delivery estimate, tracking info back to the user.',
     input_schema: {
       type: 'object' as const,
       properties: {
         status: {
           type: 'string',
-          description: 'New order status: "order_placed", "checkout_failed"',
-          enum: ['order_placed', 'checkout_failed'],
+          description: 'New order status',
+          enum: ['order_placed', 'checkout_failed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled'],
         },
         target_order_id: {
           type: 'string',
@@ -342,7 +344,19 @@ const AGENT_TOOLS: Tool[] = [
         },
         failure_reason: {
           type: 'string',
-          description: 'Reason for checkout failure (only when status is "checkout_failed")',
+          description: 'Reason for checkout failure or cancellation',
+        },
+        tracking_number: {
+          type: 'string',
+          description: 'Courier tracking number (e.g. AWB number)',
+        },
+        courier_name: {
+          type: 'string',
+          description: 'Courier/delivery partner name (e.g. "Delhivery", "BlueDart")',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable status message to show the user',
         },
       },
       required: ['status'],
@@ -1040,6 +1054,9 @@ export class AgentExecutor {
         targetTrackingUrl: args.target_tracking_url,
         estimatedDelivery: args.estimated_delivery,
         failureReason: args.failure_reason,
+        trackingNumber: args.tracking_number,
+        courierName: args.courier_name,
+        message: args.message,
       };
       if (status === 'order_placed') {
         callbacks.onStepUpdate({
@@ -1050,6 +1067,12 @@ export class AgentExecutor {
         callbacks.onStepUpdate({
           action: JSON.stringify(payload),
           status: 'order_failed',
+        });
+      } else {
+        // shipped, out_for_delivery, delivered, cancelled
+        callbacks.onStepUpdate({
+          action: JSON.stringify(payload),
+          status: 'order_status',
         });
       }
       return { acknowledged: true, status };

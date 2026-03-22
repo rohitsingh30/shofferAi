@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { OrderStatusBadge, formatCents } from '@/components/orders/OrderStatusBadge';
 
 interface OrderItem {
   name?: string;
@@ -28,35 +30,6 @@ interface Order {
 interface OrdersResponse {
   orders: Order[];
   pagination: { page: number; limit: number; total: number; pages: number };
-}
-
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  payment_received: { label: 'Payment Received', bg: 'bg-amber-500/10', text: 'text-amber-400' },
-  placing_order: { label: 'Placing Order', bg: 'bg-blue-500/10', text: 'text-blue-400' },
-  order_placed: { label: 'Order Placed', bg: 'bg-green-500/10', text: 'text-green-400' },
-  shipped: { label: 'Shipped', bg: 'bg-indigo-500/10', text: 'text-indigo-400' },
-  out_for_delivery: { label: 'Out for Delivery', bg: 'bg-purple-500/10', text: 'text-purple-400' },
-  delivered: { label: 'Delivered', bg: 'bg-emerald-500/10', text: 'text-emerald-400' },
-  checkout_failed: { label: 'Checkout Failed', bg: 'bg-red-500/10', text: 'text-red-400' },
-  cancelled: { label: 'Cancelled', bg: 'bg-zinc-500/10', text: 'text-zinc-400' },
-  refunded: { label: 'Refunded', bg: 'bg-orange-500/10', text: 'text-orange-400' },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const config = STATUS_CONFIG[status] ?? {
-    label: status.replace(/_/g, ' '),
-    bg: 'bg-zinc-500/10',
-    text: 'text-zinc-400',
-  };
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.bg} ${config.text}`}>
-      {config.label}
-    </span>
-  );
-}
-
-function formatCents(cents: number): string {
-  return `₹${(cents / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 }
 
 function getItemSummary(items: OrderItem[] | unknown, itemCount: number): string {
@@ -134,9 +107,9 @@ export default function OrdersPage() {
       {!loading && !error && orders.length > 0 && (
         <div className="space-y-3">
           {orders.map((order) => (
-            <a
+            <Link
               key={order.id}
-              href="#"
+              href={`/dashboard/orders/${order.id}`}
               className="block rounded-xl border border-white/[0.06] bg-zinc-800/50 p-4 transition-colors hover:border-white/[0.1] hover:bg-zinc-800/80"
             >
               <div className="flex items-center justify-between">
@@ -144,7 +117,7 @@ export default function OrdersPage() {
                   <p className="text-sm font-medium text-white">{order.orderNumber}</p>
                   <p className="mt-0.5 text-xs text-zinc-500">{order.targetSite}</p>
                 </div>
-                <StatusBadge status={order.status} />
+                <OrderStatusBadge status={order.status} />
               </div>
               <p className="mt-2 text-xs text-zinc-400">
                 {getItemSummary(order.items, order.itemCount)}
@@ -159,7 +132,7 @@ export default function OrdersPage() {
                   })}
                 </p>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       )}

@@ -212,7 +212,7 @@ function ChatInterfaceInner() {
           }
         }
 
-        if (status === 'order_placed' || status === 'order_failed') {
+        if (status === 'order_placed' || status === 'order_failed' || status === 'order_status') {
           try {
             const orderData = JSON.parse(action);
             if (orderData._type === 'order_status_update') {
@@ -228,12 +228,24 @@ function ChatInterfaceInner() {
                     estimatedDelivery: orderData.estimatedDelivery,
                   },
                 });
-              } else {
+              } else if (status === 'order_failed') {
                 handleSSEEvent({
                   type: 'order_failed',
                   payload: {
                     orderNumber: '',
                     reason: orderData.failureReason || 'Checkout failed',
+                  },
+                });
+              } else {
+                // order_status: shipped, out_for_delivery, delivered, cancelled
+                handleSSEEvent({
+                  type: 'order_status',
+                  payload: {
+                    orderNumber: orderData.orderNumber || '',
+                    status: orderData.status,
+                    message: orderData.message || '',
+                    targetTrackingUrl: orderData.targetTrackingUrl,
+                    targetSite: orderData.targetSite || '',
                   },
                 });
               }
@@ -349,6 +361,25 @@ function ChatInterfaceInner() {
               orderNumber: p.orderNumber as string,
               reason: (p.reason as string) || (p.message as string) || 'Unknown error',
               refundAmountCents: p.refundAmountCents as number | undefined,
+            },
+          },
+        ]);
+        break;
+      }
+      case 'order_status': {
+        const p = event.payload;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `order-status-${Date.now()}`,
+            role: 'assistant',
+            content: '',
+            orderStatus: {
+              orderNumber: p.orderNumber as string,
+              status: p.status as string,
+              message: (p.message as string) || '',
+              targetTrackingUrl: p.targetTrackingUrl as string | undefined,
+              targetSite: p.targetSite as string | undefined,
             },
           },
         ]);

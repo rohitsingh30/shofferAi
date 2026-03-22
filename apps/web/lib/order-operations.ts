@@ -150,3 +150,118 @@ export async function handleCheckoutSuccess(
     return null;
   }
 }
+
+/** Valid transitions for handleOrderStatusUpdate. */
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  order_placed: ['shipped', 'cancelled'],
+  shipped: ['out_for_delivery', 'delivered'],
+  out_for_delivery: ['delivered'],
+};
+
+/** Timestamp field to set for each status. */
+const STATUS_TIMESTAMP_FIELD: Record<string, string> = {
+  shipped: 'shippedAt',
+  delivered: 'deliveredAt',
+  cancelled: 'cancelledAt',
+};
+
+/**
+ * Handle a delivery status update (shipped, out_for_delivery, delivered, cancelled).
+ * Validates the transition, updates the Order, and records history.
+ */
+export async function handleOrderStatusUpdate(
+  orderId: string,
+  newStatus: string,
+  data: {
+    trackingNumber?: string;
+    courierName?: string;
+    targetTrackingUrl?: string;
+    message?: string;
+  } = {},
+): Promise<{
+  orderNumber: string;
+  status: string;
+  message: string;
+  targetTrackingUrl?: string;
+} | null> {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      console.error('[order-ops] handleOrderStatusUpdate: order %s not found', orderId);
+      return null;
+    }
+
+    // Validate transition
+    const allowed = STATUS_TRANSITIONS[order.status];
+    if (allowed && !allowed.includes(newStatus)) {
+      console.warn(
+        '[order-ops] invalid transition %s → %s for order %s',
+        order.status,
+        newStatus,
+        order.orderNumber,
+      );
+      // Allow anyway but log the warning — agent may have stale state
+    }
+
+    const prevStatus = order.status;
+    const now = new Date();
+
+    // Build update data
+    const updateData: Record<string, unknown> = {
+      status: newStatus,
+      statusMessage: data.message || `Status updated to ${newStatus.replace(/_/g, ' ')}`,
+      statusUpdatedAt: now,
+    };
+
+    if (data.targetTrackingUrl) {
+      updateData.targetTrackingUrl = data.targetTrackingUrl;
+    }
+
+    // Set the appropriate timestamp
+    const tsField = STATUS_TIMESTAMP_FIELD[newStatus];
+    if (tsField) {
+      updateData[tsField] = now;
+    }
+
+    // For delivered, also set actualDelivery
+    if (newStatus === 'delivered') {
+      updateData.actualDelivery = now;
+    }
+
+    await prisma.order.update({ where: { id: orderId }, data: updateData });
+
+    // Record status history
+    const metadata: Record<string, unknown> = {};
+    if (data.trackingNumber) metadata.trackingNumber = data.trackingNumber;
+    if (data.courierName) metadata.courierName = data.courierName;
+    if (data.targetTrackingUrl) metadata.targetTrackingUrl = data.targetTrackingUrl;
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId,
+        fromStatus: prevStatus,
+        toStatus: newStatus,
+        message: data.message || `${newStatus.replace(/_/g, ' ')}`,
+        metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+      },
+    });
+
+    track({
+      event: `order_${newStatus}`,
+      category: 'order',
+      userId: order.userId,
+      taskId: order.taskId,
+      metadata: { orderId, orderNumber: order.orderNumber, fromStatus: prevStatus, ...data },
+    });
+
+    return {
+      orderNumber: order.orderNumber,
+      status: newStatus,
+      message: data.message || `Order ${newStatus.replace(/_/g, ' ')}`,
+      targetTrackingUrl: data.targetTrackingUrl || order.targetTrackingUrl || undefined,
+    };
+  } catch (err) {
+    console.error('[order-ops] orderId=%s handleOrderStatusUpdate error:', orderId, err);
+    return null;
+  }
+}

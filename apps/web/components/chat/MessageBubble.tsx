@@ -3,6 +3,7 @@ import { renderMarkdown } from './render-markdown';
 import { OrderConfirmation } from './OrderConfirmation';
 import { OrderPlaced } from './OrderPlaced';
 import { OrderFailed } from './OrderFailed';
+import { OrderStatusUpdate } from './OrderStatusUpdate';
 
 export interface Message {
   id: string;
@@ -11,6 +12,7 @@ export interface Message {
   orderConfirmed?: { orderNumber: string; items: Array<{ name: string; qty?: number; quantity?: number; priceCents?: number; price?: string }>; productAmountCents: number; serviceFeeCents: number; totalCents: number; targetSite: string };
   orderPlaced?: { orderNumber: string; targetSite: string; targetOrderId?: string; targetOrderUrl?: string; targetTrackingUrl?: string; estimatedDelivery?: string };
   orderFailed?: { orderNumber: string; reason: string; refundAmountCents?: number };
+  orderStatus?: { orderNumber: string; status: string; message: string; targetTrackingUrl?: string; targetSite?: string };
 }
 
 export function MessageBubble({ message }: { message: Message }) {
@@ -35,6 +37,9 @@ export function MessageBubble({ message }: { message: Message }) {
   }
   if (message.orderFailed) {
     return <OrderFailed {...message.orderFailed} />;
+  }
+  if (message.orderStatus) {
+    return <OrderStatusUpdate {...message.orderStatus} />;
   }
 
   return (

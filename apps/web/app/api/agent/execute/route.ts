@@ -7,6 +7,7 @@ import { remoteMcpHost, workflowEngine, vault, skills, lessonStore } from '@/lib
 import { track, trackTimed } from '@/lib/telemetry';
 import { TaskLatencyTracker } from '@/lib/task-latency-tracker';
 import { getAuthUser } from '@/lib/auth-helper';
+import { handleCheckoutSuccess, handleCheckoutFailure, handleOrderStatusUpdate } from '@/lib/order-operations';
 import type {
   TaskRelayMessage,
   TaskHandoffMessage,
@@ -577,6 +578,39 @@ export async function POST(request: Request) {
           onStepUpdate(step) {
             console.log('[execute] taskId=%s step_update: %o', taskId, step);
             send('step_update', step);
+
+            // Process order status updates — update DB (fire-and-forget)
+            if (step.status === 'order_placed' || step.status === 'order_failed' || step.status === 'order_status') {
+              try {
+                const orderData = JSON.parse(step.action);
+                if (orderData._type === 'order_status_update') {
+                  // Find the order for this task
+                  prisma.order.findFirst({ where: { taskId }, orderBy: { createdAt: 'desc' } })
+                    .then(async (order) => {
+                      if (!order) return;
+                      if (step.status === 'order_placed') {
+                        await handleCheckoutSuccess(order.id, {
+                          targetOrderId: orderData.targetOrderId,
+                          targetOrderUrl: orderData.targetOrderUrl,
+                          targetTrackingUrl: orderData.targetTrackingUrl,
+                          estimatedDelivery: orderData.estimatedDelivery,
+                        });
+                      } else if (step.status === 'order_failed') {
+                        await handleCheckoutFailure(order.id, orderData.failureReason || 'Checkout failed');
+                      } else if (step.status === 'order_status') {
+                        await handleOrderStatusUpdate(order.id, orderData.status, {
+                          trackingNumber: orderData.trackingNumber,
+                          courierName: orderData.courierName,
+                          targetTrackingUrl: orderData.targetTrackingUrl,
+                          message: orderData.message,
+                        });
+                      }
+                    })
+                    .catch(e => console.error('[execute] order status DB update failed:', e));
+                }
+              } catch { /* not JSON — ignore */ }
+            }
+
             // Persist step to DB for audit trail (fire-and-forget)
             const status = step.status === 'completed' ? 'completed'
               : step.status === 'error' ? 'failed' : 'running';
