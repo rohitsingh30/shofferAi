@@ -328,6 +328,7 @@ Is laptop relay process running?
 | Component | Timeout | Meaning |
 |-----------|---------|---------|
 | **RelayOutbound phantom check** | 10s after connect | Laptop sends `sendStatus()`, expects app-level response within 10s. No response = phantom LB. |
+| **RelayOutbound HTTP verify** | 8s after connect, then every 30s | Laptop GETs `/api/admin/relay-status` via HTTP. If `connected: false` → phantom FM2 → terminate. |
 | **RelayOutbound stale connection** | 25s no app message | Laptop kills WS if only LB pongs but no JSON messages from server. Server sends `{ type: 'ping' }` every 15s. |
 | **RelayOutbound dead connection** | 20s no data at all | Laptop kills connection if total WS silence (no pongs, no messages). |
 | **RelayOutbound status broadcast** | Every 10s | Laptop sends `relay_status` to server (proves laptop is alive to server). |
@@ -335,69 +336,63 @@ Is laptop relay process running?
 | **RelayBridge grace period** | 30s after disconnect | Server waits 30s for laptop to reconnect before failing pending requests. |
 | **custom-server earlySocket** | 30s poll at 500ms | If laptop WS connects before singletons init, socket queued for 30s max. |
 | **Cloud Run WS timeout** | 3600s (1 hour) | Max WebSocket connection lifetime. After this, Cloud Run terminates the WS. |
-| **Reconnect backoff** | 1s → 2s → 4s → ... → 30s max | Exponential backoff. Reset to 1s only on close code 1001 (Going Away). |
+| **Reconnect backoff** | 1s → 2s → 4s → ... → 30s max | Exponential backoff. Reset to 1s only on close code 1001 or 1011 (Going Away / earlySocket). |
 | **Tool call timeout** | 60s | Individual relay tool call fails after 60s. |
 | **connect() wait** | 60s | `RelayBridge.connect()` waits up to 60s for laptop to connect. |
 
-## How Phantom Detection Works (and its gap)
+## How Phantom Detection Works
 
-### Two-layer detection on laptop (`relay-outbound.ts`):
+### Three-layer detection on laptop (`relay-outbound.ts`):
 1. **`lastDataAt`** — updated by ANY WS data (native pong frames + JSON messages)
-2. **`lastAppMessageAt`** — updated by incoming JSON messages only (line 139)
+2. **`lastAppMessageAt`** — updated by incoming JSON messages only
+3. **HTTP verify** — periodic GET `/api/admin/relay-status` (always hits ACTIVE Cloud Run instance)
 
-The stale check (every 10s) compares `Date.now() - lastAppMessageAt > 25s`. If true → connection is phantom → terminate → reconnect.
+The stale check (every 10s) compares `Date.now() - lastAppMessageAt > 25s`. If true → phantom LB → terminate → reconnect.
 
-### The gap (FM2):
-When Cloud Run deploys a new revision:
-1. Pre-deploy `release-relay` curl → old instance releases laptop → laptop reconnects
-2. **But laptop may reconnect to the OLD draining instance** (still alive, still accepting WS)
-3. Old instance keeps sending `{ type: 'ping' }` → `lastAppMessageAt` keeps updating → stale check never fires
-4. New instance handles HTTP requests → no relay → tasks fail
-5. Old instance stays alive for up to 3600s (Cloud Run keeps instances alive for active connections)
+The HTTP verify (every 30s + 8s after connect) GETs `/api/admin/relay-status`. If response says `connected: false` but WS is open → phantom FM2 (draining instance) → terminate → reconnect.
 
-### Why the 25s stale check doesn't help here:
-The server IS alive (just draining). It's sending real JSON heartbeat pings. These ARE application-level messages. The laptop correctly considers the connection healthy. **The problem is that HTTP requests go to a DIFFERENT instance.**
+### FM2 is now handled:
+When Cloud Run deploys a new revision, the OLD draining instance keeps sending `{ type: 'ping' }` every 15s, fooling the stale check. But the HTTP verify catches it because HTTP routes to the ACTIVE instance, which reports `connected: false`.
 
-## Long-Term Code Fixes Needed
+Additionally, `gracefulClose()` now sends `{ type: 'server_draining' }` before the close frame, triggering immediate laptop reconnect.
 
-### Fix 1: Server-side "am I the active instance?" check
-The RelayBridge should periodically verify it's the instance receiving HTTP traffic. If it detects it's draining (e.g., received SIGTERM or `process.exitCode` is set), it should immediately close the laptop WS.
+## Implemented Fixes (previously "Long-Term Fixes Needed")
 
-**File**: `apps/web/lib/relay-bridge.ts`
-**Change**: In `startHeartbeat()`, add a check for `process.exitCode !== undefined` or a `draining` flag set by SIGTERM. If draining, send close frame instead of ping.
+### ✅ Fix 1: `server_draining` message (IMPLEMENTED)
+On SIGTERM, `gracefulClose()` sends `{ type: 'server_draining', reason, revision }` to the laptop before the WS close frame. Laptop handles `server_draining` → immediate terminate + 1s reconnect.
 
-### Fix 2: Reset backoff on earlySocket timeout (code 1011)
-Currently only code 1001 resets backoff. Code 1011 (from earlySocket timeout) should also reset to prevent FM5 backoff spirals.
+**File**: `apps/web/lib/relay-bridge.ts` (`gracefulClose()` method)
 
-**File**: `apps/playwright/src/relay-outbound.ts`
-**Change**: In the `close` handler, also reset backoff for code 1011.
+### ✅ Fix 2: Reset backoff on earlySocket timeout (code 1011) (IMPLEMENTED)
+Close code 1011 now resets backoff to 1s (same as 1001), preventing FM5 backoff spirals.
 
-### Fix 3: Pre-initialize RelayBridge in custom-server.js
-Instead of lazy initialization in `singletons.ts`, create the RelayBridge in `custom-server.js` right after the HTTP server starts. This eliminates FM3 entirely.
+**File**: `apps/playwright/src/relay-outbound.ts` (close handler)
+
+### ✅ Fix 4: HTTP-level phantom detection (IMPLEMENTED — definitive FM2 fix)
+Laptop periodically GETs `/api/admin/relay-status` via HTTP. Server responds with `{ connected: boolean, revision: string }`. If `connected: false` but WS is open → phantom → terminate → reconnect.
+
+**Files**: `apps/playwright/src/relay-outbound.ts` (`doHttpVerify()`, `startHttpVerify()`) + `apps/web/app/api/admin/relay-status/route.ts` (new GET endpoint)
+
+### ✅ Fix 5: SIGTERM aggressively closes WS (IMPLEMENTED)
+SIGTERM handler calls `gracefulClose()` (sends `server_draining` + close frame), then `ws.terminate()` after 2s if not already closed.
+
+**File**: `apps/web/custom-server.js` (SIGTERM handler)
+
+### ⬜ Fix 3: Pre-initialize RelayBridge in custom-server.js (NOT YET IMPLEMENTED)
+Would eliminate FM3 (lazy singleton race) entirely by creating RelayBridge before any HTTP routes load.
 
 **File**: `apps/web/custom-server.js`
 **Change**: After `httpServer.listen()`, import and create `RelayBridge`, set on `globalThis.__relayBridge`.
-
-### Fix 4: App-level ping-pong verification
-The laptop should send a periodic "are you the active instance?" message that the server must respond to with its instance identity. If the response stops coming, the connection is phantom.
-
-**File**: `apps/playwright/src/relay-outbound.ts` + `apps/web/lib/relay-bridge.ts`
-**Change**: Add a `relay_verify` message type. Laptop sends every 30s. Server responds with Cloud Run instance ID (from `K_REVISION` env var). If laptop gets no response or gets a response from a different revision than expected, terminate.
-
-### Fix 5: SIGTERM must aggressively close WS
-The current SIGTERM handler calls `gracefulClose()` which does `ws.close(1001)`. This sends a close frame but waits for the client to acknowledge. In a deploy scenario, we should `ws.terminate()` (hard close) after a short timeout to ensure the connection drops.
-
-**File**: `apps/web/lib/relay-bridge.ts`
-**Change**: In `gracefulClose()`, after `ws.close(1001)`, set a 2s timeout to `ws.terminate()` if not already closed.
 
 ## Files Reference
 
 | File | Role | Key things to check |
 |------|------|---------------------|
-| `apps/playwright/src/relay-outbound.ts` | Laptop → Cloud Run WS | `lastAppMessageAt`, stale check, phantom check, reconnect backoff |
-| `apps/web/lib/relay-bridge.ts` | Cloud Run WS bridge | `setLaptopSocket()`, `isConnected()`, heartbeat, `gracefulClose()` |
-| `apps/web/custom-server.js` | WS upgrade handler | `wireLaptopSocket()`, `earlyLaptopSocket` queue, SIGTERM handler |
+| `apps/playwright/src/relay-outbound.ts` | Laptop → Cloud Run WS | `lastAppMessageAt`, stale check, HTTP verify (`doHttpVerify`), phantom check, `server_draining` handler, reconnect backoff |
+| `apps/web/lib/relay-bridge.ts` | Cloud Run WS bridge | `setLaptopSocket()`, `isConnected()`, heartbeat, `gracefulClose()` (sends `server_draining`), `disconnect()` |
+| `apps/web/custom-server.js` | WS upgrade handler | `wireLaptopSocket()`, `earlyLaptopSocket` queue, SIGTERM handler (draining flag + force-terminate) |
 | `apps/web/lib/singletons.ts` | Lazy singleton init | Creates `RelayBridge`, sets `globalThis.__relayBridge` on first import |
 | `apps/web/app/api/agent/execute/route.ts` | Task execution | `ensureRelayConnected()`, `onTaskHandoff()`, SSE stream |
-| `apps/web/app/api/admin/release-relay/route.ts` | Force disconnect | `remoteMcpHost.isConnected()`, `disconnect()` |
+| `apps/web/app/api/admin/release-relay/route.ts` | Force disconnect (POST) | `remoteMcpHost.isConnected()`, `disconnect()` — used by cloudbuild pre-deploy |
+| `apps/web/app/api/admin/relay-status/route.ts` | Read-only status (GET) | Returns `{ connected, revision, timestamp }` — used by laptop HTTP phantom detection |
 | `cloudbuild.yaml` | Deploy config | Pre-deploy `release-relay` step, `min/max-instances: 1` |

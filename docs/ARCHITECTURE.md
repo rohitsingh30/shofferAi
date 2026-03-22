@@ -114,10 +114,12 @@ graph TB
 - `SessionEndRequest` — Release Chrome tab slot
 - `Heartbeat` — 15s server ping, laptop responds with pong. Used for stale connection detection (see below).
 
-**Deploy Auto-Heal** — The relay survives Cloud Run deploys automatically via three layers:
+**Deploy Auto-Heal** — The relay survives Cloud Run deploys automatically via five layers:
 1. **Pre-deploy release** (`cloudbuild.yaml` Step #1): Before deploying a new revision, Cloud Build curls `POST /api/admin/release-relay` on the current instance. This force-closes the laptop WS, so the laptop reconnects to the new instance within 1-4s.
-2. **Draining guard** (`custom-server.js`): On SIGTERM, sets `draining = true` and rejects all new WS upgrade requests with HTTP 503. This prevents the laptop from reconnecting to the dying old instance during the 1-4s reconnect window — the critical fix for the "phantom connection to draining instance" bug.
-3. **Stale connection detection** (`relay-outbound.ts`): The laptop tracks application-level messages separately from WS-level pong frames. Cloud Run's load balancer responds to WS pings even when the backend instance is dead (e.g., old instance after deploy), so WS pongs alone can't detect staleness. If no app-level message arrives for 45s (3 missed server heartbeats), the laptop terminates the connection and reconnects.
+2. **Draining guard** (`custom-server.js`): On SIGTERM, sets `draining = true` and rejects all new WS upgrade requests with HTTP 503. This prevents the laptop from reconnecting to the dying old instance during the 1-4s reconnect window.
+3. **`server_draining` message** (`relay-bridge.ts`): On SIGTERM, `gracefulClose()` sends a `{ type: 'server_draining' }` message to the laptop BEFORE the WS close frame. The laptop handles this by immediately terminating the WS and reconnecting with 1s delay — even if the close frame is delayed or lost.
+4. **Stale connection detection** (`relay-outbound.ts`): The laptop tracks application-level messages separately from WS-level pong frames. Cloud Run's load balancer responds to WS pings even when the backend instance is dead, so WS pongs alone can't detect staleness. If no app-level message arrives for 25s, the laptop terminates and reconnects.
+5. **HTTP phantom detection** (`relay-outbound.ts`): Every 30s (and 8s after each new connection), the laptop GETs `GET /api/admin/relay-status` via HTTP. HTTP always routes to the ACTIVE Cloud Run instance. If it returns `connected: false` but the laptop's WS is open, the laptop is connected to a draining/phantom instance → terminates WS and reconnects. This is the definitive fix for FM2 (draining instance sending heartbeat pings that fool the stale check).
 
 **MCPHostLike Interface** — Both `MCPHost`, `RemoteMCPHost`, `RelayBridge`, and `SessionMCPHost` implement the same interface. `AgentExecutor` accepts any — zero changes to agent-core when switching modes.
 
@@ -723,7 +725,7 @@ shofferai/
 - **WebSocket upgrade** for relay connections at `/api/relay/ws` (auth via `?token=` or `x-relay-token` header)
 - **Draining guard**: On SIGTERM, sets `draining = true` and rejects new WS upgrades with HTTP 503 — prevents the laptop from reconnecting to the dying instance during deploys
 - **Early WS queue**: If the laptop connects before `singletons.ts` initializes the `RelayBridge`, the WS is queued and wired once the bridge is ready (polls every 500ms for up to 30s)
-- **SIGTERM handler**: On graceful shutdown, (1) sets draining flag, (2) closes relay WS with code 1001, (3) force-terminates after 2s, (4) exits after 8s
+- **SIGTERM handler**: On graceful shutdown, (1) sets draining flag, (2) sends `server_draining` message to laptop, (3) closes relay WS with code 1001, (4) force-terminates after 2s, (5) exits after 8s
 - **Static file serving** and Next.js request handling
 
 ```

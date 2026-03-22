@@ -93,8 +93,10 @@ interface AgentCallbacks {
 ### Deploy auto-heal
 - `cloudbuild.yaml` pre-deploy step curls `POST /api/admin/release-relay` → force-closes laptop WS → laptop reconnects to new instance in 1-4s
 - `custom-server.js` sets `draining = true` on SIGTERM → rejects new WS upgrades with HTTP 503 → prevents laptop from reconnecting to dying instance
-- Fallback: `relay-outbound.ts` detects no app-level messages for 45s → auto-terminates stale connection → reconnects
-- `custom-server.js` has early WS queue (handles laptop connecting before RelayBridge singleton initializes) + SIGTERM handler (sets draining flag, graceful close + 2s hard terminate)
+- `relay-bridge.ts` `gracefulClose()` sends `{ type: 'server_draining' }` message before close frame → laptop terminates immediately + 1s reconnect
+- Stale detection: `relay-outbound.ts` detects no app-level messages for 25s → auto-terminates → reconnects
+- **HTTP phantom detection**: `relay-outbound.ts` GETs `/api/admin/relay-status` every 30s via HTTP (always hits ACTIVE instance). If `connected: false` but WS is open → draining phantom → terminate → reconnect. Definitive fix for FM2.
+- `custom-server.js` has early WS queue (handles laptop connecting before RelayBridge singleton initializes) + SIGTERM handler (sets draining flag, sends server_draining, graceful close + 2s hard terminate)
 
 ### Relay message flow
 ```

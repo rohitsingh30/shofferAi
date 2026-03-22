@@ -49,7 +49,12 @@ Launch paths (all must follow above rules):
 - Do NOT trust `/tmp/shofferai-relay.log` — may be from previous run
 - `start-laptop.sh` writes to terminal stdout, not to log file
 - RelayOutbound auto-reconnects with exponential backoff (1s → 2s → 4s... max 30s)
-- **Deploy auto-heal**: Three layers — (1) `cloudbuild.yaml` curls `/api/admin/release-relay` before deploying (force-closes WS), (2) `custom-server.js` sets `draining=true` on SIGTERM and rejects new WS upgrades with 503, (3) laptop detects no app-level messages for 45s → auto-reconnects.
+- **Deploy auto-heal** — Five layers:
+  1. `cloudbuild.yaml` curls `/api/admin/release-relay` before deploying (force-closes WS)
+  2. `custom-server.js` sets `draining=true` on SIGTERM and rejects new WS upgrades with 503
+  3. `relay-bridge.ts` sends `{ type: 'server_draining' }` message before close frame → laptop terminates immediately
+  4. Laptop stale detection: no app-level messages for 25s → auto-reconnects
+  5. **HTTP phantom detection** (`relay-outbound.ts`): every 30s, GETs `/api/admin/relay-status` via HTTP (always hits ACTIVE instance). If returns `connected: false` but WS is open → phantom → terminate → reconnect. Definitive fix for FM2 (draining instance sending heartbeat pings).
 - **NEVER rely on WS ping/pong alone** to detect dead backends — Cloud Run's load balancer responds to pings even when the backend instance is gone
 
 ## Site-Specific Selectors
