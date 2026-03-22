@@ -1,7 +1,7 @@
 # ShofferAI — System Architecture
 
-> **Version**: 3.0 — Full Architecture with Diagrams
-> **Last Updated**: March 21, 2026
+> **Version**: 3.1 — Added Latency & Compiled Scripts references
+> **Last Updated**: March 22, 2026
 
 ---
 
@@ -875,6 +875,22 @@ Profile 3 is pre-authenticated on **12 P0 websites**: Blinkit, Swiggy, Zomato, B
 | **Store** (ScriptStore) | Saves to `compiled/` directory | ✅ 500+ scripts persisted |
 | **Replay** (ScriptPlayer) | Runs compiled scripts as child processes | ✅ ~10s execution vs 1-5min LLM |
 | **Fallback** | Script fails → automatic LLM fallback | ✅ Re-records on success |
+| **Tier 2 loop scripts** | Hand-written for grocery/food/shopping | 🔨 BigBasket + Blinkit in progress |
+
+> **Deep dive**: See [COMPILED-SCRIPTS.md](./COMPILED-SCRIPTS.md) for the three-tier compilation model and [LATENCY.md](./LATENCY.md) for telemetry-driven optimization details.
+
+### E2E Latency Optimization (March 2026)
+
+Phase 1 shipped — 5 changes reduced TTFM from 27.5s to ~1-2s (warm relay):
+1. Pruned 501 skill summaries from prompt (22k → 3k tokens/call)
+2. Skip redundant 2nd LLM call after browser handoff
+3. Parallelized param extraction + lesson loading
+4. Switched browser model from Opus to Sonnet
+5. Added instant SSE feedback after handoff
+
+Phase 2 in progress — compiled scripts for grocery skills (6min → 30-60s).
+
+> **Full details**: [LATENCY.md](./LATENCY.md)
 
 ### Not Yet Implemented
 
@@ -882,6 +898,7 @@ Profile 3 is pre-authenticated on **12 P0 websites**: Blinkit, Swiggy, Zomato, B
 |---------|--------|-------|
 | Razorpay Live mode | ❌ Test only | Switch keys for real payments |
 | Voice interface | ❌ Not started | Web Speech API mentioned in PITCH.md |
-| Mobile app | ❌ Not started | React Native mentioned in roadmap |
+| Mobile app | 🔨 In progress | Expo + React Native in `apps/mobile/` |
 | Multi-laptop scaling | ❌ Not started | Currently single operator |
 | Preference learning | ❌ Not started | User-specific workflow memory |
+| Tier 3 orchestration | ❌ Not started | Multi-site script composition |

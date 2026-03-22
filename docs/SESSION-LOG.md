@@ -4,6 +4,42 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-22 — E2E Latency Optimization (Phase 1 shipped, Phase 2 in progress)
+
+**Goal**: Reduce TTFM from 27.5s to <2s and browser execution from 6min to <1min, based on real prod telemetry data.
+
+**What was done**:
+
+*Phase 1 — Quick wins (SHIPPED to prod):*
+1. Pruned 501 skill summaries from system prompt (22k → 3k tokens/call, 86% reduction)
+2. Skip redundant 2nd LLM call after `handoff_to_browser_agent` (saves 2-3s + 22k tokens)
+3. Parallelized param extraction + lesson loading with Promise.all (~150ms saved)
+4. Switched browser model from `claude-opus-4.6` to `claude-sonnet-4` (15-30 calls × 1.5s faster)
+5. Added instant SSE `step_update` after handoff (kills 5-6s dead zone)
+6. Fixed 2 test failures in `system.test.ts` (updated assertions for removed skill block)
+7. Deployed to prod via Cloud Build (commit `43fe6e7`)
+
+*Phase 2 — Compiled scripts (IN PROGRESS):*
+- Designed three-tier compilation model: Tier 1 (auto-record), Tier 2 (hand-written loops), Tier 3 (orchestration)
+- Key architectural decision: grocery/food/shopping skills need HAND-WRITTEN loop scripts, not auto-recorded, because item count, search results, and variant selection are dynamic per user
+- Created `docs/LATENCY.md` and `docs/COMPILED-SCRIPTS.md` with full architecture documentation
+- Started BigBasket and Blinkit loop scripts
+
+**Key decisions**:
+1. Removing all 501 skill summaries is safe because `matchSkill()` picks the skill BEFORE the LLM sees anything — LLM only needs the matched skill's instructions
+2. After handoff, the 2nd LLM call was always just "I'll help you!" — completely wasted
+3. Browser model switch: Sonnet is sufficient for routine click/type/navigate; Opus reasoning is overkill
+4. Grocery scripts must be hand-written (Tier 2) because auto-recording can't handle variable-length item loops, dynamic search results, and per-user variant selection
+5. Multi-site comparison (Tier 3) is just orchestration over existing compiled scripts — no new browser automation needed
+
+**Telemetry baseline (118 tasks, before changes)**:
+- TTFM P50: 27.5s, avg: 1.3m
+- LLM input tokens: 22,189 avg/call
+- browser_execution: 6.0min avg
+- handoff_setup cold: 14.5s
+
+**Files changed**: `packages/agent-core/src/prompts/system.ts`, `packages/agent-core/src/prompts/system.test.ts`, `packages/agent-core/src/agent.ts`, `apps/playwright/src/task-manager.ts`, `apps/web/app/api/agent/execute/route.ts`, `docs/LATENCY.md` (new), `docs/COMPILED-SCRIPTS.md` (new), `docs/ARCHITECTURE.md`, `docs/SESSION-LOG.md`
+
 ## 2026-03-22 — P0 Website Session Persistence + Health Check Script
 
 **Goal**: Ensure all P0 websites are signed in on Chrome-Debug Profile 3 so the agent can execute tasks immediately without OTP/login flows.
