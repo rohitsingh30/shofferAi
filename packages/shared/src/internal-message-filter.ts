@@ -148,16 +148,30 @@ function isSentenceNarration(lower: string): boolean {
     /\bno\s+(ask|question|input|prompt)\s+(needed|required|necessary)/,
     /\brequired (info|information|params?|data|fields?)\b/,
     /^(additionally|furthermore|moreover|in that case|in this case|given that|note that|considering)\b/,
-    /\b(extracted?|extract(ing|s)?)\s+(from|the |all |param|value|info)/,
+    /\b(extracted?|extract(ing|s)?)\s+(from|the |all |param|value|info|data)/,
     /^(the |this )?(user|customer|person) (wants?|needs?|is (looking|asking|trying)|requested?|said)\b.*\.\s*(so|let|but|step|we|i|now|proceed|since)/i,
     // System bounce-back responses: agent leaking internal system messages
-    /\bthe system (says?|rejected|wants?|asked|told|requires?|needs?|instructed|returned|bounced)\b/,
+    /\bthe system (says?|rejected|wants?|asked?|is asking|told|requires?|needs?|instructed|returned|bounced)\b/,
     /\b(been told|was told|instructed) to (proceed|hand ?off|stop|use|move|continue)\b/,
     /\b(question|ask|input|query) limit\b/,
     /\bcannot ask (more|any more|further|additional) questions?\b/,
     /\bproceed with (what|whatever|available|the) (i have|info|we have|data|information)\b/,
     /\b(my previous|the previous) attempt (was |)(rejected|failed|bounced|didn't work)\b/,
     /\buse defaults?\s+(for|because|since|as)\b/,
+    // Internal stage/phase references: "at this stage", "setup screen", "before I can continue"
+    /\b(at this stage|at this point|in this phase|currently at)\b/,
+    /\b(setup screen|setup phase|setup step|configuration screen)\b/,
+    /^(before i can|until i can|i need to .+ before)\s+(continue|proceed|show|display|search|open|fetch|extract)/,
+    /^to proceed correctly\b/,
+    // Internal UI component references
+    /\b(the |this )?(carousel|card.?grid|widget|component|layout section)\s+(requires?|needs?|expects?|cannot|can't|doesn't|won't|is missing)\b/,
+    /\b(product images?|restaurant images?|real images?)\s+(which|that|are|aren't|not|i don't)\b/,
+    // Agent explaining it cannot do something due to internal state
+    /\bi cannot (show|display|render|present|provide|extract|fetch|get)\s+(restaurant|product|real|the)?\s*(images?|photos?|pictures?|data|info)/,
+    /\bno (browser|webpage|page|tab|site)\s+(is |has been )?(open|opened|available|loaded|active)\b/,
+    /\bhaven'?t opened\b.+\b(browser|page|tab|site|webpage)\b/,
+    // "Please tap/click/select above" — internal UI instructions (widgets handle this, not text)
+    /\b(tap|click|select|choose)\s+(your |the )?.+(above|below|in the widget|in the panel)\b/,
   ];
 
   const allPatterns = [...observational, ...action, ...status, ...thirdPerson, ...browserInternals, ...selfDirected, ...reasoning];

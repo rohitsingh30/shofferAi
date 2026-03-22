@@ -34,6 +34,33 @@ function formatSkillName(id: string): string {
     .join(' ');
 }
 
+/**
+ * Targeted filter for ask_user questions. Unlike shouldSuppressMessage()
+ * (which false-positives on "Enter OTP" because "enter" is an action verb),
+ * this only catches questions that leak internal bounce/system reasoning.
+ */
+function isQuestionInternalLeak(question: string): boolean {
+  const lower = question.toLowerCase();
+  const patterns = [
+    /\bimage urls?\b/,
+    /\bbrowser.?snapshot\b/,
+    /\b(setup screen|setup phase|configuration screen)\b/,
+    /\b(at this stage|at this point|in this phase)\b/,
+    /\bthe system (says?|rejected|wants?|asked?|is asking|told|requires?|needs?|instructed|returned|bounced)\b/,
+    /\b(carousel|card.?grid|widget|layout section)\s+(requires?|needs?|expects?|cannot|can't|doesn't|won't|is missing)\b/,
+    /\bno (browser|webpage|page|tab)\s+(is )?(open|available|loaded|active)\b/,
+    /\b(product images?|restaurant images?|real images?)\s+(which|that|are|aren't|not|i don't)\b/,
+    /\b(my previous|the previous) attempt (was |)(rejected|failed|bounced)\b/,
+    /\b(question|ask|input) limit\b/,
+    /\bproceed with (what|whatever|available|the) (i have|info|we have)\b/,
+    /\bcannot ask (more|any more|further) questions?\b/,
+    /\bthe skill (says?|requires?|instructs?)\b/,
+    /\bskill\.?md\b/i,
+    /\bstep\s+\d+\s*(asks?|says?|instructs?|requires?)\b/,
+  ];
+  return patterns.some(p => p.test(lower));
+}
+
 export interface AgentCallbacks {
   onMessage: (content: string) => void;
   onStepUpdate: (step: { action: string; status: string }) => void;
@@ -1037,13 +1064,29 @@ export class AgentExecutor {
         }
       }
 
+      // ── Question narration filter ──────────────────────────────────
+      // The ask_user question goes straight to the user via onInputRequired
+      // (no message filter, no AI rewrite). If the LLM stuffs internal
+      // reasoning into the question (e.g., explaining a system bounce),
+      // bounce it back and tell it to ask a clean user-facing question.
+      // NOTE: We use a targeted check, NOT shouldSuppressMessage(), because
+      // the full filter false-positives on legitimate prompts like "Enter OTP".
+      const question = args.question as string;
+      if (question && isQuestionInternalLeak(question)) {
+        logger.warn('ask_user question is internal narration — bouncing back to LLM', { question: question.slice(0, 120) });
+        this.askUserCount--;
+        return {
+          userResponse: '[SYSTEM: Your ask_user question contains internal reasoning that would confuse the user. Rephrase as a simple, clean question. Do NOT mention: image URLs, browser snapshots, system requirements, setup screens, internal errors, or technical details. Just ask the user what you need from them in plain language.]',
+        };
+      }
+
       // Do NOT send onStepUpdate here — it renders a TaskProgress card that
       // hides the interactive InputPrompt. Only onInputRequired is needed.
       const inputStart = Date.now();
       const response = await callbacks.onInputRequired({
         taskId: '',
         stepId: toolCall.id,
-        question: args.question as string,
+        question,
         inputType: args.input_type as UserInputRequest['inputType'],
         options: args.options as string[] | undefined,
         // Rich input props
@@ -1066,8 +1109,8 @@ export class AgentExecutor {
       });
 
       // Track the collected response so we can pass it to forced handoff
-      const question = (args.question as string) || 'unknown';
-      this.collectedParams[question.slice(0, 50)] = response.value;
+      const questionKey = (args.question as string) || 'unknown';
+      this.collectedParams[questionKey.slice(0, 50)] = response.value;
 
       this.trackEvent({
         event: 'tool_call', category: 'tool',

@@ -585,4 +585,89 @@ describe('AgentExecutor', () => {
     const call = (callbacks.onInputRequired as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(call.inputType).toBe('layout');
   });
+
+  it('bounces ask_user when question contains internal reasoning (leak prevention)', async () => {
+    const { agent, llm } = createAgent();
+
+    // LLM calls ask_user with leaked internal reasoning as the question
+    llm.chat.mockResolvedValueOnce({
+      content: [{
+        type: 'tool_use',
+        id: 'tool-leak',
+        name: 'ask_user',
+        input: {
+          question: 'Before I can continue — the system is asking for real image URLs extracted from a webpage. At this stage, there is no webpage. Please tap your delivery address above.',
+          input_type: 'text',
+        },
+      }],
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    // After bounce, LLM rephrases cleanly
+    llm.chat.mockResolvedValueOnce({
+      content: [{
+        type: 'tool_use',
+        id: 'tool-clean',
+        name: 'ask_user',
+        input: {
+          question: 'What is your delivery address?',
+          input_type: 'text',
+        },
+      }],
+      stopReason: 'tool_use',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    llm.chat.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Got it!' }],
+      stopReason: 'end_turn',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    await agent.execute('order food', callbacks);
+
+    // Leaked question should be bounced, clean question should go through
+    expect(callbacks.onInputRequired).toHaveBeenCalledTimes(1);
+    const call = (callbacks.onInputRequired as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(call.question).toBe('What is your delivery address?');
+  });
+
+  it('does NOT bounce legitimate ask_user questions', async () => {
+    const { agent, llm } = createAgent({ maxIterations: 10 });
+
+    const legitimateQuestions = [
+      'Enter OTP',
+      'What is your delivery address?',
+      'Which restaurant do you prefer?',
+    ];
+
+    for (let i = 0; i < legitimateQuestions.length; i++) {
+      llm.chat.mockResolvedValueOnce({
+        content: [{
+          type: 'tool_use',
+          id: `tool-${i}`,
+          name: 'ask_user',
+          input: { question: legitimateQuestions[i], input_type: 'text' },
+        }],
+        stopReason: 'tool_use',
+        usage: { inputTokens: 10, outputTokens: 5 },
+      });
+    }
+
+    llm.chat.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'Done' }],
+      stopReason: 'end_turn',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    });
+
+    await agent.execute('order food', callbacks);
+
+    // All legitimate questions should reach the user
+    expect(callbacks.onInputRequired).toHaveBeenCalledTimes(legitimateQuestions.length);
+    for (let i = 0; i < legitimateQuestions.length; i++) {
+      const call = (callbacks.onInputRequired as ReturnType<typeof vi.fn>).mock.calls[i][0];
+      expect(call.question).toBe(legitimateQuestions[i]);
+    }
+  });
 });

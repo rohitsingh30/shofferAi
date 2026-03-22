@@ -1624,6 +1624,23 @@ function genSystemBounceResponses(): TestVector[] {
     // "Shall I / Do you want me to" + internal fetch
     ['Shall I fetch the detailed product specifications?', true, 'system-bounce'],
     ['Do you want me to get the ratings for each product?', true, 'system-bounce'],
+    // Layout/carousel bounce: agent leaking internal state about setup screen
+    ['Thanks! Before I can continue — I need a quick clarification.', true, 'system-bounce'],
+    ['Right now, we\'re still on the setup screen (collecting your address + preferences).', true, 'system-bounce'],
+    ['At this stage, there is no webpage to extract images from, so the cuisine carousel cannot include real image URLs yet.', true, 'system-bounce'],
+    ['To proceed correctly, I need you to choose your delivery address first.', true, 'system-bounce'],
+    ['Please tap your delivery address above to continue.', true, 'system-bounce'],
+    ['The system is asking me to take a screenshot but no browser is open.', true, 'system-bounce'],
+    ['I cannot show restaurant images at this stage.', true, 'system-bounce'],
+    ['The carousel requires real product images which I don\'t have yet.', true, 'system-bounce'],
+    ['I need to extract data from the webpage but haven\'t opened it yet.', true, 'system-bounce'],
+    ['Before I can show you restaurants, I need to set up the browser.', true, 'system-bounce'],
+    ['At this point, I don\'t have access to the restaurant images.', true, 'system-bounce'],
+    ['The widget needs product images which aren\'t available yet.', true, 'system-bounce'],
+    ['I\'m currently at the setup phase and cannot fetch images.', true, 'system-bounce'],
+    ['No browser is open yet, so I can\'t extract the data.', true, 'system-bounce'],
+    ['Click your address above to continue with the order.', true, 'system-bounce'],
+    ['Select your delivery address above to proceed.', true, 'system-bounce'],
   ];
 }
 
