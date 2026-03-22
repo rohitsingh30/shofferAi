@@ -28,7 +28,7 @@ sequenceDiagram
     Tab2-->>RS: Click result
     RS-->>MCP: ToolCallResponse
 
-    Note over Pool: Each sessionId maps to isolated Chrome tab
+    Note over Pool: Each sessionId maps to isolated Chrome tab<br/>within pre-authenticated Profile 3 (12 P0 sites)
     Note over Pool: Tab released on SessionEndRequest
 
     SMCP->>MCP: SessionEndRequest {sessionId: "task-A"}

@@ -1,5 +1,5 @@
 graph TD
-    A["1️⃣ Chrome Debug starts<br/>(LaunchAgent on login)"] --> B["2️⃣ Verify CDP is live<br/>curl localhost:9222/json/version"]
+    A["1️⃣ Chrome Debug starts<br/>(LaunchAgent on login)<br/>Profile 3 — pre-auth 12 P0 sites"] --> B["2️⃣ Verify CDP is live<br/>curl localhost:9222/json/version"]
     B --> C["3️⃣ Start laptop relay<br/>npm run laptop"]
     C --> D{"RELAY_CLOUD_URL set?"}
     D -->|"Yes"| E["RelayOutbound connects<br/>to wss://cloud-run-url"]
