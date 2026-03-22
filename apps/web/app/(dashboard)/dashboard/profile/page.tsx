@@ -290,20 +290,18 @@ export default function ProfilePage() {
 
                     {showAddAddress && (
                       <form onSubmit={handleAddAddress} className="mt-3 space-y-2.5 border-t border-border pt-3">
-                        <div className="grid grid-cols-3 gap-2">
-                          <input
-                            value={addressForm.label}
-                            onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
-                            placeholder="Label (Home, Office...)"
-                            className="col-span-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                          <input
-                            value={addressForm.flatNo || ''}
-                            onChange={(e) => setAddressForm({ ...addressForm, flatNo: e.target.value })}
-                            placeholder="Flat / House No."
-                            className="col-span-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
+                        <input
+                          value={addressForm.label}
+                          onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
+                          placeholder="Label (Home, Office...)"
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        <input
+                          value={addressForm.flatNo || ''}
+                          onChange={(e) => setAddressForm({ ...addressForm, flatNo: e.target.value })}
+                          placeholder="Flat / House No."
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
                         <input
                           value={addressForm.line1}
                           onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
