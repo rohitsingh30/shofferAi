@@ -1,5 +1,5 @@
 import { spawn, execSync, type ChildProcess } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
@@ -432,31 +432,52 @@ export class TaskManager {
   }
 
   /**
-   * Resolve GitHub token from cache, env, or `gh auth token`.
-   * Caches for 30 min to avoid repeated keyring lookups.
-   * Passing GH_TOKEN to the subprocess avoids keyring issues in detached processes.
+   * Resolve GitHub token from env → file cache → `gh auth token` (keychain).
+   * On first keychain read, persists to ~/.config/shofferai/.gh-token (0600)
+   * so the macOS Keychain popup only appears once.
    */
   private resolveGhToken(): string | null {
-    // Prefer explicit env var (already works without keyring)
+    // 1. Prefer explicit env var (no keychain needed)
     if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
     if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
     if (process.env.COPILOT_GITHUB_TOKEN) return process.env.COPILOT_GITHUB_TOKEN;
 
-    // Return cached token if fresh (30 min TTL)
+    // 2. Return in-memory cache if fresh (30 min TTL)
     const TTL_MS = 30 * 60_000;
     if (this.ghTokenCache && Date.now() - this.ghTokenCache.fetchedAt < TTL_MS) {
       return this.ghTokenCache.token;
     }
 
-    // Fetch from gh CLI (reads keyring in parent process — works reliably)
+    // 3. Read from file cache (avoids keychain popup on every restart)
+    const tokenFile = join(homedir(), '.config', 'shofferai', '.gh-token');
+    try {
+      if (existsSync(tokenFile)) {
+        const age = Date.now() - statSync(tokenFile).mtimeMs;
+        if (age < 24 * 60 * 60_000) { // 24h file TTL
+          const token = readFileSync(tokenFile, 'utf-8').trim();
+          if (token) {
+            this.ghTokenCache = { token, fetchedAt: Date.now() };
+            return token;
+          }
+        }
+      }
+    } catch { /* file read failed, fall through to keychain */ }
+
+    // 4. Last resort: read from keychain via gh CLI (triggers popup once)
     try {
       const token = execSync(`${this.options.copilotBin} auth token 2>/dev/null`, {
-        timeout: 5_000,
+        timeout: 10_000,
         encoding: 'utf-8',
       }).trim();
       if (token) {
         this.ghTokenCache = { token, fetchedAt: Date.now() };
-        logger.info('TaskManager: cached GitHub token from gh auth');
+        // Persist to file so future runs skip keychain
+        try {
+          const dir = join(homedir(), '.config', 'shofferai');
+          mkdirSync(dir, { recursive: true, mode: 0o700 });
+          writeFileSync(tokenFile, token, { mode: 0o600 });
+          logger.info('TaskManager: cached GitHub token to file (keychain bypass)');
+        } catch { /* non-fatal — in-memory cache still works */ }
         return token;
       }
     } catch {
