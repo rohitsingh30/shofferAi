@@ -46,7 +46,7 @@ export interface BridgeRequestPaymentMessage {
   stepId: string;
   amount: number;
   description: string;
-  bookingSummary?: Record<string, unknown>;
+  bookingSummary?: string;
 }
 
 export interface BridgeProgressMessage {

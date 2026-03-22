@@ -125,7 +125,7 @@ export interface TaskPaymentRequiredMessage {
   stepId: string;
   amount: number;
   description: string;
-  bookingSummary?: Record<string, unknown>;
+  bookingSummary?: string;
 }
 
 /** Cloud → Laptop: payment confirmation */

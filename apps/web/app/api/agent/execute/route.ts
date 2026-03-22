@@ -434,19 +434,22 @@ export async function POST(request: Request) {
               break;
             }
 
-            case 'task_payment_required':
+            case 'task_payment_required': {
               console.log('[execute] taskId=%s TASK_PAYMENT_REQUIRED amount=%d', taskId, msg.amount);
+              const relaySummary = typeof msg.bookingSummary === 'string'
+                ? msg.bookingSummary
+                : msg.bookingSummary ? JSON.stringify(msg.bookingSummary) : undefined;
               send('payment_required', {
                 taskId,
                 stepId: msg.stepId,
-                bookingSummary: msg.bookingSummary,
+                bookingSummary: relaySummary,
                 amountCents: Math.round(msg.amount * 100),
                 serviceFeeCents: 0,
                 description: msg.description,
               });
               // Persist the payment request
               workflowEngine.addMessage(taskId, 'assistant',
-                `Payment required: ₹${msg.amount}${msg.bookingSummary ? '\n' + msg.bookingSummary : ''}`,
+                `Payment required: ₹${msg.amount}${relaySummary ? '\n' + relaySummary : ''}`,
                 { type: 'payment_required', amount: msg.amount, stepId: msg.stepId },
               ).catch(e => console.error('[execute] DB addMessage(task_payment_required) failed:', e));
 
@@ -513,6 +516,7 @@ export async function POST(request: Request) {
                 }
               });
               break;
+            }
 
             case 'task_complete':
               console.log('[execute] taskId=%s TASK_COMPLETE: %s', taskId, msg.summary?.slice(0, 120));
@@ -697,10 +701,13 @@ export async function POST(request: Request) {
           },
           async onPaymentRequired(details: { bookingSummary: string; amountInr: number; description: string }) {
             console.log('[execute] taskId=%s PAYMENT_REQUIRED amount=₹%d', taskId, details.amountInr);
-            workflowEngine.addMessage(taskId, 'assistant', `Payment required: ₹${details.amountInr}\n${details.bookingSummary}`, { type: 'payment', amountInr: details.amountInr }).catch(e => console.error('[execute] DB addMessage(payment-ask) failed:', e));
+            const chatSummary = typeof details.bookingSummary === 'string'
+              ? details.bookingSummary
+              : details.bookingSummary ? JSON.stringify(details.bookingSummary) : '';
+            workflowEngine.addMessage(taskId, 'assistant', `Payment required: ₹${details.amountInr}\n${chatSummary}`, { type: 'payment', amountInr: details.amountInr }).catch(e => console.error('[execute] DB addMessage(payment-ask) failed:', e));
             send('payment_required', {
               taskId,
-              bookingSummary: details.bookingSummary,
+              bookingSummary: chatSummary,
               amountCents: Math.round(details.amountInr * 100),
               serviceFeeCents: 0,
               description: details.description,

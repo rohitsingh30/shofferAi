@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { ClientErrorReporter } from '@/components/ClientErrorReporter';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -24,7 +25,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${inter.variable}`}>
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <ClientErrorReporter />
+        {children}
+      </body>
     </html>
   );
 }

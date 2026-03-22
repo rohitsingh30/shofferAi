@@ -348,12 +348,14 @@ mcpServer.registerTool(
   },
   async ({ amount, description, booking_summary }) => {
     const stepId = randomUUID();
-    let bookingSummary: Record<string, unknown> | undefined;
+    // Keep bookingSummary as a JSON string — downstream (execute/route, BookingSummaryCard) expects a string
+    let bookingSummary: string | undefined;
     if (booking_summary) {
       try {
-        bookingSummary = JSON.parse(booking_summary);
+        JSON.parse(booking_summary); // validate JSON
+        bookingSummary = booking_summary;
       } catch {
-        bookingSummary = { raw: booking_summary };
+        bookingSummary = JSON.stringify({ raw: booking_summary });
       }
     }
 

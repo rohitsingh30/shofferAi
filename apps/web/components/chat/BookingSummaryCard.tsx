@@ -10,14 +10,16 @@ interface BookingDetails {
 }
 
 export function BookingSummaryCard({ summaryJson }: { summaryJson: string }) {
+  // Defensive: if an object slips through instead of a string, stringify it
+  const raw = typeof summaryJson === 'string' ? summaryJson : JSON.stringify(summaryJson);
   let details: BookingDetails;
   try {
-    details = JSON.parse(summaryJson);
+    details = JSON.parse(raw);
   } catch {
     // If not JSON, display as plain text
     return (
       <div className="rounded-xl border border-border/50 bg-[#1a1a24] p-4">
-        <p className="text-sm text-foreground/90">{summaryJson}</p>
+        <p className="text-sm text-foreground/90">{raw}</p>
       </div>
     );
   }
