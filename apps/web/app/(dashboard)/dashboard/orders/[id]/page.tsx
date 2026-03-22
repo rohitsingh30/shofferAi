@@ -105,7 +105,7 @@ export default function OrderDetailPage() {
   if (loading) {
     return (
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl px-6 py-10">
+        <div className="mx-auto w-full max-w-5xl px-6 py-10">
           <div className="animate-pulse space-y-5">
             <div className="h-4 w-24 rounded bg-zinc-800" />
             <div className="rounded-2xl bg-zinc-800/60 p-8">
@@ -129,7 +129,7 @@ export default function OrderDetailPage() {
   if (error || !order) {
     return (
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl px-6 py-10">
+        <div className="mx-auto w-full max-w-5xl px-6 py-10">
           <button
             onClick={() => router.push('/dashboard/orders')}
             className="group mb-8 flex items-center gap-2 text-[13px] text-zinc-500 transition-colors hover:text-white"
@@ -155,7 +155,7 @@ export default function OrderDetailPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-2xl px-6 py-10">
+      <div className="mx-auto w-full max-w-5xl px-6 py-10">
 
         {/* ── Back nav ── */}
         <button

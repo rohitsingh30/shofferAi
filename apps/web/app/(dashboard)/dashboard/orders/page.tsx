@@ -79,7 +79,7 @@ export default function OrdersPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-    <div className="mx-auto w-full max-w-2xl px-6 py-10">
+    <div className="mx-auto w-full max-w-5xl px-6 py-10">
       <h1 className="mb-6 text-xl font-semibold tracking-tight text-white">Orders</h1>
 
       {loading && (
