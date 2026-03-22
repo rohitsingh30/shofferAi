@@ -125,33 +125,38 @@ export function AddressInput({ saved: savedProp = [], onSubmit }: AddressInputPr
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Saved addresses — scrollable when many */}
+      {/* Saved addresses — scrollable when many, with fade hint */}
       {addresses.length > 0 && (
-        <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto overscroll-contain pr-0.5">
-          {addresses.map((entry, i) => {
-            const on = mode === 'saved' && selectedIdx === i;
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => { setSelectedIdx(i); setMode('saved'); setShowNew(false); }}
-                className={`group flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all ${
-                  on ? 'bg-primary/12 ring-1 ring-primary/40' : 'bg-white/[0.03] hover:bg-white/[0.06]'
-                }`}
-              >
-                <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors ${
-                  on ? 'border-primary bg-primary' : 'border-white/25'
-                }`}>
-                  {on && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
-                </span>
-                <span className="text-base leading-none">{ICONS[entry.label] ?? '🏠'}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="text-[13px] font-medium text-white">{entry.label}</span>
-                  <span className="ml-2 text-xs text-white/40 line-clamp-1">{entry.address}</span>
-                </span>
-              </button>
-            );
-          })}
+        <div className="relative">
+          <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto overscroll-contain pr-0.5 scroll-smooth">
+            {addresses.map((entry, i) => {
+              const on = mode === 'saved' && selectedIdx === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => { setSelectedIdx(i); setMode('saved'); setShowNew(false); }}
+                  className={`group flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-all ${
+                    on ? 'bg-primary/12 ring-1 ring-primary/40' : 'bg-white/[0.03] hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors ${
+                    on ? 'border-primary bg-primary' : 'border-white/25'
+                  }`}>
+                    {on && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                  </span>
+                  <span className="text-base leading-none">{ICONS[entry.label] ?? '🏠'}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-[13px] font-medium text-white">{entry.label}</span>
+                    <span className="ml-2 text-xs text-white/40 line-clamp-1">{entry.address}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {addresses.length > 4 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-background to-transparent rounded-b-lg" />
+          )}
         </div>
       )}
 
