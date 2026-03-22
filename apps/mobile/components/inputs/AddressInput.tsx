@@ -4,6 +4,7 @@ import {
   Text,
   Pressable,
   TextInput,
+  ScrollView,
   StyleSheet,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -51,6 +52,7 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
 
   return (
     <View style={styles.container}>
+      <ScrollView style={styles.savedList} nestedScrollEnabled>
       {saved.map((addr, idx) => {
         const isActive = !showNew && selectedIdx === idx;
         return (
@@ -69,6 +71,7 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
           </Pressable>
         );
       })}
+      </ScrollView>
 
       <Pressable
         style={[styles.addNewBtn, showNew && styles.addNewBtnActive]}
@@ -119,6 +122,10 @@ export function AddressInput({ saved = [], onSubmit }: AddressInputProps) {
 
 const styles = StyleSheet.create({
   container: {
+    gap: spacing.sm,
+  },
+  savedList: {
+    maxHeight: 200,
     gap: spacing.sm,
   },
   addrCard: {

@@ -125,9 +125,9 @@ export function AddressInput({ saved: savedProp = [], onSubmit }: AddressInputPr
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Saved addresses */}
+      {/* Saved addresses — scrollable when many */}
       {addresses.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto overscroll-contain pr-0.5">
           {addresses.map((entry, i) => {
             const on = mode === 'saved' && selectedIdx === i;
             return (

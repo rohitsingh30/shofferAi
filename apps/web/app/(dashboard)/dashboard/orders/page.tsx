@@ -78,8 +78,9 @@ export default function OrdersPage() {
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold text-white">Orders</h1>
+    <div className="flex-1 overflow-y-auto">
+    <div className="mx-auto w-full max-w-2xl px-6 py-10">
+      <h1 className="mb-6 text-xl font-semibold tracking-tight text-white">Orders</h1>
 
       {loading && (
         <div className="space-y-3">
@@ -136,6 +137,7 @@ export default function OrdersPage() {
           ))}
         </div>
       )}
+    </div>
     </div>
   );
 }
