@@ -47,6 +47,15 @@
   background: #3f3f46;
 }
 
+/* Hide scrollbar completely (horizontal carousels) */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);

@@ -28,7 +28,7 @@ export function CardGridSkeleton({ count, cols = 'grid' }: { count: number; cols
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <div className="scrollbar-none grid grid-rows-2 grid-flow-col auto-cols-[140px] sm:auto-cols-[156px] gap-2.5 overflow-x-auto pb-2">
       {items.map((_, i) => (
         <div
           key={i}

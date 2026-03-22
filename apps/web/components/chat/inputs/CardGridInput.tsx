@@ -124,7 +124,7 @@ export function CardGridInput({
 
         {/* Real product grid — hidden until all images ready, then fades in */}
         <div
-          className={`grid grid-cols-2 gap-3 sm:grid-cols-3 transition-opacity duration-300 ${
+          className={`scrollbar-none grid grid-rows-2 grid-flow-col auto-cols-[140px] sm:auto-cols-[156px] gap-2.5 overflow-x-auto snap-x pb-2 transition-opacity duration-300 ${
             imagesReady ? 'opacity-100' : 'h-0 overflow-hidden opacity-0'
           }`}
         >
@@ -137,7 +137,7 @@ export function CardGridInput({
             return (
               <div
                 key={card.id}
-                className={`carousel-card group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all duration-200 ${
+                className={`carousel-card group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border transition-all duration-200 snap-start ${
                   isSelected
                     ? 'border-primary/60 bg-primary/[0.06] ring-2 ring-primary/25 shadow-lg shadow-primary/10'
                     : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20'
