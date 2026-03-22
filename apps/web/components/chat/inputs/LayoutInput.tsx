@@ -76,8 +76,16 @@ export function LayoutInput({ sections, onSubmit }: LayoutInputProps) {
   };
 
   const renderSection = (section: SectionConfig) => {
-    // Capture value without triggering parent submit — LayoutInput has its own submit
-    const onSectionValue = (val: string) => setSectionValue(section.name, val);
+    // For single-section layouts, submit the layout immediately when section value is set
+    const onSectionValue = (val: string) => {
+      if (sections.length === 1) {
+        const result: Record<string, unknown> = {};
+        try { result[section.name] = JSON.parse(val); } catch { result[section.name] = val; }
+        onSubmit(JSON.stringify(result));
+      } else {
+        setSectionValue(section.name, val);
+      }
+    };
 
     const completed = !!values[section.name];
 
@@ -247,14 +255,16 @@ export function LayoutInput({ sections, onSubmit }: LayoutInputProps) {
         );
       })}
 
-      {/* Submit */}
-      <button
-        onClick={handleSubmit}
-        disabled={!allRequiredFilled}
-        className="w-full rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Continue →
-      </button>
+      {/* Submit — hide when single section (it has its own submit button) */}
+      {sections.length > 1 && (
+        <button
+          onClick={handleSubmit}
+          disabled={!allRequiredFilled}
+          className="w-full rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Continue →
+        </button>
+      )}
     </div>
   );
 }
