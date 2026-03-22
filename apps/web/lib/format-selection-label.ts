@@ -21,6 +21,12 @@ export function formatSelectionLabel(
     if (card) return card.label;
   }
 
+  // Product card — user tapped Pay Now or similar action
+  if (pendingInput.inputType === 'product_card') {
+    if (value === 'proceed_to_pay') return '💳 Proceeding to payment';
+    if (value === 'added_to_cart') return '🛒 Added to cart';
+  }
+
   // Choice / chip_bar — value is 1-based index
   if (pendingInput.options?.length) {
     const idx = parseInt(value, 10);

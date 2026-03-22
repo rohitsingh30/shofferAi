@@ -22,14 +22,20 @@ function formatPrice(amount: number): string {
 }
 
 export function ProductCardInput({ product, onSubmit }: ProductCardInputProps) {
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
   const { openCart } = useL2Cart();
 
   const imageUrls = useMemo(() => [product.image], [product.image]);
   const { ready: imageReady, failed: imgFailed } = useImagePreloader(imageUrls);
 
   const handlePayNow = () => {
-    addItem(product);
+    // Only add if not already in cart (carousel selection may have added it)
+    const alreadyInCart = items.some(
+      (item) => item.id === product.id || item.name === product.name,
+    );
+    if (!alreadyInCart) {
+      addItem(product);
+    }
     openCart();
     onSubmit('proceed_to_pay');
   };
