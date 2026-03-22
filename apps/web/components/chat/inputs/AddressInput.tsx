@@ -1,11 +1,17 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect, type UIEvent } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import {
+  AddressFormFields,
+  EMPTY_ADDRESS_FORM,
+  type AddressFormData,
+} from '@/components/AddressFormFields';
 
 interface SavedAddress {
   label: string;
   address: string;
   flatNo?: string;
+  name?: string;
   line1?: string;
   line2?: string;
   city?: string;
@@ -20,24 +26,8 @@ interface AddressInputProps {
 }
 
 const ICONS: Record<string, string> = { Home: '🏠', Office: '🏢', Other: '📍' };
-const LABELS = ['Home', 'Office', 'Other'] as const;
 
-async function lookupPincode(pin: string): Promise<{ city: string; state: string } | null> {
-  try {
-    const r = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
-    const d = await r.json();
-    if (d?.[0]?.Status === 'Success' && d[0].PostOffice?.length) {
-      const po = d[0].PostOffice[0];
-      return { city: po.District || po.Division, state: po.State };
-    }
-  } catch { /* user can type manually */ }
-  return null;
-}
-
-async function saveAddressToProfile(address: {
-  label: string; flatNo?: string; line1: string;
-  city: string; state: string; pincode: string; contactNumber?: string;
-}) {
+async function saveAddressToProfile(address: AddressFormData) {
   try {
     const res = await fetch('/api/profile');
     let addresses: SavedAddress[] = [];
@@ -45,7 +35,7 @@ async function saveAddressToProfile(address: {
       const p = await res.json();
       addresses = Array.isArray(p.addresses) ? p.addresses : [];
     }
-    const fullAddress = [address.flatNo, address.line1, address.city, address.state, address.pincode].filter(Boolean).join(', ');
+    const fullAddress = [address.flatNo, address.line1, address.line2, address.city, address.state, address.pincode].filter(Boolean).join(', ');
     const entry: SavedAddress = { ...address, address: fullAddress };
     const idx = addresses.findIndex(a => a.label === address.label);
     if (idx >= 0) addresses[idx] = entry; else addresses.push(entry);
@@ -76,57 +66,35 @@ export function AddressInput({ saved: savedProp = [], onSubmit }: AddressInputPr
       .catch(() => { /* non-blocking */ });
   }, [savedProp.length]);
 
-  const [label, setLabel] = useState('');
-  const [flatNo, setFlatNo] = useState('');
-  const [line1, setLine1] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [pincode, setPincode] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
-  const [pinLoading, setPinLoading] = useState(false);
-  const [pinError, setPinError] = useState('');
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setPinError('');
-    if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-      setPinLoading(true);
-      timerRef.current = setTimeout(async () => {
-        const r = await lookupPincode(pincode);
-        if (r) { setCity(r.city); setState(r.state); }
-        else setPinError('Not found — enter city manually');
-        setPinLoading(false);
-      }, 300);
-    } else { setCity(''); setState(''); }
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [pincode]);
+  const [form, setForm] = useState<AddressFormData>(EMPTY_ADDRESS_FORM);
 
   const handleSubmit = useCallback(() => {
     if (mode === 'saved' && selectedIdx !== null && addresses[selectedIdx]) {
       onSubmit(JSON.stringify(addresses[selectedIdx]));
-    } else if (mode === 'new' && line1.trim() && pincode.trim()) {
+    } else if (mode === 'new' && form.line1.trim() && form.pincode.trim()) {
       const obj = {
-        label: label.trim() || 'Custom',
-        flatNo: flatNo.trim() || undefined,
-        line1: line1.trim(),
-        city: city.trim(), state: state.trim(), pincode: pincode.trim(),
-        contactNumber: contactNumber.trim() || undefined,
-        address: [flatNo.trim(), line1.trim(), city.trim(), state.trim(), pincode.trim()].filter(Boolean).join(', '),
+        ...form,
+        label: form.label || 'Custom',
+        name: form.name?.trim() || undefined,
+        flatNo: form.flatNo?.trim() || undefined,
+        line1: form.line1.trim(),
+        line2: form.line2?.trim() || undefined,
+        city: form.city.trim(),
+        state: form.state.trim(),
+        pincode: form.pincode.trim(),
+        contactNumber: form.contactNumber?.trim() || undefined,
+        address: [form.flatNo?.trim(), form.line1.trim(), form.line2?.trim(), form.city.trim(), form.state.trim(), form.pincode.trim()].filter(Boolean).join(', '),
       };
       onSubmit(JSON.stringify(obj));
       saveAddressToProfile(obj);
     }
-  }, [mode, selectedIdx, addresses, label, flatNo, line1, city, state, pincode, contactNumber, onSubmit]);
+  }, [mode, selectedIdx, addresses, form, onSubmit]);
 
-  const canSubmit = (mode === 'saved' && selectedIdx !== null) || (mode === 'new' && line1.trim() && pincode.trim());
-
-  const inp = 'w-full rounded-md border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/25 outline-none focus:border-primary/50 focus:bg-white/[0.06] transition-all';
+  const canSubmit = (mode === 'saved' && selectedIdx !== null) || (mode === 'new' && form.line1.trim() && form.pincode.trim());
 
   const [showFade, setShowFade] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Detect if the list is scrollable and whether we're at the bottom
   const checkScroll = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
@@ -203,55 +171,18 @@ export function AddressInput({ saved: savedProp = [], onSubmit }: AddressInputPr
         <span>{showNew ? 'Cancel' : 'New address'}</span>
       </button>
 
-      {/* Compact form */}
+      {/* Address form — uses shared AddressFormFields */}
       {showNew && (
-        <div className="flex flex-col gap-2 rounded-lg bg-white/[0.02] p-3">
-          {/* Label chips */}
-          <div className="flex gap-1.5">
-            {LABELS.map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => setLabel(l)}
-                className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-all ${
-                  label === l
-                    ? 'bg-primary/20 text-primary ring-1 ring-primary/30'
-                    : 'bg-white/[0.05] text-white/40 hover:text-white/60'
-                }`}
-              >
-                {ICONS[l]} {l}
-              </button>
-            ))}
-          </div>
-
-          {/* Flat + Address on same conceptual group */}
-          <div className="grid grid-cols-[1fr_2fr] gap-2">
-            <input type="text" placeholder="Flat / House #" value={flatNo}
-              onChange={e => { setFlatNo(e.target.value); setMode('new'); }} className={inp} />
-            <input type="text" placeholder="Street, building, area *" value={line1}
-              onChange={e => { setLine1(e.target.value); setMode('new'); }} className={inp} />
-          </div>
-
-          {/* Pincode + Contact row */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="relative">
-              <input type="text" placeholder="Pincode *" value={pincode} inputMode="numeric" maxLength={6}
-                onChange={e => { setPincode(e.target.value.replace(/\D/g, '').slice(0, 6)); setMode('new'); }} className={inp} />
-              {pinLoading && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/30 animate-pulse">···</span>}
-            </div>
-            <input type="tel" placeholder="Phone (optional)" value={contactNumber} inputMode="tel" maxLength={10}
-              onChange={e => { setContactNumber(e.target.value.replace(/\D/g, '').slice(0, 10)); setMode('new'); }} className={inp} />
-          </div>
-
-          {/* Pincode result or error — single line */}
-          {pinError && <p className="text-[11px] text-amber-400/80 -mt-1">{pinError}</p>}
-          {city && !pinLoading && (
-            <p className="text-[11px] text-white/30 -mt-1">📍 {[city, state].filter(Boolean).join(', ')}</p>
-          )}
+        <div className="rounded-lg bg-white/[0.02] p-3">
+          <AddressFormFields
+            value={form}
+            onChange={(v) => { setForm(v); setMode('new'); }}
+            variant="chat"
+          />
         </div>
       )}
 
-      {/* Submit — inline right */}
+      {/* Submit */}
       <button
         type="button"
         disabled={!canSubmit}

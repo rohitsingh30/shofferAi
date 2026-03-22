@@ -1,6 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import {
+  AddressFormFields,
+  EMPTY_ADDRESS_FORM,
+  type AddressFormData,
+} from '@/components/AddressFormFields';
 
 interface Address {
   id?: string;
@@ -34,37 +39,6 @@ interface UserInfo {
   email: string;
 }
 
-const ADDRESS_LABELS = ['Home', 'Work', 'Office', 'Other'] as const;
-
-const emptyAddressForm: Omit<Address, 'id'> = {
-  label: 'Home',
-  name: '',
-  line1: '',
-  line2: '',
-  city: '',
-  state: '',
-  pincode: '',
-  contactNumber: '',
-};
-
-function usePincodeLookup(
-  pincode: string,
-  onResult: (city: string, state: string) => void,
-) {
-  useEffect(() => {
-    if (!/^\d{6}$/.test(pincode)) return;
-    let cancelled = false;
-    fetch(`/api/pincode?code=${pincode}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled || !data.city) return;
-        onResult(data.city, data.state);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [pincode]); // eslint-disable-line react-hooks/exhaustive-deps
-}
-
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -73,7 +47,7 @@ export default function ProfilePage() {
   const [showAddAddress, setShowAddAddress] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [editPhone, setEditPhone] = useState('');
-  const [addressForm, setAddressForm] = useState(emptyAddressForm);
+  const [addressForm, setAddressForm] = useState<AddressFormData>(EMPTY_ADDRESS_FORM);
   const [savingAddress, setSavingAddress] = useState(false);
   const [cardForm, setCardForm] = useState({
     label: '',
@@ -85,16 +59,6 @@ export default function ProfilePage() {
   });
   const [saving, setSaving] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-
-  const handlePincodeResult = useCallback((city: string, state: string) => {
-    setAddressForm((prev) => ({
-      ...prev,
-      city: prev.city || city,
-      state: prev.state || state,
-    }));
-  }, []);
-
-  usePincodeLookup(addressForm.pincode, handlePincodeResult);
 
   useEffect(() => {
     Promise.all([
@@ -149,7 +113,7 @@ export default function ProfilePage() {
     });
     const updated = await fetch('/api/profile').then((r) => r.json());
     setProfile(updated);
-    setAddressForm(emptyAddressForm);
+    setAddressForm(EMPTY_ADDRESS_FORM);
     setShowAddAddress(false);
     setSavingAddress(false);
   };
@@ -293,70 +257,11 @@ export default function ProfilePage() {
 
             {showAddAddress && (
               <form onSubmit={handleAddAddress} className={`space-y-3 ${profile && profile.addresses.length > 0 ? 'mt-4 border-t border-border pt-4' : ''}`}>
-                <div className="grid grid-cols-4 gap-2">
-                  <select
-                    value={addressForm.label}
-                    onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    {ADDRESS_LABELS.map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                  <input
-                    value={addressForm.name || ''}
-                    onChange={(e) => setAddressForm({ ...addressForm, name: e.target.value })}
-                    placeholder="Contact name"
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <input
-                    type="tel"
-                    value={addressForm.contactNumber || ''}
-                    onChange={(e) => setAddressForm({ ...addressForm, contactNumber: e.target.value })}
-                    placeholder="Phone *"
-                    required
-                    className="col-span-2 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <input
-                  value={addressForm.line1}
-                  onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
-                  placeholder="Address line 1 *"
-                  required
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                <AddressFormFields
+                  value={addressForm}
+                  onChange={setAddressForm}
+                  variant="page"
                 />
-                <input
-                  value={addressForm.line2 || ''}
-                  onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
-                  placeholder="Address line 2 (optional)"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <div className="grid grid-cols-3 gap-2">
-                  <input
-                    value={addressForm.pincode}
-                    onChange={(e) => setAddressForm({
-                      ...addressForm,
-                      pincode: e.target.value.replace(/\D/g, '').slice(0, 6),
-                      ...(e.target.value.replace(/\D/g, '').length < 6 ? { city: '', state: '' } : {}),
-                    })}
-                    placeholder="Pincode *"
-                    required
-                    maxLength={6}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <input
-                    value={addressForm.city}
-                    onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                    placeholder="City"
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                  <input
-                    value={addressForm.state}
-                    onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
-                    placeholder="State"
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
                 <div className="flex gap-2">
                   <button
                     type="submit"
@@ -367,7 +272,7 @@ export default function ProfilePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setShowAddAddress(false); setAddressForm(emptyAddressForm); }}
+                    onClick={() => { setShowAddAddress(false); setAddressForm(EMPTY_ADDRESS_FORM); }}
                     className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
                   >
                     Cancel

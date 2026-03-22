@@ -65,13 +65,15 @@ interface AgentCallbacks {
 
 ## Cart & L2 Split View
 
-- **CartContext** (`CartContext.tsx`) — client-side cart (items, store, add/remove/clear). Single-store enforcement — adding from different store clears previous items
+- **CartContext** (`CartContext.tsx`) — client-side cart (items, store, add/remove/clear). Single-store enforcement — adding from different store clears previous items. Each item has a `source` field (`'user'` or `'agent'`):
+  - `source: 'user'` — items picked by user via card_grid/carousel (`addItem()`). **Never overwritten** by agent sync.
+  - `source: 'agent'` — items synced from agent `cart_update` SSE events (`syncFromAgent()`). Replaced on each sync, user items preserved.
 - **L2CartContext** (`L2CartContext.tsx`) — cart panel state machine: `CLOSED → OPENING (300ms) → OPEN → CLOSING (300ms) → CLOSED`
 - **L2PaymentContext** (`L2PaymentContext.tsx`) — payment panel state (same state machine)
 - **L2SplitView** — 60% chat / 40% panel. Payment panel takes priority over cart panel
 - **CartBar** — floating bar above input when cart is non-empty; click summary area to open L2CartPanel, click "Continue →" to submit to agent
-- **ProductCardInput** — rich product card with "Add to Cart" → `CartContext.addItem()`
-- **"New Chat" reset** — `resetChat()` calls `closeL2()` + `closeCart()` + `clearCart()` — always clears all L2 state
+- **ProductCardInput** — rich product card with "Add to Cart" → `CartContext.addItem()` (source: 'user')
+- **"New Chat" reset** — `resetChat()` calls `closeL2()` + `closeCart()` + `clearCart()` — always clears all L2 state (both user and agent items)
 
 ## Credential Vault
 
@@ -80,6 +82,17 @@ interface AgentCallbacks {
 - `CredentialVault.retrieve()` decrypts → `CredentialInjector.fill()` types into browser form
 - LLM NEVER sees raw credentials
 - Types: `SiteLoginData`, `CardData`, `UPIData`, `AddressData` (in `packages/shared/src/credentials.ts`)
+
+## Address Form (Shared Component)
+
+- **`AddressFormFields`** (`components/AddressFormFields.tsx`) — single source of truth for address fields across all surfaces
+- Used by: chat `AddressInput`, profile page, onboarding page
+- Fields: label (chips), name, flatNo, line1, line2, pincode, city, state, contactNumber
+- Pincode auto-fill via `/api/pincode` → city + state (editable by user if lookup fails)
+- `variant` prop: `'chat'` (dark compact) or `'page'` (standard card)
+- `hideLabel` prop: suppresses label chips (e.g. onboarding where label is fixed)
+- Exports: `AddressFormFields`, `AddressFormData`, `EMPTY_ADDRESS_FORM`, `ADDRESS_LABELS`, `usePincodeLookup`
+- **Rule: NEVER create a new inline address form** — always use `AddressFormFields`
 
 ## Relay (Cloud Run side)
 

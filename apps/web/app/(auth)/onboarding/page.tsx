@@ -1,37 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-
-function usePincodeLookup(
-  pincode: string,
-  onResult: (city: string, state: string) => void,
-) {
-  useEffect(() => {
-    if (!/^\d{6}$/.test(pincode)) return;
-    let cancelled = false;
-    fetch(`/api/pincode?code=${pincode}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled || !data.city) return;
-        onResult(data.city, data.state);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [pincode]); // eslint-disable-line react-hooks/exhaustive-deps
-}
+import {
+  AddressFormFields,
+  EMPTY_ADDRESS_FORM,
+  type AddressFormData,
+} from '@/components/AddressFormFields';
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState({
+  const [address, setAddress] = useState<AddressFormData>({
+    ...EMPTY_ADDRESS_FORM,
     label: 'Home',
-    line1: '',
-    line2: '',
-    city: '',
-    state: '',
-    pincode: '',
   });
   const [loading, setLoading] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
@@ -48,27 +31,20 @@ export default function OnboardingPage() {
           setAddress((prev) => ({
             ...prev,
             label: a.label || prev.label,
+            name: a.name || '',
+            flatNo: a.flatNo || '',
             line1: a.line1 || '',
             line2: a.line2 || '',
             city: a.city || '',
             state: a.state || '',
             pincode: a.pincode || '',
+            contactNumber: a.contactNumber || '',
           }));
         }
       })
       .catch(() => {})
       .finally(() => setProfileLoaded(true));
   }, []);
-
-  const handlePincodeResult = useCallback((city: string, state: string) => {
-    setAddress((prev) => ({
-      ...prev,
-      city: prev.city || city,
-      state: prev.state || state,
-    }));
-  }, []);
-
-  usePincodeLookup(address.pincode, handlePincodeResult);
 
   const handleComplete = async () => {
     setLoading(true);
@@ -157,45 +133,11 @@ export default function OnboardingPage() {
                   Used for deliveries and bookings
                 </p>
               </div>
-              <input
-                value={address.line1}
-                onChange={(e) => setAddress({ ...address, line1: e.target.value })}
-                placeholder="Address line 1"
-                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <input
-                value={address.line2}
-                onChange={(e) => setAddress({ ...address, line2: e.target.value })}
-                placeholder="Address line 2 (optional)"
-                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  value={address.city}
-                  onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                  placeholder="City"
-                  className="rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <input
-                  value={address.state}
-                  onChange={(e) => setAddress({ ...address, state: e.target.value })}
-                  placeholder="State"
-                  className="rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <input
-                value={address.pincode}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                  setAddress({
-                    ...address,
-                    pincode: val,
-                    ...(val.length < 6 ? { city: '', state: '' } : {}),
-                  });
-                }}
-                placeholder="Pincode"
-                maxLength={6}
-                className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              <AddressFormFields
+                value={address}
+                onChange={setAddress}
+                variant="page"
+                hideLabel
               />
               <div className="flex justify-between pt-2">
                 <button
