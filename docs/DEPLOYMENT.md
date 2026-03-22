@@ -112,7 +112,12 @@ CMD ["node", "apps/web/server.js"]  # custom-server.js with WS support
 2. **Pre-deploy relay release** — Curls `POST /api/admin/release-relay` on the current instance to force-close the laptop WS. The laptop auto-reconnects within 1-4s. Without this, the laptop stays connected to the old instance (Cloud Run treats the WS as an "active request" and keeps the old instance alive for up to `--timeout=3600s`), while new HTTP requests route to the new instance.
 3. **Deploy** — `gcloud run deploy` with the new image
 
-If the pre-deploy curl fails (e.g., endpoint not available on old instance), the laptop's stale connection detection kicks in — it terminates connections that receive no application-level messages for 45s and auto-reconnects.
+**Three-layer defense against stale relay connections:**
+1. **Draining guard** (`custom-server.js`): On SIGTERM, sets a `draining` flag and rejects all new WS upgrade requests with HTTP 503. This prevents the laptop from reconnecting to the dying instance during the 1-4s window between disconnect and new instance readiness.
+2. **Hard terminate** (`custom-server.js`): After graceful close (1001), force-terminates the WS after 2s to ensure the connection is fully severed before the instance dies.
+3. **Stale detection** (`relay-outbound.ts`): If no application-level message for 45s (3 missed server heartbeats), terminates and reconnects — catches cases where the pre-deploy curl and draining guard both fail.
+
+**Why all three layers are needed:** Cloud Run keeps draining instances alive for active connections. Without the draining guard, the old instance accepts the laptop's WS reconnection after SIGTERM (the LB still routes upgrades to it during draining). The laptop thinks it's connected, but all HTTP requests go to the new instance which has no relay WS.
 
 **What's NOT on Cloud Run:** Chrome, Playwright, CDP, any browser automation.
 

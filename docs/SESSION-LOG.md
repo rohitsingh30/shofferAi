@@ -4,6 +4,24 @@ A running log of every Copilot CLI development session. Each entry captures what
 
 > **For the developer**: After each session, add notes on what worked / what didn't under the relevant entry. This feedback loop helps the AI improve across sessions.
 
+## 2026-03-22 — Relay phantom connection root cause fix (draining instance)
+
+**Goal**: Diagnose and permanently fix the relay phantom connection bug — the laptop relay connects to a draining Cloud Run instance after deploys, causing all tasks to fail.
+
+**Root cause discovered**: After SIGTERM, the old Cloud Run instance's WS upgrade handler still accepted new connections. The laptop reconnected in 1-4s to the dying old instance (still alive for draining), while the new instance handled HTTP requests with no relay WS.
+
+**What was done**:
+- Diagnosed via `gcloud logging read` — Cloud Run logs showed old instance accepting WS upgrades 45s after SIGTERM
+- Added `draining` flag to `custom-server.js` — set on SIGTERM, checked before WS upgrade, returns 503 to force laptop to new instance
+- Added 2s hard-terminate timeout after graceful WS close in SIGTERM handler
+- Added backoff reset on close code 1011 in `relay-outbound.ts` (bridge not initialized)
+- Updated relay-doctor skill with comprehensive architecture analysis, 5 failure modes, decision tree
+- Updated all relay documentation (DEPLOYMENT.md, ARCHITECTURE.md, REPEATING-MISTAKES.md, instructions files)
+
+**Key decision**: Three-layer defense — (1) pre-deploy release-relay curl, (2) draining guard rejecting WS upgrades post-SIGTERM, (3) stale connection detection at 45s. All three needed because each catches a different failure window.
+
+**Files changed**: `apps/web/custom-server.js`, `apps/playwright/src/relay-outbound.ts`, `.github/skills/relay-doctor/SKILL.md`, `docs/DEPLOYMENT.md`, `docs/ARCHITECTURE.md`, `docs/REPEATING-MISTAKES.md`, `.github/instructions/web-frontend.instructions.md`, `.github/instructions/relay-browser.instructions.md`
+
 ## 2026-03-22 — Product widget auto-detection, cart Pay Now, relay gracefulClose
 
 **Goal**: Auto-detect product text from agent → render as rich ProductCard widget. Merge payment into cart panel ("Pay Now" → Razorpay). Fix relay disconnect during deploys.

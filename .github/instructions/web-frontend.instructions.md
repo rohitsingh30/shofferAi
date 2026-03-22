@@ -83,8 +83,9 @@ interface AgentCallbacks {
 
 ### Deploy auto-heal
 - `cloudbuild.yaml` pre-deploy step curls `POST /api/admin/release-relay` → force-closes laptop WS → laptop reconnects to new instance in 1-4s
+- `custom-server.js` sets `draining = true` on SIGTERM → rejects new WS upgrades with HTTP 503 → prevents laptop from reconnecting to dying instance
 - Fallback: `relay-outbound.ts` detects no app-level messages for 45s → auto-terminates stale connection → reconnects
-- `custom-server.js` has early WS queue (handles laptop connecting before RelayBridge singleton initializes) + SIGTERM handler (disconnects WS on graceful shutdown)
+- `custom-server.js` has early WS queue (handles laptop connecting before RelayBridge singleton initializes) + SIGTERM handler (sets draining flag, graceful close + 2s hard terminate)
 
 ### Relay message flow
 ```
@@ -110,7 +111,7 @@ Message types: `task_progress`, `task_input_required`, `task_payment_required`, 
 ## Key Rules
 
 - Never use singleton `taskEventHandler` — use `Map<taskId, handler>` for concurrent tasks
-- `custom-server.js` handles WebSocket upgrade for relay connections + early WS queue + SIGTERM handler
+- `custom-server.js` handles WebSocket upgrade for relay connections + draining guard (rejects WS after SIGTERM) + early WS queue + SIGTERM handler
 - `/api/admin/release-relay` — admin endpoint to force-disconnect laptop WS (auth via Bearer RELAY_AUTH_TOKEN)
 - Docker: `FROM node:20-alpine` (no Chrome, no Playwright)
 - Docker: `ENV RELAY_MODE=cloud` — uses RelayBridge
