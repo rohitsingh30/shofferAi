@@ -14,7 +14,7 @@ siteUrl: https://www.jiomart.com
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of items to order (e.g. "atta, rice, oil, pulses, spices")
   - name: address
     required: false

@@ -23,7 +23,7 @@ siteUrl: https://www.swiggy.com/instamart
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of grocery items to order (e.g. "milk, bread, eggs")
   - name: address
     required: false

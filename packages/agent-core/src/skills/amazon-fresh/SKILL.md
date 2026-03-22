@@ -14,7 +14,7 @@ siteUrl: https://www.amazon.in/fresh
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of items to order (e.g. "milk, eggs, fruits, vegetables, bread")
   - name: address
     required: false

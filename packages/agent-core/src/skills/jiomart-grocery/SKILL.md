@@ -14,7 +14,7 @@ siteUrl: https://www.jiomart.com
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of items to order (e.g. "rice 5kg, atta, oil, sugar")
   - name: address
     required: false

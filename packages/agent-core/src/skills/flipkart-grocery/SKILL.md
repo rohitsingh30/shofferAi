@@ -14,7 +14,7 @@ siteUrl: https://www.flipkart.com/grocery-supermart-store
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of grocery items to order (e.g. "rice 5kg, dal 1kg, milk 1L")
   - name: address
     required: false

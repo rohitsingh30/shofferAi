@@ -14,7 +14,7 @@ siteUrl: https://www.dmart.in
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of items to order (e.g. "rice, dal, cooking oil, sugar")
   - name: address
     required: false

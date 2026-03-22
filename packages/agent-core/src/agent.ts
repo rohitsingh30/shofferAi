@@ -11,6 +11,7 @@ import {
   type UserInputRequest,
   type UserInputResponse,
   type FillCredentialRequest,
+  type RichInputType,
   shouldSuppressMessage,
   SHOPPING_SKILLS,
   looksLikeProductPresentation,
@@ -626,20 +627,17 @@ export class AgentExecutor {
             continue;
           }
 
-          const looksLikeQuestion = !looksLikeError && fullText.includes('?') &&
-            (lowerText.includes('address') ||
-             lowerText.includes('phone') ||
-             lowerText.includes('which') ||
-             lowerText.includes('what') ||
-             lowerText.includes('please') ||
-             lowerText.includes('enter') ||
-             lowerText.includes('choose') ||
-             lowerText.includes('select') ||
-             lowerText.includes('deliver') ||
-             lowerText.includes('location') ||
-             lowerText.includes('pincode') ||
-             lowerText.includes('would you like') ||
-             lowerText.includes('prefer'));
+          // Aggressive question detection: ANY text with `?` that isn't an error/handoff
+          // is a question to the user that should have been an ask_user tool call.
+          // The LLM's text output goes DIRECTLY to the user's chat — questions must be widgets.
+          const hasQuestionMark = fullText.includes('?');
+          // Also catch imperative requests without `?` (e.g., "Please list the items you'd like to order.")
+          const looksLikeImperativeRequest = !hasQuestionMark && (
+            /\bplease\s+(provide|list|share|tell|enter|specify|confirm|give|mention|type)/i.test(fullText) ||
+            /\b(let me know|i need to know|could you|can you)\b/i.test(fullText)
+          );
+          const looksLikeQuestion = !looksLikeError && !looksLikeHandoff &&
+            (hasQuestionMark || looksLikeImperativeRequest);
 
           if (looksLikeQuestion) {
             // Don't send question text as a chat message — the InputPrompt shows it.
@@ -658,7 +656,21 @@ export class AgentExecutor {
             // Use card_grid for product-like lists (3+ items with prices/weights)
             const isProductList = hasChoices && extractedOptions.length >= 3 &&
               extractedOptions.some((o: string) => /₹|rs\.?|price|ml|kg|ltr|litre|gram/i.test(o));
-            const inputType = isProductList ? 'card_grid' : (hasChoices ? 'choice' : 'freetext');
+
+            // Smart widget selection based on question content
+            const isAddressQuestion = /\b(address|deliver[y]?\s*(location|address)?|where.*(deliver|ship|send)|pincode|zip\s*code)\b/i.test(fullText);
+            const isDateQuestion = /\b(date|when|check.?in|check.?out|schedule|time\s*slot|delivery\s*slot)\b/i.test(fullText) && /\b(pick|choose|select|prefer|when|schedule)\b/i.test(fullText);
+            const isConfirmation = /\b(confirm|proceed|continue|go ahead|shall i|should i|ready to|want me to)\b/i.test(fullText) && fullText.includes('?') && fullText.length < 200;
+            const isYesNo = /\b(yes\s*\/?\s*no|y\s*\/?\s*n)\b/i.test(fullText) || isConfirmation;
+
+            let inputType: RichInputType;
+            if (isAddressQuestion) inputType = 'address';
+            else if (isDateQuestion) inputType = 'calendar';
+            else if (isYesNo) inputType = 'confirmation';
+            else if (isProductList) inputType = 'card_grid';
+            else if (hasChoices) inputType = 'choice';
+            else inputType = 'freetext';
+
             const options = hasChoices ? extractedOptions : undefined;
 
             // Replace the last assistant message (already added above) with one

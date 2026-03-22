@@ -6,7 +6,7 @@ import type { ProductCardData } from './types/agent';
 export const SHOPPING_SKILLS = new Set([
   'flipkart-shopping', 'myntra-shopping', 'amazon-shopping',
   'blinkit-grocery', 'zepto-grocery', 'swiggy-instamart',
-  'boat-electronics',
+  'boat-electronics', 'bigbasket-grocery',
 ]);
 
 const SKILL_STORE_MAP: Record<string, string> = {
@@ -17,6 +17,7 @@ const SKILL_STORE_MAP: Record<string, string> = {
   'zepto-grocery': 'Zepto',
   'swiggy-instamart': 'Swiggy Instamart',
   'boat-electronics': 'Flipkart',
+  'bigbasket-grocery': 'BigBasket',
 };
 
 export function inferStoreFromSkill(skillName: string): string {

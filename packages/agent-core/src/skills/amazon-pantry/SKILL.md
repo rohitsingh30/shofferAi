@@ -14,7 +14,7 @@ siteUrl: https://www.amazon.in/pantry
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of pantry items (e.g. "atta 5kg, sugar 1kg, cooking oil 1L, soap")
   - name: address
     required: false

@@ -14,7 +14,7 @@ siteUrl: https://blinkit.com
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: List of items to order (e.g. "milk, bread, eggs, butter, fruits")
   - name: address
     required: false

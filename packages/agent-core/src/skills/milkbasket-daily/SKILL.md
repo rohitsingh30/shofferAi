@@ -16,7 +16,7 @@ siteUrl: https://www.milkbasket.com
 requiresAuth: true
 params:
   - name: items
-    required: true
+    required: false
     hint: What to subscribe (e.g. "toned milk 500ml daily", "curd and bread", "milk and eggs every morning")
   - name: address
     required: false
