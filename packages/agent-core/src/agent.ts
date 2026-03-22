@@ -999,8 +999,10 @@ export class AgentExecutor {
       const BOUNCE_MSG_CARDS = '[SYSTEM: Your carousel cards are missing image URLs. Take a browser_snapshot of the current page, extract the real product image URLs (src of <img> elements in each product card), then re-call ask_user with the image field set to the actual https:// URL for each card. Do NOT use emoji or placeholder text — use the real image URL from the page.]';
       const BOUNCE_MSG_PRODUCT = '[SYSTEM: Your product_card is missing an image URL. Take a browser_snapshot, extract the real product image URL (https://...) from the product page, then re-call ask_user with product.image set to the actual URL.]';
 
+      // Only bounce cards that HAVE an image field but it's not a URL.
+      // Label-only cards (no image field at all) are intentional — don't bounce.
       const cardsLackImages = (cards: Array<{ id: string; image?: string }> | undefined): boolean =>
-        !!(cards && cards.length > 0 && !cards.some(c => c.image?.startsWith('http')));
+        !!(cards && cards.length > 0 && cards.some(c => c.image) && !cards.some(c => c.image?.startsWith('http')));
 
       if (effectiveInputType === 'carousel' || effectiveInputType === 'card_grid') {
         const cards = args.cards as Array<{ id: string; image?: string }> | undefined;
