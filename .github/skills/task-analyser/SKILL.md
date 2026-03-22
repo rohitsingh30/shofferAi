@@ -17,61 +17,59 @@ Which task do you want to analyse? Provide the task ID (you can copy it from the
 
 The taskId is a CUID string like `cm5abc123def456`.
 
-### Step 2: Fetch Task Data from Prod API
+### Step 2: Authenticate & Fetch Task Data
+
+#### 2a. Ensure prod auth cookie exists
+
+Run the auth helper script. It handles CSRF + NextAuth sign-in and saves a cookie jar.
+
+```bash
+bash /Users/rohit/shofferAi/.github/skills/task-analyser/fetch-prod-cookie.sh
+```
+
+This creates `/tmp/shofferai-cookies.txt` (curl `-b` compatible). Valid for 24h; auto-skips if still fresh.
+
+#### 2b. Fetch task data from prod API
 
 ```bash
 TASK_ID="<the task id>"
-curl -s "https://shofferai-27188185100.asia-south1.run.app/api/admin/telemetry?view=task-detail&taskId=${TASK_ID}" \
-  -H "Cookie: $(cat /tmp/shofferai-admin-cookie 2>/dev/null || echo '')" \
+curl -s -b /tmp/shofferai-cookies.txt \
+  "https://shofferai-27188185100.asia-south1.run.app/api/admin/telemetry?view=task-detail&taskId=${TASK_ID}" \
   | python3 -m json.tool > /tmp/task-analysis-${TASK_ID}.json
 ```
 
-If the curl fails (no auth cookie), fetch from the local database instead:
+If this returns `{"error":"Forbidden"}`, re-run the auth script with `--force`:
+
+```bash
+bash /Users/rohit/shofferAi/.github/skills/task-analyser/fetch-prod-cookie.sh --force
+```
+
+#### 2c. Fallback: query prod DB directly via Prisma Client
+
+Only use this if the API is down. It queries the **local** database (Docker Compose PostgreSQL), not prod.
 
 ```bash
 cd /Users/rohit/shofferAi
-
-# Task details
-echo "=== TASK ===" 
-npx prisma db execute --stdin <<SQL
-SELECT t.id, t.description, t.status, t."workflowType", t.result, t."createdAt", t."completedAt",
-       u.email, u.name
-FROM "Task" t JOIN "User" u ON t."userId" = u.id
-WHERE t.id = '${TASK_ID}';
-SQL
-
-# Messages (conversation)
-echo "=== MESSAGES ==="
-npx prisma db execute --stdin <<SQL
-SELECT role, content, "createdAt" FROM "Message"
-WHERE "taskId" = '${TASK_ID}' ORDER BY "createdAt";
-SQL
-
-# Steps (agent actions)
-echo "=== STEPS ==="
-npx prisma db execute --stdin <<SQL
-SELECT "stepNumber", action, status, error, "toolCalls", result,
-       "startedAt", "completedAt", "inputNeeded", "userInput"
-FROM "TaskStep"
-WHERE "taskId" = '${TASK_ID}' ORDER BY "stepNumber";
-SQL
-
-# Telemetry events
-echo "=== TELEMETRY ==="
-npx prisma db execute --stdin <<SQL
-SELECT event, category, success, "durationMs", metadata, timestamp
-FROM "TelemetryEvent"
-WHERE "taskId" = '${TASK_ID}' ORDER BY timestamp;
-SQL
-
-# Payments
-echo "=== PAYMENTS ==="
-npx prisma db execute --stdin <<SQL
-SELECT status, "amountCents", currency, "bookingSummary", "createdAt", "paidAt"
-FROM "Payment"
-WHERE "taskId" = '${TASK_ID}' ORDER BY "createdAt";
-SQL
+TASK_ID="<the task id>"
+node -e "
+const { PrismaClient } = require('@prisma/client');
+const p = new PrismaClient();
+(async () => {
+  const id = '${TASK_ID}';
+  const [task, msgs, steps, events, payments] = await Promise.all([
+    p.task.findUnique({ where: { id }, include: { user: { select: { email: true, name: true } } } }),
+    p.message.findMany({ where: { taskId: id }, orderBy: { createdAt: 'asc' } }),
+    p.taskStep.findMany({ where: { taskId: id }, orderBy: { stepNumber: 'asc' } }),
+    p.telemetryEvent.findMany({ where: { taskId: id }, orderBy: { timestamp: 'asc' } }),
+    p.payment.findMany({ where: { taskId: id }, orderBy: { createdAt: 'asc' } }),
+  ]);
+  console.log(JSON.stringify({ task, steps, messages: msgs, telemetry: events, payments }, null, 2));
+  await p.\\\$disconnect();
+})();
+" > /tmp/task-analysis-${TASK_ID}.json
 ```
+
+**Note**: Local DB only has data if you're running Docker Compose locally. For prod tasks, always prefer the API (Step 2b).
 
 ### Step 3: Analyse the Data
 
