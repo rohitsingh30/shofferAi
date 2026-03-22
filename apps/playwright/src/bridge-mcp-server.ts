@@ -264,6 +264,30 @@ mcpServer.registerTool(
 
     try {
       const response = await waitForResponse(stepId, INPUT_TIMEOUT_MS, 'User input');
+
+      // Enrich carousel/card_grid responses: map raw card ID(s) back to
+      // card labels so the LLM knows WHICH product the user selected
+      // (e.g. "User selected: boAt Airdopes Alpha — ₹849" instead of "2").
+      if ((inputType === 'carousel' || inputType === 'card_grid') && cards?.length) {
+        try {
+          const selectedIds: string[] = response.startsWith('[')
+            ? JSON.parse(response)
+            : [response];
+          const selected = cards.filter(c => selectedIds.includes(c.id));
+          if (selected.length > 0) {
+            const descriptions = selected.map(c =>
+              c.subtitle ? `${c.label} — ${c.subtitle}` : c.label,
+            );
+            const enriched = selected.length === 1
+              ? `User selected: ${descriptions[0]}`
+              : `User selected ${selected.length} items:\n${descriptions.map((d, i) => `${i + 1}. ${d}`).join('\n')}`;
+            return {
+              content: [{ type: 'text' as const, text: enriched }],
+            };
+          }
+        } catch { /* fall through to raw response if parse fails */ }
+      }
+
       return {
         content: [{ type: 'text' as const, text: response }],
       };
