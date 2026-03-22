@@ -10,14 +10,11 @@ function usePincodeLookup(
   useEffect(() => {
     if (!/^\d{6}$/.test(pincode)) return;
     let cancelled = false;
-    fetch(`https://api.postalpincode.in/pincode/${pincode}`)
+    fetch(`/api/pincode?code=${pincode}`)
       .then((r) => r.json())
       .then((data) => {
-        if (cancelled) return;
-        if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length) {
-          const po = data[0].PostOffice[0];
-          onResult(po.District || po.Division || '', po.State || '');
-        }
+        if (cancelled || !data.city) return;
+        onResult(data.city, data.state);
       })
       .catch(() => {});
     return () => { cancelled = true; };
