@@ -1,22 +1,24 @@
 /**
- * Order groceries from BigBasket — search products, add to cart, schedule delivery, pay.
+ * Order groceries from BigBasket — Tier 2 loop script with variant selection.
  *
- * Compiled with real selectors from live browsing (2026-03-20).
+ * Hand-written template (NOT auto-compiled) because grocery ordering is
+ * inherently a loop with per-item user choices.
+ *
  * Site: https://www.bigbasket.com
- * Params: items (required), address (optional), payment_method (optional)
+ * Params: items (required — comma-separated), address (optional)
  *
- * Real selectors discovered:
+ * Architecture: Navigation is SCRIPTED (instant, known selectors).
+ * Decisions are INTERACTIVE (ask_user pauses via requestFromHost).
+ * See docs/COMPILED-SCRIPTS.md for the Tier 2 design rationale.
+ *
+ * Real selectors (crawled 2026-03-20):
  *   Search bar:        textbox "Search for Products..."
- *   Location popup:    menu "Delivery in 10 mins Select Location"
+ *   Location popup:    auto-shown on first visit
  *   Location search:   textbox "Search for area or street name"
  *   Login button:      button "Login/ Sign Up"
- *   Category dropdown: button "Shop by Category"
  *   Product heading:   heading[level=3] with brand + product + weight
- *   Product price:     two sibling generics (sale price, then MRP)
+ *   Product price:     sibling elements with ₹ prefix
  *   Add to cart:       button "Add"
- *   Weight selector:   button with weight text (e.g. "1 kg")
- *   Product URLs:      /pd/{id}/{slug}/
- *   Category URLs:     /cl/{category}/ or /pc/{parent}/{sub}/
  *   Cart page:         /basket/
  */
 export const SCRIPT_CODE = `
@@ -90,7 +92,6 @@ const fs = require('fs');
     await page.waitForTimeout(3000);
 
     // ── Step 2: Handle location popup ──────────────────────────
-    // BigBasket auto-shows a location popup: menu "Delivery in 10 mins Select Location"
     log({ step: 'Setting delivery location...', status: 'running' });
     const locationInput = page.getByPlaceholder('Search for area or street name').first();
     const locationPopupVisible = await locationInput.isVisible({ timeout: 5000 }).catch(() => false);
@@ -109,7 +110,6 @@ const fs = require('fs');
       if (locationQuery) {
         await locationInput.fill(locationQuery);
         await page.waitForTimeout(2000);
-        // Click first suggestion
         const suggestion = page.locator('[role="option"], [class*="suggestion"], [class*="location-item"]').first();
         if (await suggestion.isVisible({ timeout: 3000 }).catch(() => false)) {
           await suggestion.click();
@@ -120,7 +120,6 @@ const fs = require('fs');
 
     // ── Step 3: Verify login ──────────────────────────────────
     log({ step: 'Checking login status...', status: 'running' });
-    // Real selector: button "Login/ Sign Up" — if visible, NOT logged in
     const loginBtn = page.getByRole('button', { name: 'Login/ Sign Up' }).first();
     const needsLogin = await loginBtn.isVisible({ timeout: 3000 }).catch(() => false);
 
@@ -129,10 +128,8 @@ const fs = require('fs');
       await loginBtn.click();
       await page.waitForTimeout(2000);
 
-      // BigBasket uses phone + OTP (no Google sign-in)
       const phoneInput = page.locator('input[type="tel"], input[name="phone"], input[placeholder*="phone" i], input[placeholder*="mobile" i]').first();
       if (await phoneInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // Operator phone is pre-filled from profile or needs to be entered
         const phoneResp = await requestFromHost({
           type: 'input_required',
           question: 'Enter the phone number for BigBasket login:',
@@ -144,7 +141,6 @@ const fs = require('fs');
           if (await continueBtn.isVisible({ timeout: 2000 }).catch(() => false)) await continueBtn.click();
           await page.waitForTimeout(3000);
 
-          // OTP input
           const otpResp = await requestFromHost({
             type: 'input_required',
             question: 'Enter the OTP sent to your phone for BigBasket login:',
@@ -163,13 +159,14 @@ const fs = require('fs');
       }
     }
 
-    // ── Step 4: Search & Add Items ────────────────────────────
+    // ── Step 4: Search & Add Items (LOOP with variant selection) ──
     const addedItems = [];
 
-    for (const item of items) {
-      log({ step: 'Searching for: ' + item, status: 'running' });
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      log({ step: 'Searching for: ' + item + ' (' + (i + 1) + '/' + items.length + ')', status: 'running' });
 
-      // Real selector: textbox "Search for Products..."
+      // Use search bar — clear previous search first
       const searchBar = page.getByPlaceholder('Search for Products...').first();
       await searchBar.click();
       await searchBar.fill(item);
@@ -177,31 +174,87 @@ const fs = require('fs');
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(3000);
 
-      // Product cards are listitem elements with heading[level=3] containing brand + product
-      const productCards = page.locator('li h3, [class*="product"] h3, [class*="card"] h3').first();
-      const hasResults = await productCards.isVisible({ timeout: 5000 }).catch(() => false);
+      // Scrape product results using page.evaluate for reliability
+      const products = await page.evaluate(() => {
+        const cards = document.querySelectorAll('li');
+        return Array.from(cards).slice(0, 8).map((card, idx) => {
+          const h3 = card.querySelector('h3');
+          if (!h3) return null;
+          const name = h3.textContent?.trim() || '';
+          if (!name || name.length < 3) return null;
 
-      if (!hasResults) {
-        log({ step: 'No results for: ' + item, status: 'running' });
-        continue;
+          // Price: look for ₹ in the card
+          const priceEls = Array.from(card.querySelectorAll('*')).filter(el =>
+            el.textContent?.trim().startsWith('₹') && el.children.length === 0
+          );
+          const price = priceEls[0]?.textContent?.trim() || '';
+          const mrp = priceEls[1]?.textContent?.trim() || '';
+
+          // Weight: look for patterns like "1 kg", "500 ml", "6 pcs"
+          const allText = Array.from(card.querySelectorAll('*')).map(el => el.textContent?.trim()).filter(Boolean);
+          const weight = allText.find(t => /^\\d+(\\.\\d+)?\\s*(g|kg|ml|ltr|l|pcs|pack|unit|x\\d)/i.test(t)) || '';
+
+          return { idx: idx + 1, name, price, mrp, weight };
+        }).filter(Boolean);
+      });
+
+      if (!products || products.length === 0) {
+        // No results — ask user for alternative
+        const altResp = await requestFromHost({
+          type: 'input_required',
+          question: 'No results found for "' + item + '" on BigBasket. Enter a different search term, or type "skip" to skip this item:',
+          inputType: 'freetext',
+        });
+        if (altResp.value && altResp.value.toLowerCase() !== 'skip') {
+          // Retry with alternative search
+          await searchBar.click();
+          await searchBar.fill(altResp.value);
+          await page.keyboard.press('Enter');
+          await page.waitForLoadState('domcontentloaded');
+          await page.waitForTimeout(3000);
+          // If still no results, skip
+          const retryH3 = page.locator('li h3').first();
+          if (!(await retryH3.isVisible({ timeout: 3000 }).catch(() => false))) {
+            log({ step: 'Still no results for "' + altResp.value + '", skipping', status: 'running' });
+            continue;
+          }
+        } else {
+          continue;
+        }
       }
 
-      // Extract first result's details
-      const firstProduct = page.locator('li').filter({ has: page.locator('h3') }).first();
-      const productName = await firstProduct.locator('h3').first().innerText().catch(() => 'Unknown');
+      // Ask user to pick a variant (the key Tier 2 feature)
+      let selectedIdx = 0;
+      if (products && products.length > 1) {
+        const options = products.map(p =>
+          p.idx + '. ' + p.name + (p.weight ? ' (' + p.weight + ')' : '') + ' — ' + p.price + (p.mrp && p.mrp !== p.price ? ' (MRP ' + p.mrp + ')' : '')
+        );
 
-      // Get prices — sale price and MRP are sibling generics
-      const priceText = await firstProduct.locator('text=/₹/').first().innerText().catch(() => '');
+        const choiceResp = await requestFromHost({
+          type: 'input_required',
+          question: 'Found ' + products.length + ' options for "' + item + '":\\n' + options.join('\\n') + '\\nWhich one? (enter number)',
+          inputType: 'choice',
+          options: options,
+        });
 
-      // Click "Add" button — real selector: button "Add"
-      const addBtn = firstProduct.getByRole('button', { name: 'Add' }).first();
+        const choiceNum = parseInt(choiceResp.value || '1');
+        selectedIdx = (!isNaN(choiceNum) && choiceNum >= 1 && choiceNum <= products.length) ? choiceNum - 1 : 0;
+      }
+
+      const selected = products && products[selectedIdx] ? products[selectedIdx] : { idx: 1, name: item, price: '', weight: '' };
+      log({ step: 'Adding: ' + selected.name + ' ' + (selected.weight || '') + ' ' + selected.price, status: 'running' });
+
+      // Click the Add button on the selected product card
+      const productListItems = page.locator('li').filter({ has: page.locator('h3') });
+      const targetCard = productListItems.nth(selectedIdx);
+      const addBtn = targetCard.getByRole('button', { name: 'Add' }).first();
       if (await addBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
         await addBtn.click();
         await page.waitForTimeout(1500);
-        addedItems.push({ name: productName.trim(), price: priceText.trim(), searchTerm: item });
-        log({ step: 'Added: ' + productName.trim() + ' ' + priceText.trim(), status: 'running' });
+        addedItems.push({ name: selected.name, price: selected.price, weight: selected.weight, searchTerm: item });
+        log({ step: 'Added: ' + selected.name + ' ' + selected.price, status: 'running' });
       } else {
-        log({ step: 'Could not add: ' + item + ' (button not found)', status: 'running' });
+        log({ step: 'Could not find Add button for: ' + selected.name, status: 'running' });
       }
     }
 
@@ -214,20 +267,42 @@ const fs = require('fs');
     }
 
     // ── Step 5: Review Cart ──────────────────────────────────
-    log({ step: 'Opening cart...', status: 'running' });
+    log({ step: 'Opening cart (' + addedItems.length + ' items)...', status: 'running' });
     await page.goto('https://www.bigbasket.com/basket/');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(3000);
 
-    const cartTitle = await page.title();
-    const cartUrl = page.url();
+    // Extract cart totals from the page
+    const cartDetails = await page.evaluate(() => {
+      const body = document.body.textContent || '';
+      const subtotalMatch = body.match(/Sub\\s*total[:\\s]*₹([\\d,.]+)/i);
+      const deliveryMatch = body.match(/Delivery\\s*charge[:\\s]*₹([\\d,.]+)/i);
+      const totalMatch = body.match(/(?:Grand|Order)\\s*total[:\\s]*₹([\\d,.]+)/i);
+      const savingsMatch = body.match(/(?:You\\s*save|Savings)[:\\s]*₹([\\d,.]+)/i);
+      return {
+        subtotal: subtotalMatch ? '₹' + subtotalMatch[1] : null,
+        delivery: deliveryMatch ? '₹' + deliveryMatch[1] : 'Free',
+        total: totalMatch ? '₹' + totalMatch[1] : null,
+        savings: savingsMatch ? '₹' + savingsMatch[1] : null,
+      };
+    });
 
-    // Build summary for confirmation
-    const itemSummary = addedItems.map((i, idx) => (idx + 1) + '. ' + i.name + ' — ' + i.price).join('\\n');
+    const itemSummary = addedItems.map((it, idx) =>
+      (idx + 1) + '. ' + it.name + (it.weight ? ' (' + it.weight + ')' : '') + ' — ' + it.price
+    ).join('\\n');
+
+    const billSection = cartDetails.total
+      ? '\\n\\nBill Details:' +
+        (cartDetails.subtotal ? '\\nSubtotal: ' + cartDetails.subtotal : '') +
+        '\\nDelivery: ' + cartDetails.delivery +
+        (cartDetails.savings ? '\\nSavings: ' + cartDetails.savings : '') +
+        '\\nTotal: ' + cartDetails.total
+      : '';
+
     const confirmResp = await requestFromHost({
       type: 'confirm_action',
       action: 'Review BigBasket Cart',
-      details: 'Items added:\\n' + itemSummary + '\\n\\nPlease review your cart on BigBasket and confirm to proceed to checkout.',
+      details: 'Items:\\n' + itemSummary + billSection,
     });
 
     if (!confirmResp.confirmed) {
@@ -241,14 +316,12 @@ const fs = require('fs');
     // ── Step 6: Checkout & Payment ───────────────────────────
     log({ step: 'Proceeding to checkout...', status: 'running' });
 
-    // Extract total from cart page
-    const totalText = await page.locator('text=/₹/').last().innerText().catch(() => '0');
-    const totalAmount = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+    const totalAmount = cartDetails.total ? parseFloat(cartDetails.total.replace(/[^0-9.]/g, '')) : 0;
 
     const payResp = await requestFromHost({
       type: 'payment_required',
       action: 'Complete BigBasket grocery order',
-      details: 'Items: ' + addedItems.length + '\\nEstimated total: ' + totalText,
+      details: 'Items: ' + addedItems.length + '\\nTotal: ' + (cartDetails.total || 'see cart'),
       amountInr: totalAmount,
       description: 'BigBasket grocery order — ' + addedItems.length + ' items',
     });
@@ -261,7 +334,6 @@ const fs = require('fs');
       return;
     }
 
-    // Click checkout/place order button
     const checkoutBtn = page.locator('button:has-text("Place Order"), button:has-text("Checkout"), button:has-text("Proceed")').first();
     if (await checkoutBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await checkoutBtn.click();
@@ -286,12 +358,11 @@ const fs = require('fs');
 
     // ── Completion ───────────────────────────────────────────
     const finalUrl = page.url();
-    const finalTitle = await page.title();
     log({ step: 'BigBasket order completed!', status: 'completed' });
     log({
-      message: 'Order placed on BigBasket!\\nItems: ' + addedItems.map(i => i.name).join(', ') + '\\nTotal: ' + totalText,
+      message: 'Order placed on BigBasket!\\nItems: ' + addedItems.map(it => it.name).join(', ') + '\\nTotal: ' + (cartDetails.total || 'see cart'),
     });
-    log({ done: true, url: finalUrl, title: finalTitle, items: addedItems });
+    log({ done: true, url: finalUrl, items: addedItems, cart: cartDetails });
 
   } catch (err) {
     log({ step: 'Error: ' + err.message, status: 'failed' });
