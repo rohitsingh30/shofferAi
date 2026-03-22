@@ -161,10 +161,15 @@ export function matchSkill(skills: SkillMetadata[], userMessage: string): SkillM
       }
     }
 
-    // Domain mention is a strong signal
+    // Domain / brand mention is a strong signal.
+    // Check full domain ("zomato.com") and also the base name ("zomato")
+    // so "Order biryani from Zomato" correctly matches the Zomato skill.
     if (skill.siteUrl) {
-      const domain = skill.siteUrl.replace('https://', '').replace('www.', '');
+      const domain = skill.siteUrl.replace('https://', '').replace('www.', '').split('/')[0];
+      const domainBase = domain.split('.')[0];
       if (msg.includes(domain)) {
+        score += 3;
+      } else if (domainBase.length >= 4 && msg.includes(domainBase)) {
         score += 3;
       }
     }
