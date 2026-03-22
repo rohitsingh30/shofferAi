@@ -139,9 +139,10 @@ httpServer.on('upgrade', (request, socket, head) => {
     }
 
     wss.handleUpgrade(request, socket, head, (ws) => {
-      console.log('[relay] Laptop WebSocket connected');
+      console.log('[relay] Laptop WebSocket connected (remoteAddr=%s)', request.socket.remoteAddress);
 
       if (wireLaptopSocket(ws)) {
+        console.log('[relay] Wired laptop socket to bridge immediately');
         return; // Wired successfully
       }
 

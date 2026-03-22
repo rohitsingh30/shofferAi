@@ -19,9 +19,12 @@ import { UserInputTimeoutError, SHOPPING_SKILLS, looksLikeProductPresentation } 
 /** Lazy relay connection — only needed when agent actually tries to use the browser */
 async function ensureRelayConnected() {
   if (!remoteMcpHost.isConnected()) {
-    console.log('[execute] Relay not connected, connecting...');
+    console.log('[execute] Relay not connected (isConnected=false), attempting connect...');
+    const start = Date.now();
     await remoteMcpHost.connect();
-    console.log('[execute] Relay connected');
+    console.log('[execute] Relay connected (took %dms)', Date.now() - start);
+  } else {
+    console.log('[execute] Relay already connected (isConnected=true)');
   }
 }
 

@@ -170,6 +170,13 @@ export class RelayClient {
 
   private sendRequest(msg: ToolCallRequest | ToolListRequest): Promise<unknown> {
     if (!this.ws || !this.connected) {
+      logger.error('RelayClient: sendRequest failed — not connected', {
+        hasWs: !!this.ws,
+        connected: this.connected,
+        wsReadyState: this.ws?.readyState,
+        msgType: msg.type,
+        pendingRequests: this.pending.size,
+      });
       return Promise.reject(new BrowserError('Relay not connected'));
     }
 

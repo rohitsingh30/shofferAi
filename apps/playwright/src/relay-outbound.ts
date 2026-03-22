@@ -96,7 +96,11 @@ export class RelayOutbound {
         this.reconnectDelay = 1000;
         this.lastDataAt = Date.now();
         this.lastAppMessageAt = Date.now();
-        logger.info('Connected to Cloud Run relay', { url: this.cloudUrl });
+        logger.info('Connected to Cloud Run relay', {
+          url: this.cloudUrl,
+          reconnectDelay: this.reconnectDelay,
+          hadPreviousConnection: !!this.healthCheckInterval,
+        });
 
         // Verify the connection reaches the actual backend (not just the LB).
         // Send an app-level ping and expect an app-level message back within 10s.
@@ -151,9 +155,13 @@ export class RelayOutbound {
       });
 
       this.ws.on('close', (code: number, reason: Buffer) => {
-        logger.info('Disconnected from Cloud Run relay', {
+        const uptimeMs = Date.now() - this.lastDataAt;
+        logger.warn('Disconnected from Cloud Run relay', {
           code, reason: reason?.toString() || '', shouldReconnect: this.shouldReconnect,
           reconnectScheduled: this.reconnectScheduled,
+          uptimeMs,
+          lastDataAgoMs: Date.now() - this.lastDataAt,
+          lastAppMessageAgoMs: Date.now() - this.lastAppMessageAt,
         });
         this.stopHealthCheck();
         this.stopStatusBroadcast();
@@ -303,7 +311,12 @@ export class RelayOutbound {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     } else {
-      logger.warn('RelayOutbound: cannot send, WebSocket not open', { type: (msg as { type: string }).type });
+      logger.warn('RelayOutbound: cannot send, WebSocket not open', {
+        type: (msg as { type: string }).type,
+        readyState: this.ws?.readyState,
+        taskId: (msg as { taskId?: string }).taskId,
+        wsExists: !!this.ws,
+      });
     }
   }
 
@@ -332,9 +345,12 @@ export class RelayOutbound {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
       const silentMs = Date.now() - this.lastDataAt;
+      const staleMs = Date.now() - this.lastAppMessageAt;
       if (silentMs > RelayOutbound.DEAD_CONNECTION_TIMEOUT_MS) {
         logger.warn('RelayOutbound: no data for 20s, closing dead connection', {
           silentMs,
+          staleMs,
+          wsReadyState: this.ws.readyState,
         });
         this.ws.terminate(); // Hard close — faster than ws.close() which waits for handshake
         return;
@@ -345,8 +361,10 @@ export class RelayOutbound {
       // Only application-level messages prove the backend is alive.
       const staleSinceMs = Date.now() - this.lastAppMessageAt;
       if (staleSinceMs > RelayOutbound.STALE_CONNECTION_TIMEOUT_MS) {
-        logger.warn('RelayOutbound: no app-level message for 45s — backend likely dead after deploy, reconnecting', {
+        logger.warn('RelayOutbound: no app-level message for 25s — backend likely dead after deploy, reconnecting', {
           staleSinceMs,
+          lastDataAgoMs: Date.now() - this.lastDataAt,
+          wsReadyState: this.ws.readyState,
         });
         this.ws.terminate();
         return;

@@ -50,8 +50,16 @@ export class RelayBridge implements MCPHostLike {
     // set up the new socket (race condition: old close fires async and
     // sets connected=false even though the new socket is alive).
     if (this.laptopSocket) {
+      logger.warn('RelayBridge: replacing existing laptop socket', {
+        oldReadyState: this.laptopSocket.readyState,
+        wasConnected: this.connected,
+        pendingRequests: this.pending.size,
+        pendingCancels: this.pendingCancels.size,
+      });
       this.laptopSocket.removeAllListeners();
       this.laptopSocket.close();
+    } else {
+      logger.info('RelayBridge: first laptop socket connection');
     }
 
     this.laptopSocket = ws;
@@ -68,10 +76,18 @@ export class RelayBridge implements MCPHostLike {
       }
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code: number, reason: Buffer) => {
       // Guard: only handle if this is still the active socket
-      if (this.laptopSocket !== ws) return;
-      logger.info('RelayBridge: laptop disconnected — waiting 30s grace period before rejecting pending requests');
+      if (this.laptopSocket !== ws) {
+        logger.debug('RelayBridge: ignoring close from replaced socket');
+        return;
+      }
+      logger.warn('RelayBridge: laptop disconnected', {
+        code,
+        reason: reason?.toString() || '',
+        pendingRequests: this.pending.size,
+        uptimeMs: Date.now() - this.lastPongAt,
+      });
       this.laptopSocket = null;
       this.connected = false;
       this.stopHeartbeat();
@@ -174,6 +190,13 @@ export class RelayBridge implements MCPHostLike {
 
   private sendRequest(msg: Record<string, unknown>): Promise<unknown> {
     if (!this.laptopSocket || !this.connected) {
+      logger.error('RelayBridge: sendRequest failed — laptop not connected', {
+        hasSocket: !!this.laptopSocket,
+        connected: this.connected,
+        socketReadyState: this.laptopSocket?.readyState,
+        msgType: msg.type,
+        pendingRequests: this.pending.size,
+      });
       return Promise.reject(new BrowserError('Laptop not connected'));
     }
 
@@ -272,6 +295,13 @@ export class RelayBridge implements MCPHostLike {
   /** Send a task-level message to the laptop (task_handoff, task_input_response, etc.) */
   sendTaskMessage(msg: TaskRelayMessage): void {
     if (!this.laptopSocket || !this.connected) {
+      logger.error('RelayBridge: sendTaskMessage failed — laptop not connected', {
+        hasSocket: !!this.laptopSocket,
+        connected: this.connected,
+        socketReadyState: this.laptopSocket?.readyState,
+        msgType: msg.type,
+        taskId: (msg as { taskId?: string }).taskId,
+      });
       // Queue cancel messages for delivery when laptop reconnects
       if (msg.type === 'task_cancel' && 'taskId' in msg) {
         this.pendingCancels.add((msg as { taskId: string }).taskId);
@@ -334,9 +364,14 @@ export class RelayBridge implements MCPHostLike {
     this.lastPongAt = Date.now();
     this.heartbeatInterval = setInterval(() => {
       if (this.laptopSocket && this.connected) {
+        const sincePong = Date.now() - this.lastPongAt;
         // Check if laptop is still alive (no pong for 20s → consider dead)
-        if (Date.now() - this.lastPongAt > 20000) {
-          logger.warn('RelayBridge: no heartbeat pong for 20s, closing dead connection');
+        if (sincePong > 20000) {
+          logger.warn('RelayBridge: no heartbeat pong for 20s, closing dead connection', {
+            sincePongMs: sincePong,
+            socketReadyState: this.laptopSocket.readyState,
+            pendingRequests: this.pending.size,
+          });
           this.laptopSocket.close();
           return;
         }

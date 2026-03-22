@@ -36,6 +36,7 @@ if (!g.mcpHost) {
     g.relayBridge = bridge;
     g.__relayBridge = bridge; // custom-server.js reads this to wire up WebSocket
     g.mcpHost = bridge;
+    console.log('[singletons] RelayBridge set on globalThis.__relayBridge (custom-server.js can now wire WS)');
   } else {
     // Dev: connect OUT to local relay server (laptop runs RelayServer on localhost:8765)
     const relayUrl = process.env.RELAY_LAPTOP_URL || 'ws://localhost:8765';
