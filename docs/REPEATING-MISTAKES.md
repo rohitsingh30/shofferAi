@@ -330,16 +330,16 @@ Other filter gates still active:
 
 **What happens:** Agent deploys to Cloud Run, then immediately tests E2E. The laptop relay needs a few seconds to detect the disconnection and reconnect to the new instance.
 
-**How it's mitigated (three-layer auto-heal):**
+**How it's mitigated (five-layer auto-heal):**
 1. `cloudbuild.yaml` Step #1 curls `POST /api/admin/release-relay` before deploying — force-closes the laptop WS on the current instance so the laptop reconnects immediately (within 1-4s)
-2. `custom-server.js` sets `draining = true` on SIGTERM and rejects new WS upgrade requests with HTTP 503 — prevents the laptop from reconnecting to the dying old instance during the 1-4s reconnect window
-3. `relay-outbound.ts` tracks application-level messages separately from WS pong frames — if no app-level message for 45s, terminates and reconnects (catches cases where layers 1 and 2 both miss)
+2. `custom-server.js` sets `draining = true` on SIGTERM and rejects new WS upgrade requests with HTTP 503 — prevents the laptop from reconnecting to the dying old instance
+3. `relay-bridge.ts` `gracefulClose()` sends `{ type: 'server_draining' }` message before the WS close frame — laptop handles it by immediately terminating + 1s reconnect
+4. `relay-outbound.ts` stale detection: no app-level message for 25s → terminates and reconnects
+5. `relay-outbound.ts` **HTTP phantom detection**: every 30s (and 8s after connect), GETs `/api/admin/relay-status` via HTTP. HTTP always routes to the ACTIVE instance. If `connected: false` but WS is open → phantom → terminate → reconnect. **This is the definitive FM2 fix.**
 
-**Why WS pong alone isn't enough:** Cloud Run's load balancer responds to WS ping/pong frames even when the backend instance is dead (e.g., old instance after deploy). The laptop thinks the connection is alive because WS pongs keep arriving, but the backend isn't processing any messages.
+**Why layers 1-4 weren't enough (FM2 — the draining instance bug):** After deploy, the OLD Cloud Run instance enters "draining" mode but stays alive (up to 3600s) because the WS is an active connection. It keeps sending `{ type: 'ping' }` every 15s — these are REAL JSON application-level messages, so `lastAppMessageAt` keeps updating and the stale check NEVER fires. Meanwhile all HTTP requests go to the NEW instance which has NO relay. The `server_draining` message (layer 3) helps on clean shutdowns, but if the laptop reconnects to the old instance BEFORE SIGTERM fires, it's stuck. Only layer 5 (HTTP verify) catches this because it uses a fundamentally different network path.
 
-**Root cause of the original bug:** Cloud Run deploys create new instances while keeping old ones alive. The old (draining) instance would accept the laptop's WS reconnection after SIGTERM — its upgrade handler had no draining check. All HTTP requests routed to the new instance (no laptop WS), while the laptop stayed connected to the old instance. Fixed by adding a `draining` flag in `custom-server.js`.
-
-**Rule:** After deploying to Cloud Run, WAIT at least 30 seconds before running an E2E test. The relay auto-heals but needs a few seconds. If the first attempt fails with a relay error, wait 30 seconds and retry once before investigating further.
+**Rule:** After deploying to Cloud Run, the relay should auto-heal within 30s (HTTP verify cycle). If it doesn't, the laptop relay may need a restart to pick up new code. Always verify relay status with `curl -H "Authorization: Bearer shofferai-relay-2026" https://shofferai-27188185100.asia-south1.run.app/api/admin/relay-status` after deploy.
 
 ---
 
@@ -665,23 +665,27 @@ launchctl list | grep shofferai
 
 **What happens:** The laptop relay sends WebSocket ping frames to detect dead connections. Cloud Run's load balancer responds to WS ping/pong at the proxy layer, even when the backend instance is gone (terminated, replaced by deploy). The laptop thinks the connection is alive because pong frames keep arriving, but no application-level messages are being processed.
 
+**The WORSE variant (FM2 — draining instance):** Even application-level heartbeats aren't enough! After deploy, the OLD instance is "draining" but still alive — it keeps sending `{ type: 'ping' }` JSON every 15s. These ARE real application-level messages, so `lastAppMessageAt` keeps updating and the stale check NEVER fires. But all HTTP requests route to the NEW instance (no relay). The laptop is connected to the wrong instance and has no way to know via the WS channel alone.
+
 **Symptoms:**
 - Laptop shows "Connected to Cloud Run relay" indefinitely after deploy
 - Cloud Run logs show no laptop connection on the new instance
 - `lsof` shows ESTABLISHED TCP to Cloud Run's IP, but `release-relay` endpoint returns `wasConnected: false`
 - Tasks fail with "Laptop not connected to relay bridge"
 
-**Root cause:** WS ping/pong operates at the WebSocket protocol layer. Cloud Run's HTTP/2 reverse proxy handles these frames independently of the backend container. When the backend is dead, the proxy keeps the TCP/TLS connection alive and responds to pings, creating a zombie WS connection.
+**Root cause:** WS ping/pong operates at the WebSocket protocol layer. Cloud Run's HTTP/2 reverse proxy handles these frames independently of the backend container. For FM1 (dead backend), the proxy keeps TCP alive and responds to pings. For FM2 (draining instance), the old backend IS alive and sends real JSON heartbeats — the stale check can't distinguish "connected to right instance" from "connected to wrong instance."
 
 **The fix (2026-03-21, enhanced 2026-03-22):**
-1. `relay-outbound.ts` now tracks `lastAppMessageAt` separately from `lastDataAt`
+1. `relay-outbound.ts` tracks `lastAppMessageAt` separately from `lastDataAt`
 2. WS `pong` frames update `lastDataAt` only (for TCP-level dead detection at 20s)
 3. Application-level messages (JSON from server) update both `lastDataAt` AND `lastAppMessageAt`
-4. If `lastAppMessageAt` exceeds 45s (3 missed server heartbeats at 15s interval), connection is terminated and laptop reconnects
-5. `custom-server.js` now sets `draining = true` on SIGTERM and rejects new WS upgrades with HTTP 503 — prevents the laptop from reconnecting to a draining instance that is still sending heartbeats (the most insidious variant of this bug)
-6. `relay-outbound.ts` resets reconnect backoff on close code 1011 (bridge not initialized) — prevents spiraling to 30s delays
+4. If `lastAppMessageAt` exceeds 25s, connection is terminated and laptop reconnects (catches FM1)
+5. `custom-server.js` sets `draining = true` on SIGTERM and rejects new WS upgrades with HTTP 503
+6. `relay-bridge.ts` `gracefulClose()` sends `{ type: 'server_draining' }` message before close frame — laptop terminates immediately
+7. `relay-outbound.ts` resets reconnect backoff on close code 1011 (bridge not initialized) — prevents spiraling to 30s delays
+8. **HTTP phantom detection** (definitive FM2 fix): `relay-outbound.ts` GETs `/api/admin/relay-status` via HTTP every 30s (and 8s after connect). HTTP always routes to the ACTIVE instance. If response says `connected: false` but WS is open → phantom → terminate → reconnect. This uses a fundamentally different network path (HTTP vs WS) to verify the connection reaches the right instance.
 
-**Rule:** NEVER rely solely on WS ping/pong for health checks when behind a reverse proxy (Cloud Run, ALB, Nginx). Always include application-level heartbeats with their own timeout. The server sends `{"type":"ping"}` every 15s — if the laptop doesn't receive any for 45s, the backend is dead. Additionally, the server must reject new WS connections after SIGTERM to prevent the draining instance from capturing the reconnecting client.
+**Rule:** NEVER rely solely on WS-level signals (ping/pong OR application-level heartbeats) to verify you're connected to the RIGHT instance behind a reverse proxy. A draining instance is a real server that sends real messages — the WS channel cannot distinguish it from the active instance. Use an out-of-band verification channel (HTTP) that always routes to the active instance.
 
 ---
 
