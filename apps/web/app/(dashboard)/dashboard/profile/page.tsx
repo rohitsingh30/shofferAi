@@ -223,151 +223,147 @@ export default function ProfilePage() {
             </div>
           </section>
 
-          {/* Profile Details */}
+          {/* Saved Addresses */}
           <section className="rounded-xl border border-border bg-card p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Addresses</h2>
+              <h2 className="text-lg font-semibold">Saved Addresses</h2>
+              {!showAddAddress && (
+                <button
+                  onClick={() => setShowAddAddress(true)}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Add Address
+                </button>
+              )}
             </div>
 
-            {profile && (
-                <div className="space-y-3">
-                  <div className="rounded-lg bg-background/50 px-4 py-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+            {profile && profile.addresses.length === 0 && !showAddAddress && (
+              <div className="rounded-lg border border-dashed border-border py-8 text-center">
+                <svg className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+                <p className="text-sm text-muted-foreground">No addresses saved</p>
+                <p className="mt-1 text-xs text-muted-foreground/60">Add an address for faster deliveries and bookings</p>
+              </div>
+            )}
+
+            {profile && profile.addresses.length > 0 && (
+              <div className="space-y-2">
+                {profile.addresses.map((a, i) => (
+                  <div
+                    key={a.id || i}
+                    className="group flex items-center justify-between rounded-lg border border-border bg-background/50 px-4 py-3 transition-colors hover:bg-background"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-card">
                         <svg className="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                         </svg>
-                        <p className="text-xs text-muted-foreground">Addresses</p>
                       </div>
-                      {!showAddAddress && (
-                        <button
-                          onClick={() => setShowAddAddress(true)}
-                          className="rounded-lg px-3 py-1.5 text-sm text-primary hover:bg-primary/10 transition-colors"
-                        >
-                          + Add
-                        </button>
-                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
+                          {a.label}
+                          {a.contactNumber && (
+                            <span className="ml-2 font-normal text-muted-foreground">· {a.contactNumber}</span>
+                          )}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[a.flatNo, a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(', ')}
+                        </p>
+                      </div>
                     </div>
-
-                    {profile.addresses.length === 0 && !showAddAddress ? (
-                      <p className="text-sm font-medium text-muted-foreground">None saved</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {profile.addresses.map((a, i) => (
-                          <div
-                            key={a.id || i}
-                            className="flex items-start justify-between rounded-lg border border-border bg-card px-3 py-2.5"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium">
-                                <span className="inline-block rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
-                                  {a.label}
-                                </span>
-                              </p>
-                              <p className="mt-1 text-sm text-foreground">
-                                {[a.flatNo, a.line1, a.line2].filter(Boolean).join(', ')}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {[a.city, a.state, a.pincode].filter(Boolean).join(', ')}
-                              </p>
-                              {a.contactNumber && (
-                                <p className="text-xs text-muted-foreground">
-                                  📞 {a.contactNumber}
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleDeleteAddress(a.id, i)}
-                              className="ml-2 shrink-0 rounded-lg px-2 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {showAddAddress && (
-                      <form onSubmit={handleAddAddress} className="mt-3 space-y-2.5 border-t border-border pt-3">
-                        <input
-                          value={addressForm.label}
-                          onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
-                          placeholder="Label (Home, Office...)"
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                        <input
-                          value={addressForm.flatNo || ''}
-                          onChange={(e) => setAddressForm({ ...addressForm, flatNo: e.target.value })}
-                          placeholder="Flat / House No."
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                        <input
-                          value={addressForm.line1}
-                          onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
-                          placeholder="Address line 1 *"
-                          required
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                        <input
-                          value={addressForm.line2 || ''}
-                          onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
-                          placeholder="Address line 2 (optional)"
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                        <div className="grid grid-cols-3 gap-2">
-                          <input
-                            value={addressForm.pincode}
-                            onChange={(e) => setAddressForm({
-                              ...addressForm,
-                              pincode: e.target.value.replace(/\D/g, '').slice(0, 6),
-                              ...(e.target.value.replace(/\D/g, '').length < 6 ? { city: '', state: '' } : {}),
-                            })}
-                            placeholder="Pincode *"
-                            required
-                            maxLength={6}
-                            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                          <input
-                            value={addressForm.city}
-                            onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                            placeholder="City"
-                            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                          <input
-                            value={addressForm.state}
-                            onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
-                            placeholder="State"
-                            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                        <input
-                          type="tel"
-                          value={addressForm.contactNumber || ''}
-                          onChange={(e) => setAddressForm({ ...addressForm, contactNumber: e.target.value })}
-                          placeholder="Phone number for this address"
-                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            type="submit"
-                            disabled={savingAddress}
-                            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                          >
-                            {savingAddress ? 'Saving...' : 'Save Address'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setShowAddAddress(false); setAddressForm(emptyAddressForm); }}
-                            className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    )}
+                    <button
+                      onClick={() => handleDeleteAddress(a.id, i)}
+                      className="shrink-0 rounded-lg px-3 py-1.5 text-xs text-destructive opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive/10"
+                    >
+                      Remove
+                    </button>
                   </div>
+                ))}
+              </div>
+            )}
+
+            {showAddAddress && (
+              <form onSubmit={handleAddAddress} className={`space-y-3 ${profile && profile.addresses.length > 0 ? 'mt-4 border-t border-border pt-4' : ''}`}>
+                <div className="grid grid-cols-4 gap-2">
+                  <input
+                    value={addressForm.label}
+                    onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
+                    placeholder="Label *"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <input
+                    value={addressForm.flatNo || ''}
+                    onChange={(e) => setAddressForm({ ...addressForm, flatNo: e.target.value })}
+                    placeholder="Flat / House No."
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <input
+                    type="tel"
+                    value={addressForm.contactNumber || ''}
+                    onChange={(e) => setAddressForm({ ...addressForm, contactNumber: e.target.value })}
+                    placeholder="Phone"
+                    className="col-span-2 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
                 </div>
+                <input
+                  value={addressForm.line1}
+                  onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
+                  placeholder="Address line 1 *"
+                  required
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <input
+                  value={addressForm.line2 || ''}
+                  onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
+                  placeholder="Address line 2 (optional)"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    value={addressForm.pincode}
+                    onChange={(e) => setAddressForm({
+                      ...addressForm,
+                      pincode: e.target.value.replace(/\D/g, '').slice(0, 6),
+                      ...(e.target.value.replace(/\D/g, '').length < 6 ? { city: '', state: '' } : {}),
+                    })}
+                    placeholder="Pincode *"
+                    required
+                    maxLength={6}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <input
+                    value={addressForm.city}
+                    onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                    placeholder="City"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <input
+                    value={addressForm.state}
+                    onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
+                    placeholder="State"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={savingAddress}
+                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {savingAddress ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddAddress(false); setAddressForm(emptyAddressForm); }}
+                    className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
             )}
           </section>
 
