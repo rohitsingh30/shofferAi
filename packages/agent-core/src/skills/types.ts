@@ -4,6 +4,16 @@ export interface SkillParam {
   hint: string;
 }
 
+export interface SkillLayoutSection {
+  id: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  collapsed?: boolean;
+  options?: string | string[]; // pipe-separated string from frontmatter, or array
+  cards?: Array<{ id: string; label: string; subtitle?: string; image?: string; badge?: string }>;
+}
+
 export interface SkillMetadata {
   name: string;
   description: string;
@@ -12,6 +22,8 @@ export interface SkillMetadata {
   requiresAuth: boolean;
   params: SkillParam[];
   instructions: string; // full markdown body (everything after frontmatter)
+  layoutSections?: SkillLayoutSection[]; // structured layout for first ask_user
+  layoutQuestion?: string; // question text for the layout widget
 }
 
 export interface LessonEntry {

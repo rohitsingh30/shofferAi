@@ -19,6 +19,22 @@ params:
   - name: payment_method
     required: false
     hint: Payment preference (UPI, card, COD)
+layoutQuestion: "Let's set up your Zomato order! 🍛"
+layoutSections:
+  - id: address
+    label: Delivery Address
+    type: address
+    required: true
+  - id: cuisine
+    label: What are you craving?
+    type: carousel
+    required: true
+    options: 🥘 Biryani|🍕 Pizza|🍔 Burger|🍱 Thali|🥡 Chinese|🥞 South Indian|🌯 Rolls|🍰 Dessert
+  - id: dietary
+    label: Dietary Preferences
+    type: chip_bar
+    collapsed: true
+    options: 🟢 Veg only|🔴 Non-veg OK|Jain|No onion|No garlic
 ---
 
 # Zomato Food Ordering

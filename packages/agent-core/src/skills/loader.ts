@@ -135,6 +135,8 @@ export function loadSkills(skillsDir?: string): SkillMetadata[] {
       requiresAuth: (meta.requiresAuth as boolean) || false,
       params: (meta.params as SkillMetadata['params']) || [],
       instructions: body,
+      layoutSections: (meta.layoutSections as SkillMetadata['layoutSections']) || undefined,
+      layoutQuestion: (meta.layoutQuestion as string) || undefined,
     });
   }
 

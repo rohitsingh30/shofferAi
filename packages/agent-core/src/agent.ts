@@ -941,19 +941,68 @@ export class AgentExecutor {
         };
       }
 
-      // ── Image validation for visual widgets ──────────────────────────
-      // Carousel, card_grid, and product_card MUST have real image URLs.
-      // If the LLM used emoji placeholders or omitted images, bounce it
-      // back to extract real URLs from the page before showing the user.
-      // Also validates card_grids nested inside layout sections.
+      // ── Layout enforcement ─────────────────────────────────────────
+      // If the matched skill defines layoutSections in frontmatter and
+      // the LLM used a non-layout input_type on its first ask_user,
+      // upgrade to a layout call with the skill's structured sections.
+      // This guarantees the multi-section widget appears regardless of
+      // LLM compliance.
       const inputType = args.input_type as string;
+      if (
+        inputType !== 'layout' &&
+        this.askUserCount === 1 &&
+        this.matchedSkill?.layoutSections?.length
+      ) {
+        logger.info('Layout enforcement: upgrading ask_user to layout', {
+          originalType: inputType,
+          skill: this.matchedSkill.name,
+          sectionCount: this.matchedSkill.layoutSections.length,
+        });
+
+        // Build sections, injecting saved addresses and parsing pipe-separated options
+        const savedAddresses = this.config.userContext.savedAddresses;
+        const sections = this.matchedSkill.layoutSections.map((s) => {
+          const section: Record<string, unknown> = {
+            name: s.id, // InputSection uses 'name', skill frontmatter uses 'id'
+            label: s.label,
+            type: s.type,
+          };
+          if (s.required) section.required = true;
+          if (s.collapsed) section.collapsed = true;
+          if (s.type === 'address' && savedAddresses?.length) {
+            section.saved = savedAddresses;
+          }
+          // Parse pipe-separated options string into proper arrays
+          if (typeof s.options === 'string' && (s.options as string).includes('|')) {
+            const items = (s.options as string).split('|').map(o => o.trim());
+            if (s.type === 'carousel' || s.type === 'card_grid') {
+              // Convert to card objects for carousel/card_grid
+              section.cards = items.map((label, i) => ({
+                id: label.replace(/[^\w]/g, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '') || `item-${i}`,
+                label,
+              }));
+            } else {
+              section.options = items;
+            }
+          }
+          return section;
+        });
+
+        args.input_type = 'layout';
+        args.sections = sections;
+        args.question = this.matchedSkill.layoutQuestion || args.question || 'Please fill in the details below:';
+      }
+
+      // ── Image validation for visual widgets ──────────────────────────
+      // Re-read inputType after possible layout enforcement above
+      const effectiveInputType = args.input_type as string;
       const BOUNCE_MSG_CARDS = '[SYSTEM: Your carousel cards are missing image URLs. Take a browser_snapshot of the current page, extract the real product image URLs (src of <img> elements in each product card), then re-call ask_user with the image field set to the actual https:// URL for each card. Do NOT use emoji or placeholder text — use the real image URL from the page.]';
       const BOUNCE_MSG_PRODUCT = '[SYSTEM: Your product_card is missing an image URL. Take a browser_snapshot, extract the real product image URL (https://...) from the product page, then re-call ask_user with product.image set to the actual URL.]';
 
       const cardsLackImages = (cards: Array<{ id: string; image?: string }> | undefined): boolean =>
         !!(cards && cards.length > 0 && !cards.some(c => c.image?.startsWith('http')));
 
-      if (inputType === 'carousel' || inputType === 'card_grid') {
+      if (effectiveInputType === 'carousel' || effectiveInputType === 'card_grid') {
         const cards = args.cards as Array<{ id: string; image?: string }> | undefined;
         if (cardsLackImages(cards)) {
           logger.warn('ask_user carousel/card_grid missing image URLs — bouncing back to LLM');
@@ -962,7 +1011,7 @@ export class AgentExecutor {
         }
       }
       // Validate card_grids/carousels nested inside layout sections
-      if (inputType === 'layout') {
+      if (effectiveInputType === 'layout') {
         const sections = args.sections as Array<{ type?: string; cards?: Array<{ id: string; image?: string }> }> | undefined;
         for (const section of sections ?? []) {
           if ((section.type === 'card_grid' || section.type === 'carousel') && cardsLackImages(section.cards)) {
@@ -972,7 +1021,7 @@ export class AgentExecutor {
           }
         }
       }
-      if (inputType === 'product_card') {
+      if (effectiveInputType === 'product_card') {
         const product = args.product as { image?: string } | undefined;
         if (product && !product.image?.startsWith('http')) {
           logger.warn('ask_user product_card missing image URL — bouncing back to LLM');
