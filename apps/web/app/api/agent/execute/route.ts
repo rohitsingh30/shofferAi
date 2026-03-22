@@ -202,14 +202,9 @@ export async function POST(request: Request) {
               if (existingProfile?.addresses) {
                 addresses = JSON.parse(existingProfile.addresses);
               }
-              // Upsert by label: replace existing address with same label, or append
+              // Always append with unique ID — never overwrite by label
               const label = (address.label as string) || 'Home';
-              const idx = addresses.findIndex((a) => a.label === label);
-              if (idx >= 0) {
-                addresses[idx] = address;
-              } else {
-                addresses.push(address);
-              }
+              addresses.push({ ...address, id: crypto.randomUUID(), label });
               await prisma.profile.upsert({
                 where: { userId: targetUserId },
                 update: { addresses: JSON.stringify(addresses) },

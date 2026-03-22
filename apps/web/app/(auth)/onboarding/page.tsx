@@ -1,7 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+
+function usePincodeLookup(
+  pincode: string,
+  onResult: (city: string, state: string) => void,
+) {
+  useEffect(() => {
+    if (!/^\d{6}$/.test(pincode)) return;
+    let cancelled = false;
+    fetch(`https://api.postalpincode.in/pincode/${pincode}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length) {
+          const po = data[0].PostOffice[0];
+          onResult(po.District || po.Division || '', po.State || '');
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pincode]); // eslint-disable-line react-hooks/exhaustive-deps
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -17,6 +38,16 @@ export default function OnboardingPage() {
   });
   const [loading, setLoading] = useState(false);
 
+  const handlePincodeResult = useCallback((city: string, state: string) => {
+    setAddress((prev) => ({
+      ...prev,
+      city: prev.city || city,
+      state: prev.state || state,
+    }));
+  }, []);
+
+  usePincodeLookup(address.pincode, handlePincodeResult);
+
   const handleComplete = async () => {
     setLoading(true);
     try {
@@ -26,7 +57,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           phone,
           addresses: address.line1
-            ? [{ ...address, isDefault: true }]
+            ? [{ ...address, id: crypto.randomUUID(), isDefault: true }]
             : [],
         }),
       });
@@ -130,8 +161,16 @@ export default function OnboardingPage() {
               </div>
               <input
                 value={address.pincode}
-                onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setAddress({
+                    ...address,
+                    pincode: val,
+                    ...(val.length < 6 ? { city: '', state: '' } : {}),
+                  });
+                }}
                 placeholder="Pincode"
+                maxLength={6}
                 className="w-full rounded-lg border border-border bg-background px-4 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <div className="flex justify-between pt-2">

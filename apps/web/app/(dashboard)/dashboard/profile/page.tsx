@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+
+interface Address {
+  id?: string;
+  label: string;
+  flatNo?: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  pincode: string;
+  isDefault?: boolean;
+}
 
 interface ProfileData {
   phone: string;
-  addresses: Array<{
-    label: string;
-    line1: string;
-    line2?: string;
-    city: string;
-    state: string;
-    pincode: string;
-    isDefault: boolean;
-  }>;
+  addresses: Address[];
 }
 
 interface Credential {
@@ -28,13 +32,47 @@ interface UserInfo {
   email: string;
 }
 
+const emptyAddressForm: Omit<Address, 'id'> = {
+  label: 'Home',
+  flatNo: '',
+  line1: '',
+  line2: '',
+  city: '',
+  state: '',
+  pincode: '',
+};
+
+function usePincodeLookup(
+  pincode: string,
+  onResult: (city: string, state: string) => void,
+) {
+  useEffect(() => {
+    if (!/^\d{6}$/.test(pincode)) return;
+    let cancelled = false;
+    fetch(`https://api.postalpincode.in/pincode/${pincode}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length) {
+          const po = data[0].PostOffice[0];
+          onResult(po.District || po.Division || '', po.State || '');
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pincode]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [showAddAddress, setShowAddAddress] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [editPhone, setEditPhone] = useState('');
+  const [addressForm, setAddressForm] = useState(emptyAddressForm);
+  const [savingAddress, setSavingAddress] = useState(false);
   const [cardForm, setCardForm] = useState({
     label: '',
     cardNumber: '',
@@ -45,6 +83,16 @@ export default function ProfilePage() {
   });
   const [saving, setSaving] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+
+  const handlePincodeResult = useCallback((city: string, state: string) => {
+    setAddressForm((prev) => ({
+      ...prev,
+      city: prev.city || city,
+      state: prev.state || state,
+    }));
+  }, []);
+
+  usePincodeLookup(addressForm.pincode, handlePincodeResult);
 
   useEffect(() => {
     Promise.all([
@@ -74,6 +122,47 @@ export default function ProfilePage() {
     setProfile(updated);
     setEditingProfile(false);
     setSavingProfile(false);
+  };
+
+  const handleAddAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addressForm.line1.trim() || !addressForm.pincode.trim()) return;
+    setSavingAddress(true);
+    const newAddress: Address = {
+      id: crypto.randomUUID(),
+      label: addressForm.label.trim() || 'Home',
+      flatNo: addressForm.flatNo?.trim() || undefined,
+      line1: addressForm.line1.trim(),
+      line2: addressForm.line2?.trim() || undefined,
+      city: addressForm.city.trim(),
+      state: addressForm.state.trim(),
+      pincode: addressForm.pincode.trim(),
+    };
+    const updatedAddresses = [...(profile?.addresses || []), newAddress];
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addresses: updatedAddresses }),
+    });
+    const updated = await fetch('/api/profile').then((r) => r.json());
+    setProfile(updated);
+    setAddressForm(emptyAddressForm);
+    setShowAddAddress(false);
+    setSavingAddress(false);
+  };
+
+  const handleDeleteAddress = async (addressId: string | undefined, index: number) => {
+    if (!profile) return;
+    const updatedAddresses = profile.addresses.filter((a, i) =>
+      addressId ? a.id !== addressId : i !== index,
+    );
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addresses: updatedAddresses }),
+    });
+    const updated = await fetch('/api/profile').then((r) => r.json());
+    setProfile(updated);
   };
 
   const handleSaveCard = async (e: React.FormEvent) => {
@@ -192,25 +281,131 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3 rounded-lg bg-background/50 px-4 py-3">
-                    <svg className="mt-0.5 h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                    </svg>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Addresses</p>
-                      {profile.addresses.length === 0 ? (
-                        <p className="text-sm font-medium">None saved</p>
-                      ) : (
-                        <div className="space-y-1">
-                          {profile.addresses.map((a, i) => (
-                            <p key={i} className="text-sm font-medium">
-                              <span className="text-muted-foreground">{a.label}:</span> {a.line1}, {a.city} {a.pincode}
-                            </p>
-                          ))}
-                        </div>
+                  <div className="rounded-lg bg-background/50 px-4 py-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <svg className="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                        </svg>
+                        <p className="text-xs text-muted-foreground">Addresses</p>
+                      </div>
+                      {!showAddAddress && (
+                        <button
+                          onClick={() => setShowAddAddress(true)}
+                          className="rounded-lg px-3 py-1.5 text-sm text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          + Add
+                        </button>
                       )}
                     </div>
+
+                    {profile.addresses.length === 0 && !showAddAddress ? (
+                      <p className="text-sm font-medium text-muted-foreground">None saved</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {profile.addresses.map((a, i) => (
+                          <div
+                            key={a.id || i}
+                            className="flex items-start justify-between rounded-lg border border-border bg-card px-3 py-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium">
+                                <span className="inline-block rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                                  {a.label}
+                                </span>
+                              </p>
+                              <p className="mt-1 text-sm text-foreground">
+                                {[a.flatNo, a.line1, a.line2].filter(Boolean).join(', ')}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {[a.city, a.state, a.pincode].filter(Boolean).join(', ')}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteAddress(a.id, i)}
+                              className="ml-2 shrink-0 rounded-lg px-2 py-1 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {showAddAddress && (
+                      <form onSubmit={handleAddAddress} className="mt-3 space-y-2.5 border-t border-border pt-3">
+                        <div className="grid grid-cols-3 gap-2">
+                          <input
+                            value={addressForm.label}
+                            onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
+                            placeholder="Label (Home, Office...)"
+                            className="col-span-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <input
+                            value={addressForm.flatNo || ''}
+                            onChange={(e) => setAddressForm({ ...addressForm, flatNo: e.target.value })}
+                            placeholder="Flat / House No."
+                            className="col-span-2 rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <input
+                          value={addressForm.line1}
+                          onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
+                          placeholder="Address line 1 *"
+                          required
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        <input
+                          value={addressForm.line2 || ''}
+                          onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
+                          placeholder="Address line 2 (optional)"
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        <div className="grid grid-cols-3 gap-2">
+                          <input
+                            value={addressForm.pincode}
+                            onChange={(e) => setAddressForm({
+                              ...addressForm,
+                              pincode: e.target.value.replace(/\D/g, '').slice(0, 6),
+                              ...(e.target.value.replace(/\D/g, '').length < 6 ? { city: '', state: '' } : {}),
+                            })}
+                            placeholder="Pincode *"
+                            required
+                            maxLength={6}
+                            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <input
+                            value={addressForm.city}
+                            onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                            placeholder="City"
+                            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <input
+                            value={addressForm.state}
+                            onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
+                            placeholder="State"
+                            className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="submit"
+                            disabled={savingAddress}
+                            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {savingAddress ? 'Saving...' : 'Save Address'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowAddAddress(false); setAddressForm(emptyAddressForm); }}
+                            className="rounded-lg px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 </div>
               )
