@@ -16,6 +16,10 @@ vi.mock('bcryptjs', () => ({
   },
 }));
 
+vi.mock('@/lib/telemetry', () => ({
+  track: vi.fn(),
+}));
+
 import { prisma } from '@/lib/prisma';
 
 function makeRequest(body: object): Request {
@@ -92,6 +96,34 @@ describe('POST /api/auth/register', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           profile: { create: {} },
+        }),
+      })
+    );
+  });
+
+  // ── SAFETY: email normalization ──────────────────────────────────
+
+  it('lowercases email before uniqueness check', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.user.create).mockResolvedValue({ id: 'u1', email: 'test@test.com' } as any);
+
+    await POST(makeRequest({ email: 'Test@Test.COM', password: 'longpassword' }));
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { email: 'test@test.com' },
+    });
+  });
+
+  it('stores email as lowercase — prevents case-duplicate accounts', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.user.create).mockResolvedValue({ id: 'u1', email: 'user@gmail.com' } as any);
+
+    await POST(makeRequest({ name: 'X', email: 'User@Gmail.COM', password: 'longpassword' }));
+
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          email: 'user@gmail.com',
         }),
       })
     );
