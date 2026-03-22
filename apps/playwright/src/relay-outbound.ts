@@ -171,6 +171,13 @@ export class RelayOutbound {
           this.reconnectDelay = 1000;
           this.shouldReconnect = true;
         }
+        // Server sent 1011 ("Internal Error") or earlySocket timeout —
+        // the bridge wasn't ready. Reset backoff so we retry quickly
+        // instead of spiraling into 30s delays.
+        if (code === 1011) {
+          this.reconnectDelay = 1000;
+          this.shouldReconnect = true;
+        }
         // Only schedule reconnect if one isn't already pending (prevents
         // exponential chain duplication when doConnect() fails — both the
         // 'close' handler and the catch block would call scheduleReconnect).

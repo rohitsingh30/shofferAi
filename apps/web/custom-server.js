@@ -96,6 +96,11 @@ const httpServer = createServer((req, res) => {
 // ─── WebSocket Relay ────────────────────────────────────────────
 const wss = new WebSocketServer({ noServer: true });
 
+// Set on SIGTERM — prevents the draining instance from accepting new laptop
+// WS connections. Without this, the laptop reconnects to the dying instance
+// instead of the new one, causing relay failures on all subsequent tasks.
+let draining = false;
+
 // RelayBridge is created by the Next.js app (singletons.ts) and stored on globalThis.
 // The custom server wires up the WebSocket to it.
 //
@@ -126,6 +131,15 @@ httpServer.on('upgrade', (request, socket, head) => {
   }
 
   if (parsedUrl.pathname === '/api/relay/ws') {
+    // DRAINING GUARD: After SIGTERM, reject new WS connections so the laptop
+    // is forced to connect to the NEW Cloud Run instance, not this dying one.
+    if (draining) {
+      console.warn('[relay] Rejecting laptop WS — instance is draining after SIGTERM');
+      socket.write('HTTP/1.1 503 Service Unavailable\r\nRetry-After: 2\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
     // Auth check
     if (authToken) {
       const token =
@@ -196,9 +210,28 @@ httpServer.on('upgrade', (request, socket, head) => {
 // the new instance (which has no laptop WS) → relay always fails.
 process.on('SIGTERM', () => {
   console.log('[server] SIGTERM received — closing relay WS to force laptop reconnect');
+
+  // Set draining flag FIRST so the upgrade handler rejects new connections
+  // before we close the existing one. This prevents the laptop from
+  // reconnecting to this dying instance during the 1-4s reconnect window.
+  draining = true;
+
   const bridge = globalThis.__relayBridge;
   if (bridge && typeof bridge.gracefulClose === 'function') {
     bridge.gracefulClose('Cloud Run deploying new revision');
+    // Hard-terminate after 2s if graceful close didn't complete —
+    // ensures the WS is fully severed before the instance dies.
+    if (bridge.laptopSocket || bridge._laptopSocket) {
+      setTimeout(() => {
+        try {
+          const sock = bridge.laptopSocket || bridge._laptopSocket;
+          if (sock && sock.readyState <= 1) {
+            console.log('[server] Force-terminating laptop WS after 2s grace');
+            sock.terminate();
+          }
+        } catch { /* best-effort */ }
+      }, 2000);
+    }
   }
   httpServer.close(() => {
     console.log('[server] HTTP server closed');
