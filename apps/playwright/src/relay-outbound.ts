@@ -38,12 +38,14 @@ export class RelayOutbound {
   private taskManager: TaskManager | null = null;
   private cloudUrl: string;
   private authToken: string;
+  private httpBaseUrl: string;
   private shouldReconnect = true;
   private reconnectScheduled = false;
   private reconnectDelay = 1000;
   private maxReconnectDelay: number;
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   private statusInterval: ReturnType<typeof setInterval> | null = null;
+  private httpVerifyInterval: ReturnType<typeof setInterval> | null = null;
   private lastDataAt = Date.now();
   /** Last time we received an APPLICATION-LEVEL message (not just WS pong).
    *  Cloud Run's load balancer responds to WS pings even when the backend
@@ -57,12 +59,21 @@ export class RelayOutbound {
   /** If no application-level message for 45s, backend is dead.
    *  Server sends heartbeat pings every 15s, so 3 missed = dead. */
   private static readonly STALE_CONNECTION_TIMEOUT_MS = 25_000;
+  /** Verify via HTTP every 30s that the active Cloud Run instance has our relay */
+  private static readonly HTTP_VERIFY_INTERVAL_MS = 30_000;
+  /** Delay before first HTTP verify after connect (let singletons init) */
+  private static readonly HTTP_VERIFY_INITIAL_DELAY_MS = 8_000;
 
   constructor(chromePool: ChromePool, cloudUrl: string, options: RelayOutboundOptions = {}) {
     this.chromePool = chromePool;
     this.cloudUrl = cloudUrl;
     this.authToken = options.authToken || process.env.RELAY_AUTH_TOKEN || '';
     this.maxReconnectDelay = options.maxReconnectDelayMs || 30000;
+    // Derive HTTP base URL from WSS URL: wss://host/api/relay/ws → https://host
+    this.httpBaseUrl = cloudUrl
+      .replace(/^wss:/, 'https:')
+      .replace(/^ws:/, 'http:')
+      .replace(/\/api\/relay\/ws.*$/, '');
   }
 
   /** Attach a TaskManager for Copilot CLI task routing */
@@ -130,6 +141,7 @@ export class RelayOutbound {
 
         this.startHealthCheck();
         this.startStatusBroadcast();
+        this.startHttpVerify();
         resolved = true;
         resolve();
       });
@@ -165,6 +177,7 @@ export class RelayOutbound {
         });
         this.stopHealthCheck();
         this.stopStatusBroadcast();
+        this.stopHttpVerify();
         // Server sent 1001 ("Going Away") — deploy or intentional shutdown.
         // Force reconnect regardless of shouldReconnect (deploy ≠ local disconnect).
         if (code === 1001) {
@@ -202,6 +215,19 @@ export class RelayOutbound {
   private async handleMessage(msg: RelayMessage): Promise<void> {
     if (isHeartbeatPing(msg)) {
       this.ws?.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+      return;
+    }
+
+    // Server is shutting down (SIGTERM) — terminate immediately and reconnect
+    // to the NEW Cloud Run instance. Don't wait for the close frame.
+    if ((msg as { type: string }).type === 'server_draining') {
+      logger.warn('RelayOutbound: server_draining received — instance shutting down, reconnecting immediately', {
+        reason: (msg as { reason?: string }).reason,
+        revision: (msg as { revision?: string }).revision,
+      });
+      this.reconnectDelay = 1000;
+      this.shouldReconnect = true;
+      this.ws?.terminate();
       return;
     }
 
@@ -332,6 +358,7 @@ export class RelayOutbound {
     this.reconnectScheduled = false;
     this.stopHealthCheck();
     this.stopStatusBroadcast();
+    this.stopHttpVerify();
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -421,5 +448,84 @@ export class RelayOutbound {
       chromePool,
     };
     this.send(msg);
+  }
+
+  // ─── HTTP-Level Phantom Detection ───────────────────────────────
+  // The WS stale check fails against FM2 (draining instance sends real pings).
+  // HTTP always routes to the ACTIVE Cloud Run instance, so we ask it directly:
+  // "do you have my relay?" If it says no but our WS is open → phantom → reconnect.
+
+  /**
+   * Start periodic HTTP verification.
+   * First check after 8s (let singletons init), then every 30s.
+   */
+  private startHttpVerify(): void {
+    this.stopHttpVerify();
+    // Initial check: 8s after connect (gives Cloud Run singletons time to init)
+    const initialTimer = setTimeout(() => {
+      this.doHttpVerify();
+      // Then periodic checks every 30s
+      this.httpVerifyInterval = setInterval(
+        () => this.doHttpVerify(),
+        RelayOutbound.HTTP_VERIFY_INTERVAL_MS,
+      );
+    }, RelayOutbound.HTTP_VERIFY_INITIAL_DELAY_MS);
+    // Store the initial timer so stopHttpVerify can clean it up
+    this.httpVerifyInterval = initialTimer as unknown as ReturnType<typeof setInterval>;
+  }
+
+  private stopHttpVerify(): void {
+    if (this.httpVerifyInterval) {
+      clearInterval(this.httpVerifyInterval);
+      clearTimeout(this.httpVerifyInterval as unknown as ReturnType<typeof setTimeout>);
+      this.httpVerifyInterval = null;
+    }
+  }
+
+  /**
+   * Ask the active Cloud Run instance (via HTTP) if it has a relay connected.
+   * If it says no but our WS is open, we're connected to a phantom/draining instance.
+   */
+  private async doHttpVerify(): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    try {
+      const url = `${this.httpBaseUrl}/api/admin/relay-status`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      const resp = await fetch(url, {
+        headers: this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {},
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!resp.ok) {
+        // Can't verify (endpoint not deployed yet, auth issue, etc.) — skip
+        logger.debug('RelayOutbound: HTTP verify got non-200, skipping', { status: resp.status });
+        return;
+      }
+
+      const data = await resp.json() as { connected: boolean; revision?: string };
+      if (!data.connected) {
+        logger.warn('RelayOutbound: HTTP verify says relay NOT connected on active instance — PHANTOM detected, terminating WS', {
+          revision: data.revision,
+          wsReadyState: this.ws?.readyState,
+          lastAppMessageAgoMs: Date.now() - this.lastAppMessageAt,
+        });
+        // Force reconnect to the active instance
+        this.reconnectDelay = 1000;
+        this.shouldReconnect = true;
+        this.ws?.terminate();
+      } else {
+        logger.debug('RelayOutbound: HTTP verify confirmed relay connected', { revision: data.revision });
+      }
+    } catch (err) {
+      // Network error, abort, etc. — don't terminate on HTTP flakiness
+      const errMsg = err instanceof Error ? err.message : 'Unknown';
+      if (!errMsg.includes('abort')) {
+        logger.debug('RelayOutbound: HTTP verify failed (non-fatal)', { error: errMsg });
+      }
+    }
   }
 }

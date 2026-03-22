@@ -350,6 +350,18 @@ export class RelayBridge implements MCPHostLike {
   gracefulClose(reason = 'Server shutting down'): void {
     if (this.laptopSocket) {
       try {
+        // Tell the laptop we're draining BEFORE the close frame.
+        // This triggers immediate reconnect on the laptop side,
+        // even if the close frame gets delayed or lost.
+        this.laptopSocket.send(JSON.stringify({
+          type: 'server_draining',
+          reason,
+          revision: process.env.K_REVISION || 'unknown',
+        }));
+      } catch {
+        // best-effort — socket may already be closing
+      }
+      try {
         this.laptopSocket.close(1001, reason);
       } catch {
         // best-effort
