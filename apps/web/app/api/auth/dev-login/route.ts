@@ -8,7 +8,27 @@ const DEV_USER = {
   password: 'demo1234',
 };
 
+/**
+ * Gate: only enabled when NODE_ENV !== 'production' OR the operator has
+ * explicitly opted in via ENABLE_DEV_LOGIN=1 (e.g. for E2E test environments
+ * that run against prod-like builds).
+ *
+ * In a vanilla production deploy this returns 404 — anyone hitting it
+ * cannot upsert/authenticate as the demo user.
+ *
+ * Reported as BUG-010 in the bug-hunt session: previously this endpoint
+ * was wide-open in prod, returning the demo password to any caller.
+ */
+function devLoginEnabled(): boolean {
+  if (process.env.ENABLE_DEV_LOGIN === '1') return true;
+  return process.env.NODE_ENV !== 'production';
+}
+
 export async function POST() {
+  if (!devLoginEnabled()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const passwordHash = await bcrypt.hash(DEV_USER.password, 12);
 
   // Upsert: create if missing, reset password if exists
