@@ -279,10 +279,16 @@ export class AgentExecutor {
           })(),
         ]);
         this.activeLessons = lessons;
+        // Capture site tool names so we can inject them into the system prompt
+        // explicitly (the skill markdown still references old browser-style ops
+        // like "Click button Add" / "Take snapshot" — without an explicit list
+        // of what's actually callable, the LLM gives up after one round).
+        const siteToolNames = (this.mcpHost.getTools?.() ?? []).map(t => t.name);
         this.systemPrompt = buildSystemPrompt(
           this.config.userContext, this.allSkills, this.matchedSkill, this.activeLessons,
           Object.keys(extractedParams).length > 0 ? extractedParams : undefined,
           this.config.previousContext,
+          siteToolNames,
         );
         callbacks.onStepUpdate({
           action: `🧠 ${formatSkillName(this.matchedSkill.name)} — let me handle this`,
@@ -471,11 +477,13 @@ export class AgentExecutor {
   private async handleToolCall(toolCall: ToolUseBlock, callbacks: AgentCallbacks): Promise<unknown> {
     const { name, input } = toolCall;
     const args = input as Record<string, unknown>;
+    const callStart = Date.now();
 
     // ── ask_user ───────────────────────────────────────────────
     if (name === 'ask_user') {
       this.askUserCount++;
       if (this.askUserCount > this.maxAskUserCalls) {
+        this.emitToolCallEvent(name, callStart, true, { reason: 'limit_exceeded' });
         return {
           userResponse: '[SYSTEM: ask_user limit exceeded. Proceed with what you have or call update_order_status with a checkout_failed status.]',
         };
@@ -506,9 +514,11 @@ export class AgentExecutor {
         if (userResponse.value && typeof userResponse.value === 'string') {
           this.collectedParams[args.question as string] = userResponse.value;
         }
+        this.emitToolCallEvent(name, callStart, true);
         return { userResponse: userResponse.value };
       } catch (err) {
-        return { error: err instanceof Error ? err.message : 'ask_user failed' };
+        this.emitToolCallEvent(name, callStart, false, { error: errMsg(err) });
+        return { error: errMsg(err, 'ask_user failed') };
       }
     }
 
@@ -519,36 +529,47 @@ export class AgentExecutor {
           action: args.action_description as string,
           description: (args.details as string) || '',
         });
+        this.emitToolCallEvent(name, callStart, true, { confirmed });
         return { confirmed };
       } catch (err) {
-        return { error: err instanceof Error ? err.message : 'confirm_action failed' };
+        this.emitToolCallEvent(name, callStart, false, { error: errMsg(err) });
+        return { error: errMsg(err, 'confirm_action failed') };
       }
     }
 
     // ── collect_payment ────────────────────────────────────────
     if (name === 'collect_payment') {
-      if (!callbacks.onPaymentRequired) return { error: 'Payment collection not supported in this context' };
+      if (!callbacks.onPaymentRequired) {
+        this.emitToolCallEvent(name, callStart, false, { error: 'payment_unavailable' });
+        return { error: 'Payment collection not supported in this context' };
+      }
       try {
         const paid = await callbacks.onPaymentRequired({
           bookingSummary: args.summary as string,
           amountInr: args.amount_inr as number,
           description: args.description as string,
         });
+        this.emitToolCallEvent(name, callStart, true, { paid });
         return { paid };
       } catch (err) {
-        return { error: err instanceof Error ? err.message : 'collect_payment failed' };
+        this.emitToolCallEvent(name, callStart, false, { error: errMsg(err) });
+        return { error: errMsg(err, 'collect_payment failed') };
       }
     }
 
     // ── save_address ───────────────────────────────────────────
     if (name === 'save_address') {
       if (!this.config.onSaveAddress || !this.config.userContext.userId) {
+        this.emitToolCallEvent(name, callStart, false, { error: 'save_address_unavailable' });
         return { error: 'Address save unavailable' };
       }
       try {
-        return await this.config.onSaveAddress(this.config.userContext.userId, args);
+        const result = await this.config.onSaveAddress(this.config.userContext.userId, args);
+        this.emitToolCallEvent(name, callStart, true);
+        return result;
       } catch (err) {
-        return { error: err instanceof Error ? err.message : 'save_address failed' };
+        this.emitToolCallEvent(name, callStart, false, { error: errMsg(err) });
+        return { error: errMsg(err, 'save_address failed') };
       }
     }
 
@@ -558,14 +579,17 @@ export class AgentExecutor {
         action: `${args.step_number}. ${args.step_name}: ${args.outcome}`,
         status: 'running',
       });
+      this.emitToolCallEvent(name, callStart, true);
       return { reported: true };
     }
     if (name === 'report_cart') {
       // Frontend listens for tool calls; agent loop just acknowledges.
+      this.emitToolCallEvent(name, callStart, true);
       return { reported: true };
     }
     if (name === 'update_order_status') {
       // Same — frontend reads from SSE stream.
+      this.emitToolCallEvent(name, callStart, true);
       return { reported: true };
     }
 
@@ -582,7 +606,7 @@ export class AgentExecutor {
         });
         return result;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'MCP tool failed';
+        const msg = errMsg(err, 'MCP tool failed');
         this.trackEvent({
           event: 'mcp_call', category: 'tool',
           userId: this.config.userContext.userId, taskId: this.taskId,
@@ -593,6 +617,56 @@ export class AgentExecutor {
       }
     }
 
-    return { error: `Unknown tool: ${name}` };
+    // ── Unknown tool — was previously a silent return. Now: emit telemetry,
+    // log loudly, and surface the available tool catalogue to the LLM so it
+    // can self-correct instead of fabricating a "system glitch" apology.
+    const knownMcpTools = this.mcpHost.getTools().map(t => t.name);
+    const knownCloudTools = ['ask_user', 'confirm_action', 'collect_payment', 'save_address', 'report_step', 'report_cart', 'update_order_status'];
+    const allKnown = [...knownCloudTools, ...knownMcpTools];
+
+    // Suggest closest match if any (case-insensitive substring/normalized)
+    const norm = (s: string) => s.toLowerCase().replace(/[._-]/g, '');
+    const target = norm(name);
+    const suggestion = allKnown.find(t => norm(t) === target)
+      || allKnown.find(t => norm(t).includes(target) || target.includes(norm(t)));
+
+    const errorMsg = `Unknown tool: ${name}. ${suggestion ? `Did you mean "${suggestion}"? ` : ''}Available tools: ${allKnown.join(', ')}`;
+
+    this.emitToolCallEvent(name, callStart, false, {
+      error: 'unknown_tool',
+      requestedName: name,
+      suggestion,
+      availableCount: allKnown.length,
+    });
+
+    // Loud server log so this never disappears silently again.
+    console.error(`[agent] UNKNOWN TOOL CALLED: "${name}" — task=${this.taskId} suggestion=${suggestion ?? 'none'}. Available: [${allKnown.join(', ')}]`);
+
+    return { error: errorMsg };
   }
+
+  /**
+   * Single chokepoint for emitting tool_call telemetry. Every branch in
+   * handleToolCall calls this so we never have a silent dead-end again.
+   */
+  private emitToolCallEvent(
+    toolName: string,
+    startMs: number,
+    success: boolean,
+    metadata?: Record<string, unknown>,
+  ): void {
+    this.trackEvent({
+      event: 'tool_call',
+      category: 'tool',
+      userId: this.config.userContext.userId,
+      taskId: this.taskId,
+      durationMs: Date.now() - startMs,
+      success,
+      metadata: { tool: toolName, ...(metadata ?? {}) },
+    });
+  }
+}
+
+function errMsg(err: unknown, fallback = 'unknown error'): string {
+  return err instanceof Error ? err.message : fallback;
 }

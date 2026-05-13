@@ -144,33 +144,96 @@ export class BrowserOpsHost implements MCPHostLike {
     return this.toolsCache?.some(t => t.name === toolName) ?? false;
   }
 
-  /** Convert MCP tools into Anthropic-style Tool definitions for the LLM. */
+  /**
+   * Convert MCP tools into Anthropic-style Tool definitions for the LLM.
+   *
+   * **Schema flattening (per Anthropic / MCP spec 2025 best practices):**
+   * Runner tools today use `{ session_id, input: { ... } }` envelope. LLMs
+   * are trained on flat schemas and consistently hallucinate or drop the
+   * `input` wrapper. We expose flat schemas to the LLM (just the inner
+   * `input.properties`) and re-envelope server-side in callTool().
+   *
+   * Also drops `session_id` entirely from the LLM-visible schema — the
+   * active session is injected automatically and has no business in the
+   * LLM's reasoning surface.
+   *
+   * Reference: https://anthropic.com/engineering/writing-tools-for-agents
+   * Reference: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+   */
   getToolsAsAnthropicFormat(): AnthropicTool[] {
     return (this.toolsCache ?? []).map(t => ({
       name: t.name,
       description: t.description,
-      input_schema: (t.inputSchema as AnthropicTool['input_schema']) ?? {
-        type: 'object',
-        properties: {},
-      },
+      input_schema: this.flattenSchemaForLLM(t.inputSchema),
     }));
+  }
+
+  /**
+   * Flatten the server's `{ session_id, input: { properties... } }` schema
+   * into a flat `{ properties... }` schema. Drops `session_id` (auto-injected)
+   * and unwraps `input` (auto-wrapped) so the LLM sees the natural arg shape.
+   *
+   * If the source schema doesn't match the expected envelope, returns it
+   * as-is — graceful degradation for non-conforming tools (e.g. session.open).
+   */
+  private flattenSchemaForLLM(rawSchema: unknown): AnthropicTool['input_schema'] {
+    const fallback: AnthropicTool['input_schema'] = { type: 'object' as const, properties: {} };
+    if (!rawSchema || typeof rawSchema !== 'object') return fallback;
+    const s = rawSchema as Record<string, unknown>;
+    const props = s.properties as Record<string, unknown> | undefined;
+    if (!props) return fallback;
+
+    // If schema has `input` wrapper, hoist its properties to the top level
+    // and drop the `session_id` field (auto-injected server-side).
+    const inputSchema = props.input as Record<string, unknown> | undefined;
+    if (inputSchema && typeof inputSchema === 'object') {
+      const innerProps = (inputSchema.properties as Record<string, unknown>) ?? {};
+      const innerRequired = (inputSchema.required as string[]) ?? [];
+      return {
+        type: 'object' as const,
+        properties: innerProps,
+        required: innerRequired,
+        additionalProperties: false,
+      } as AnthropicTool['input_schema'];
+    }
+
+    // No `input` wrapper — just strip `session_id` if present and pass through.
+    const cleanedProps = { ...props };
+    delete cleanedProps.session_id;
+    const cleanedRequired = ((s.required as string[]) ?? []).filter(r => r !== 'session_id');
+    return {
+      type: 'object' as const,
+      properties: cleanedProps,
+      required: cleanedRequired,
+      additionalProperties: false,
+    } as AnthropicTool['input_schema'];
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     const start = Date.now();
     mcpEventBus.emitToolStart(this.config.taskId, name, args);
 
-    // Auto-inject session_id (the SessionMCPHost pattern, but per-task here).
-    const enrichedArgs: Record<string, unknown> = {
-      ...args,
-    };
-    if (this.session && enrichedArgs.session_id == null) {
-      enrichedArgs.session_id = this.session.session_id;
+    // Re-envelope flat LLM args back into the runner's expected shape.
+    // The runner tools follow `{ session_id, input: { ... } }`. The LLM only
+    // sees the inner properties (see flattenSchemaForLLM above), so we wrap
+    // here on the way out.
+    const wrappedArgs: Record<string, unknown> = {};
+    if (this.session) {
+      wrappedArgs.session_id = this.session.session_id;
+    }
+    // Pull session_id out of args if the LLM somehow set it (we ignore it
+    // and use the active session instead). Everything else goes under `input`.
+    const { session_id: _ignoredSessionId, input: existingInput, ...rest } = args;
+    if (existingInput && typeof existingInput === 'object' && !Array.isArray(existingInput)) {
+      // LLM accidentally still sent an `input` wrapper — merge it.
+      wrappedArgs.input = { ...(existingInput as object), ...rest };
+    } else if (Object.keys(rest).length > 0) {
+      wrappedArgs.input = rest;
     }
 
     let result: MCPCallResult;
     try {
-      result = await this.config.client.callTool(name, enrichedArgs, {
+      result = await this.config.client.callTool(name, wrappedArgs, {
         meta: this.buildMeta(name),
         timeoutMs: DEFAULT_OP_TIMEOUT_MS,
       });

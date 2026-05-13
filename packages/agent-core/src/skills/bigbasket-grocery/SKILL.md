@@ -1,12 +1,11 @@
 ---
 name: bigbasket-grocery
-description: Order groceries from BigBasket — browse real products visually, add to cart, schedule delivery, pay.
+description: Order groceries from BigBasket — search the catalog, add items to cart, and review the checkout total. Use this when the user wants to shop on BigBasket (grocery / household / fresh produce).
 triggers:
   - bigbasket
   - big basket
-  - order from bigbasket
-  - bigbasket grocery
   - bb grocery
+  - order from bigbasket
   - bigbasket order
   - buy groceries from bigbasket
   - get groceries on bigbasket
@@ -15,175 +14,101 @@ triggers:
   - bigbasket fruits and veggies
   - grocery delivery bigbasket
   - need things from bigbasket
-  - bb order groceries
+allowed-tools:
+  - bigbasket.search
+  - bigbasket.get_product
+  - bigbasket.add_to_cart
+  - bigbasket.update_cart_qty
+  - bigbasket.remove_from_cart
+  - bigbasket.clear_cart
+  - bigbasket.get_cart
+  - bigbasket.list_delivery_slots
+  - bigbasket.select_delivery_slot
+  - bigbasket.checkout_summary
+  - bigbasket.set_delivery_address
+  - bigbasket.whoami
+  - bigbasket.get_order
 siteUrl: https://www.bigbasket.com
 requiresAuth: true
 params:
   - name: items
     required: false
-    hint: List of items to order (e.g. "rice 5kg, dal, cooking oil") — optional, user can browse visually
+    hint: List of items the user wants (e.g. "amul gold milk 1L, tata salt 1kg") — optional, you can search interactively if vague
   - name: address
-    required: true
-    hint: Delivery address or area name
-  - name: payment_method
     required: false
-    hint: Payment preference (UPI, card, COD, wallet)
+    hint: Delivery address — usually pre-set on the operator's account; only ask if BigBasket complains
 ---
 
-# BigBasket Grocery Ordering
+# BigBasket Grocery — Tool Map
 
-Chrome profile: rsinghtomar3011@gmail.com.
+Drive BigBasket directly via the MCP tools listed above. **Do NOT describe browser actions ("click button", "take snapshot") — the tools handle all UI interaction.** A signed-in browser session is opened for you automatically; you only call the verbs.
 
-**KEY PRINCIPLE**: Show real products with actual images and prices from BigBasket — never generic text or emoji cards. The user should feel like they're browsing a grocery app, not filling out a text form. NEVER ask the user "what items do you want?" as text. Instead, open the site, scrape real products, and show them visually.
+## When to use which tool
 
-## Steps
+| User intent | Tool call(s) |
+|---|---|
+| "Search for X" / "find X on bigbasket" | `bigbasket.search({ query })` → render results to user with `ask_user(input_type=card_grid)` so they can pick + set quantity |
+| "Add X to cart" (specific item already known) | `bigbasket.search({ query })` first to get a `product_id`, then `bigbasket.add_to_cart({ product_id, quantity })` |
+| "Add these N items" | Loop: for each item, `bigbasket.search({ query })` → pick top in-stock result → `bigbasket.add_to_cart({ product_id, quantity })` |
+| "What's in my cart" / "show my cart" | `bigbasket.get_cart({})` → render with `report_cart` |
+| "Remove X" / "I don't want X" | `bigbasket.remove_from_cart({ product_id })` |
+| "Make it 3" / "change qty" | `bigbasket.update_cart_qty({ product_id, quantity })` |
+| "Clear my cart" / "start over" | `bigbasket.clear_cart({})` |
+| "Show me the total" / "checkout" | `bigbasket.list_delivery_slots({})` → ask user to pick → `bigbasket.select_delivery_slot({ slot_id })` → `bigbasket.checkout_summary({})` |
+| "Where's my order" | `bigbasket.get_order({ order_id })` |
 
-### Step 0: Confirm delivery address & phone
-**ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode, phone). The user must pick a saved address or enter a full one. The address widget collects flat/building, street, city, pincode, AND contact phone — all critical for delivery.
+## Sequencing rules
 
-- Call `ask_user` with `input_type: "address"`. Show saved addresses. If the user mentioned an area, pre-fill it in the question:
-  ```json
-  {"input_type": "address", "question": "Confirm your delivery address and phone:", "saved": <use the saved addresses from the system prompt>}
-  ```
-- **Only skip** if the user provided a FULL address with building/flat, street, city, pincode, AND phone number.
-- **Do NOT ask for items as text** — extract them from the user's message. If vague or missing, handoff immediately and let the browser agent browse the site visually.
-- **Do NOT show product cards, prices, or images from the cloud LLM** — the cloud LLM has no access to BigBasket's catalog. Only the browser agent can fetch real product data.
+1. **Always `search` before `add_to_cart`.** Never invent a `product_id` — only use IDs returned by `bigbasket.search` or `bigbasket.get_cart`.
+2. **Address is usually already set** on the operator's account. Skip `set_delivery_address` unless `checkout_summary` returns an error about missing address.
+3. **`list_delivery_slots` → `select_delivery_slot` → `checkout_summary`** — call all three at checkout time, in that order.
+4. **`place_order` is a STUB** — do NOT call it. If the user wants to actually pay, tell them: *"Payment is in beta — please complete checkout in your BigBasket browser tab."*
 
-**CRITICAL**: Do NOT open the browser until you have a complete delivery address with phone. Without a delivery location, BigBasket shows ZERO products and opens a location-select popup immediately.
+## Domain knowledge
 
-### 1. Open BigBasket & Set Delivery Location
-- Open a NEW tab and navigate to `https://www.bigbasket.com`.
-- **CLEAR PREVIOUS CART FIRST**: Before doing anything else, navigate to `https://www.bigbasket.com/basket/`. If there are any leftover items from a previous session, click "Remove All" or remove each item individually. This ensures a clean cart for the new order. Then navigate back to `https://www.bigbasket.com`.
-- Take snapshot immediately to confirm the page loaded and determine the current state.
-- **Location popup auto-appears**: BigBasket shows a `menu "Delivery in 10 mins Select Location"` overlay with text "Select a location for delivery" and "Choose your address location to see product availability and delivery options".
-- Find `textbox "Search for area or street name"` inside the popup.
-- Type the user's area/locality (e.g. "Tellapur" or "Koramangala").
-- Wait for location suggestions to appear, click the best match.
-- Take snapshot to verify the popup closed and products are now visible.
+- **Search query format:** Best results from `<brand> <product> <size>`, e.g. `"amul gold milk 1L"`, `"tata salt 1kg"`. If 0 results, retry without the brand: `"milk 1L"`.
+- **Common units:** `500g`, `1kg`, `2kg`, `500ml`, `1L`, `2L`, `6 pack`, `dozen`.
+- **Out of stock items:** `bigbasket.search` returns `inStock: false` — skip those when adding; tell the user and ask if they want a substitute.
+- **Pricing:** Each product has `priceInr` (sale) and `mrpInr` (MRP). Show the sale price; mention the discount only if `discountPct > 5`.
+- **Free delivery threshold:** ~₹500-600 cart value. Below this, BigBasket adds a delivery fee shown in `checkout_summary`.
+- **Quick commerce ("bb Now"):** Some areas get 10-min delivery; others get scheduled slots. The `slots` array tells you which.
 
-### 2. Verify Login Status
-- After location is set, take snapshot and check header.
-- Look for `button "Login/ Sign Up"` — if visible, the user is NOT logged in.
-- If logged in, the header shows a profile icon/name instead of "Login/ Sign Up".
-- If NOT logged in:
-  - Click `button "Login/ Sign Up"`.
-  - BigBasket uses phone number + OTP login. Enter operator phone.
-  - Use `ask_user` (input_type "otp") for the OTP code.
-  - Verify login succeeded by taking snapshot — "Login/ Sign Up" button should be gone.
-- **If login fails or session expired, STOP and tell user: "Session expired, please re-login in Chrome Debug."**
+## Showing results to the user
 
-### 3. Show Real Categories or Search Results to User
-This step depends on what the user asked for:
+When `bigbasket.search` returns products, use `ask_user` with `input_type: card_grid`:
+```json
+{
+  "input_type": "card_grid",
+  "question": "Here's what I found — tap to add to cart:",
+  "show_quantity": true,
+  "multi_select": true,
+  "cards": [
+    {
+      "id": "<product_id>",
+      "label": "<product.name>",
+      "image": "<product.imageUrl>",
+      "subtitle": "₹<product.priceInr> · <product.pack>",
+      "badge": "<discountPct>% off"
+    }
+  ]
+}
+```
 
-**If user gave SPECIFIC items** (e.g., "order rice, dal, and cooking oil"):
-- Skip category browsing. Go directly to Step 4 for each item.
+For a single confirmed product, use `input_type: product_card` instead.
 
-**If user gave VAGUE/CATEGORICAL items** (e.g., "order fruits and vegetables", "get me groceries", "need some snacks"):
-- Click `button "Shop by Category"` to open category dropdown.
-- Take a `browser_snapshot`.
-- Extract all visible category tiles — each has: category name (text), category image URL (from BigBasket CDN), and link.
-- Call `ask_user` with `input_type: "carousel"` and `multi_select: true`:
-  - `question`: "What would you like to browse? Pick categories or search for something specific."
-  - `cards`: Array of real categories from the page, each with:
-    - `id`: category slug or link path (e.g., "/cl/fruits-vegetables/")
-    - `label`: category name (e.g., "Fruits & Vegetables")
-    - `image`: real category image URL from BigBasket CDN
-    - `subtitle`: subcategory hint if visible
-  - `allow_custom`: true (so user can type "paneer" or "chocolate" to search directly)
+## Error recovery
 
-**If user gave NO items** (e.g., "order from BigBasket"):
-- Same as vague items — show the category browser and let them browse visually.
+| Error returned by a tool | What to do |
+|---|---|
+| `signedIn: false` from any tool | Tell user: "Your BigBasket session expired — please refresh your Chrome tab and re-login." Do NOT loop trying. |
+| `product not found` from add_to_cart | Re-search with a broader query, or tell the user "couldn't find that on BigBasket" and ask for an alternative. |
+| `out of stock` | Tell the user the item is unavailable and suggest a substitute (search again with brand stripped). |
+| `address not set` from checkout_summary | Call `set_delivery_address({ saved_label: "Home" })`. If that fails, ask the user to set their address in BigBasket directly. |
+| Tool times out (>30s) | Tell user "BigBasket is slow right now" and offer to retry once. Don't auto-retry more than once. |
 
-### 4. Search & Show Real Products with Images
-For each item (specific from user message, or category/search from Step 3):
+## Hard rules
 
-**If user selected a category:**
-- Click the category link to navigate to the category page.
-- Take a `browser_snapshot` of the category page.
-- Extract product cards — each has: product name, weight/size, price (₹), image URL, discount badge, delivery time.
-
-**If user typed a search term or has specific items:**
-- Click the search bar `textbox "Search for Products..."` at the top of the page.
-- Type the item name and press Enter.
-- Take snapshot of search results.
-- **Search results page structure**: Each product is a `listitem` containing:
-  - `heading [level=3]` with brand + product name + quantity (e.g. "fresho! Capsicum - Green 1 kg")
-  - Weight/variant selector: `button` with weight text (e.g. "1 kg")
-  - Pricing: two `generic` elements — first is sale price (e.g. "₹133.6"), second is MRP (e.g. "₹167")
-  - Delivery time badge: `generic` showing "10 mins"
-  - Action: `button "Add"` to add to cart
-
-**Then show products to user:**
-- Call `ask_user` with `input_type: "card_grid"`:
-  - `question`: "Here's what's available — tap to add items:"
-  - `cards`: Array of REAL products (up to 12-16), each with:
-    - `id`: product ID from the page (from URL pattern `/pd/{id}/{slug}/`)
-    - `label`: product name (e.g., "fresho! Capsicum - Green")
-    - `image`: REAL product image URL from BigBasket CDN — extract the `src` attribute from `<img>` tags inside product cards
-    - `subtitle`: price and weight (e.g., "₹28 · 1 kg · MRP ₹89")
-    - `badge`: discount or delivery time if any (e.g., "10 mins")
-    - `url`: product page URL from BigBasket (extract from the `<a>` tag wrapping the product card, e.g., "https://www.bigbasket.com/pd/40015040/capsicum-green/")
-  - `show_quantity`: true
-  - `multi_select`: true
-  - `allow_custom`: true (so user can type more items to search)
-
-**CRITICAL**: Use REAL image URLs from the page. BigBasket product images are on their CDN (`www.bigbasket.com/media/uploads/` or similar) — these are public URLs. Extract the `src` attribute from `<img>` tags inside product cards.
-
-### 5. Add Selected Items to Cart
-For each product the user selected (with quantities):
-- Find the product on the current page (it should still be visible).
-- Click `button "Add"` on the product card. After adding, the button transforms into a quantity stepper with +/- buttons.
-- Adjust quantity to match what the user requested.
-- If user selected items from different categories/searches, search for each one:
-  - Click search bar, type item name, press Enter, find the matching product, click Add, adjust qty.
-
-**If user wants to browse more**: They can type additional items in the custom input. For each, search on BigBasket, scrape results, show another `card_grid` with real products, and let them pick. Repeat until they say they're done.
-
-### 6. Review Cart
-- Click the cart/basket icon button in the header or navigate to `https://www.bigbasket.com/basket/`.
-- Take snapshot of the cart page.
-- Use `confirm_action` to present order summary:
-  - Each item with brand, quantity, weight, sale price
-  - Subtotal, delivery charges, total
-  - Available delivery slots (BigBasket offers scheduled delivery)
-- Ask user to pick a delivery slot if multiple available (use `ask_user` with `input_type: "chip_bar"`).
-- Do NOT proceed unless user confirms. If cancelled, ask what to change.
-
-### 7. Checkout & Payment
-- Proceed to checkout from the cart page.
-- Verify delivery address and selected time slot.
-- Apply coupons if visible and beneficial.
-- Use `collect_payment` to collect via Razorpay:
-  - summary: JSON with items, prices, delivery charge, total, delivery slot
-  - amount_inr: total amount (number)
-  - description: "BigBasket grocery order"
-- STOP and WAIT for payment confirmation. If cancelled, ask what to change.
-
-### 8. Place Order & Confirm
-- Click "Place Order" or equivalent on the checkout page.
-- Handle payment OTP via `ask_user` if needed.
-- Take snapshot of confirmation page.
-- Report: order number, items, total paid, delivery slot/date.
-
-## Site Notes
-
-- **Location popup on first visit**: BigBasket immediately shows a location-select overlay with `textbox "Search for area or street name"`. Products are NOT visible until a location is set. ALWAYS handle this first.
-- **"Delivery in 10 mins" mode**: BigBasket now offers quick commerce (bb Now) alongside scheduled delivery. The location popup header says "Delivery in 10 mins".
-- **Login method**: BigBasket uses phone number + OTP. There is NO Google sign-in. The button text is `"Login/ Sign Up"`.
-- **Search bar selector**: `textbox "Search for Products..."` — appears in both regular and sticky header.
-- **Product card "Add" button**: Each product card has a `button "Add"` at the bottom. After first add, it switches to a quantity stepper with +/- buttons.
-- **Weight/variant selector**: Shown as a `button` inside the product heading (e.g. `button "1 kg"`). Click to see other variants.
-- **Price display**: Two elements — sale price first (e.g. "₹28"), then MRP crossed out (e.g. "₹89").
-- **Category navigation**: `button "Shop by Category"` opens a dropdown with categories like "Fruits & Vegetables" (`/cl/fruits-vegetables/`), "Foodgrains, Oil & Masala" (`/cl/foodgrains-oil-masala/`), etc.
-- **Product images**: Extract REAL `src` from `<img>` inside product cards. BigBasket images are on their CDN and publicly accessible.
-- **Smart Basket**: Homepage shows "My Smart Basket" section with personalized product recommendations — can be scraped and shown to user.
-- BigBasket offers both quick commerce (10 min) and scheduled delivery — delivery slots are same-day or next-day.
-- Operator Chrome Profile 3 should be logged in. Do NOT ask user for credentials.
-- If session expired, login transparently. OTP goes to operator.
-- BigBasket has a wide catalog (15K+ products) — search is reliable.
-- Free delivery above a certain order value (usually ₹500-600).
-- Products may show MRP vs sale price — always show the effective (lower) price.
-- Some items are sold by weight (e.g. fruits/veggies) — confirm quantity.
-- BigBasket membership (bb Star) may offer extra discounts.
-- Use `confirm_action` for cart review, `collect_payment` for checkout.
-- When using confirm_action or collect_payment, WAIT for user response. Do NOT auto-proceed.
+- **Never** describe browser actions in your text response. The user does not see the browser.
+- **Never** invent product IDs, slot IDs, or order IDs.
+- **Never** call `place_order`, `submit_otp`, or `confirm_payment` — they are stubs.
+- **Always** show real prices and product images from `bigbasket.search` results — do not paraphrase or fabricate.

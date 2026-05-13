@@ -16,8 +16,10 @@ steps:
       - '--build-arg=NEXT_PUBLIC_RAZORPAY_KEY_ID=${_RAZORPAY_PUBLIC_KEY_ID}'
 
   # Deploy to Cloud Run with full configuration.
-  # Uses a shell step so we can fetch DATABASE_PASSWORD from Secret Manager and
-  # compose it into DATABASE_URL (Cloud SQL Unix socket connection string).
+  # Uses a shell step so we can fetch DATABASE_PASSWORD from Secret Manager,
+  # compose it into DATABASE_URL, AND preserve runtime-mutated env vars
+  # (BROWSER_OPS_MCP_URL is rewritten by the laptop's tunnel-watchdog when the
+  # cloudflared URL rotates — we must NOT clobber it on every deploy).
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
     id: deploy
     entrypoint: 'bash'
@@ -28,6 +30,21 @@ steps:
         DB_PW=$(gcloud secrets versions access latest --secret=DATABASE_PASSWORD)
         SOCKET_PATH="/cloudsql/${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE}"
         DATABASE_URL="postgresql://postgres:$${DB_PW}@localhost/shofferai?host=$${SOCKET_PATH}&schema=public"
+
+        # Read current BROWSER_OPS_MCP_URL from the live service so we don't
+        # clobber the watchdog's value. Fall back to an obviously-broken
+        # placeholder so a misconfig is loud, not silent.
+        CURRENT_OPS_URL=$(gcloud run services describe shofferai \
+          --region=${_REGION} \
+          --format='value(spec.template.spec.containers[0].env)' 2>/dev/null \
+          | tr ';' '\n' | grep -E "name': 'BROWSER_OPS_MCP_URL'" -A1 \
+          | grep -oE "https?://[^'\"]+" | head -1)
+        if [ -z "$${CURRENT_OPS_URL}" ]; then
+          CURRENT_OPS_URL="http://no-tunnel-set.invalid/mcp"
+          echo "WARN: no live BROWSER_OPS_MCP_URL found; will redeploy with placeholder. Watchdog should overwrite within 30s."
+        else
+          echo "Preserving live BROWSER_OPS_MCP_URL=$${CURRENT_OPS_URL}"
+        fi
 
         gcloud run deploy shofferai \
           --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/shofferai:${_TAG} \
@@ -41,8 +58,8 @@ steps:
           --timeout=3600 \
           --service-account=${_RUNTIME_SA} \
           --add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
-          --set-env-vars="^~^NODE_ENV=production~RELAY_MODE=cloud~LOG_LEVEL=info~AUTH_TRUST_HOST=true~AUTH_URL=${_APP_URL}~NEXT_PUBLIC_APP_URL=${_APP_URL}~DATABASE_URL=$${DATABASE_URL}~LLM_MODEL=gpt-5.1-chat~REWRITER_MODEL=gpt-4o-mini~AZURE_OPENAI_ENDPOINT=${_AZURE_OPENAI_ENDPOINT}~AZURE_OPENAI_API_VERSION=2024-10-21~AUTH_GOOGLE_ID=${_AUTH_GOOGLE_ID}~RAZORPAY_KEY_ID=${_RAZORPAY_KEY_ID}~NEXT_PUBLIC_RAZORPAY_KEY_ID=${_RAZORPAY_PUBLIC_KEY_ID}~AGENT_MODE=relay~SKILLS_DIR=/app/skills" \
-          --set-secrets="AUTH_SECRET=AUTH_SECRET:latest,CREDENTIAL_ENCRYPTION_KEY=CREDENTIAL_ENCRYPTION_KEY:latest,RELAY_AUTH_TOKEN=RELAY_AUTH_TOKEN:latest,AZURE_OPENAI_API_KEY=AZURE_OPENAI_API_KEY:latest,AUTH_GOOGLE_SECRET=AUTH_GOOGLE_SECRET:latest,RAZORPAY_KEY_SECRET=RAZORPAY_KEY_SECRET:latest" \
+          --set-env-vars="^~^NODE_ENV=production~RELAY_MODE=cloud~LOG_LEVEL=info~AUTH_TRUST_HOST=true~AUTH_URL=${_APP_URL}~NEXT_PUBLIC_APP_URL=${_APP_URL}~DATABASE_URL=$${DATABASE_URL}~LLM_MODEL=gpt-5.1-chat~REWRITER_MODEL=gpt-4o-mini~AZURE_OPENAI_ENDPOINT=${_AZURE_OPENAI_ENDPOINT}~AZURE_OPENAI_API_VERSION=2024-10-21~AUTH_GOOGLE_ID=${_AUTH_GOOGLE_ID}~RAZORPAY_KEY_ID=${_RAZORPAY_KEY_ID}~NEXT_PUBLIC_RAZORPAY_KEY_ID=${_RAZORPAY_PUBLIC_KEY_ID}~AGENT_MODE=relay~SKILLS_DIR=/app/skills~BROWSER_OPS_MCP_URL=$${CURRENT_OPS_URL}" \
+          --set-secrets="AUTH_SECRET=AUTH_SECRET:latest,CREDENTIAL_ENCRYPTION_KEY=CREDENTIAL_ENCRYPTION_KEY:latest,RELAY_AUTH_TOKEN=RELAY_AUTH_TOKEN:latest,AZURE_OPENAI_API_KEY=AZURE_OPENAI_API_KEY:latest,AUTH_GOOGLE_SECRET=AUTH_GOOGLE_SECRET:latest,RAZORPAY_KEY_SECRET=RAZORPAY_KEY_SECRET:latest,BROWSER_OPS_TOKEN=BROWSER_OPS_TOKEN:latest" \
           --quiet
 
 substitutions:
