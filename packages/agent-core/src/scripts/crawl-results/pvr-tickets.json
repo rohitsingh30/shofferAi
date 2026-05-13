@@ -1,8 +1,0 @@
-{
-  "skillName": "pvr-tickets",
-  "siteUrl": "https://www.pvrcinemas.com",
-  "crawledAt": "2026-03-16T14:28:48.889Z",
-  "success": false,
-  "selectors": {},
-  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.pvrcinemas.com/\", waiting until \"domcontentloaded\"\u001b[22m\n"
-}

@@ -1,76 +1,69 @@
+/**
+ * POST /api/agent/execute
+ *
+ * SSE endpoint that runs the cloud chat loop, with browser ops delegated
+ * to the external Browser Operations Service via MCP.
+ *
+ * Per-task lifecycle:
+ *   1. Create Task row
+ *   2. Open SSE stream
+ *   3. Open BrowserOpsHost: connect MCP, loadTools, optionally session.open
+ *   4. Run AgentExecutor (LLM loop + tool dispatch)
+ *   5. Close session, emit task_complete
+ *
+ * No relay, no laptop bridge, no WebSocket. Pure HTTP+MCP.
+ */
+
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { AgentExecutor, type AgentCallbacks, matchSkill, getMessageRewriter, getInputEnricher } from '@shofferai/agent-core';
+import { AgentExecutor, type AgentCallbacks, matchSkill } from '@shofferai/agent-core';
 import { CredentialInjector } from '@/lib/credential-vault';
-import { remoteMcpHost, workflowEngine, vault, skills, lessonStore } from '@/lib/singletons';
+import { browserOpsClient, workflowEngine, vault, skills, lessonStore } from '@/lib/singletons';
+import { BrowserOpsHost } from '@/lib/browser-ops';
 import { track, trackTimed } from '@/lib/telemetry';
 import { TaskLatencyTracker } from '@/lib/task-latency-tracker';
 import { getAuthUser } from '@/lib/auth-helper';
 import { handleCheckoutSuccess, handleCheckoutFailure, handleOrderStatusUpdate } from '@/lib/order-operations';
-import type {
-  TaskRelayMessage,
-  TaskHandoffMessage,
-  TaskInputResponseMessage,
-  TaskPaymentResponseMessage,
-  TaskCancelMessage,
-} from '@shofferai/shared';
-import { UserInputTimeoutError, SHOPPING_SKILLS, looksLikeProductPresentation } from '@shofferai/shared';
+import { UserInputTimeoutError } from '@shofferai/shared';
 
-/** Lazy relay connection — only needed when agent actually tries to use the browser */
-async function ensureRelayConnected() {
-  if (!remoteMcpHost.isConnected()) {
-    console.log('[execute] Relay not connected (isConnected=false), attempting connect...');
-    const start = Date.now();
-    await remoteMcpHost.connect();
-    console.log('[execute] Relay connected (took %dms)', Date.now() - start);
-  } else {
-    console.log('[execute] Relay already connected (isConnected=true)');
-  }
-}
+export const dynamic = 'force-dynamic';
 
-function safeParseJSON(str: string): unknown {
-  try { return JSON.parse(str); } catch { return str; }
+/** Map a skill name → site id understood by the runner. */
+function siteForSkill(skillId: string | undefined): string | null {
+  if (!skillId) return null;
+  if (skillId.startsWith('bigbasket')) return 'bigbasket';
+  if (skillId.startsWith('blinkit'))   return 'blinkit';
+  if (skillId.startsWith('zepto'))     return 'zepto';
+  if (skillId.startsWith('swiggy-instamart')) return 'swiggy_instamart';
+  if (skillId.startsWith('zomato'))    return 'zomato';
+  if (skillId.startsWith('swiggy'))    return 'swiggy';
+  return null;
 }
 
 export async function POST(request: Request) {
-  console.log('[execute] POST /api/agent/execute — incoming request');
-
-  // ─── Phase: auth ─────────────────────────────────────────────────
   const authStart = Date.now();
   const authUser = await getAuthUser(request);
   if (!authUser) {
-    console.warn('[execute] Unauthorized request');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
   const { message } = await request.json();
-  console.log('[execute] user=%s message=%s', authUser.userId, message?.slice(0, 120));
   if (!message) {
     return NextResponse.json({ error: 'Message is required' }, { status: 400 });
   }
-
   const userId = authUser.userId;
 
-  // ─── Phase: task_setup ───────────────────────────────────────────
-  // Create task first so we have the taskId for the latency tracker
   const taskId = await workflowEngine.createTask(userId, message);
   await workflowEngine.updateTaskStatus(taskId, 'running');
-  let stepCounter = 0; // monotonic step counter (avoids Date.now() INT4 overflow)
-  console.log('[execute] taskId=%s created, status=running', taskId);
+  let stepCounter = 0;
 
-  // Initialize latency tracker — tracks all phases for this task
   const lat = new TaskLatencyTracker(taskId, userId);
-  // Retroactively record auth phase duration
   lat.startPhase('auth');
   lat.endPhase('auth', { durationOverride: Date.now() - authStart });
-
   lat.startPhase('task_setup');
 
   track({ event: 'task_created', category: 'task', userId, taskId, metadata: { message: message.slice(0, 200) } });
   const taskTimer = trackTimed({ event: 'task_execution', category: 'task', userId, taskId });
 
-  // Get user context + previous conversation context (parallel)
   const [profile, credentials, previousCtx] = await Promise.all([
     prisma.profile.findUnique({ where: { userId } }),
     vault.list(userId),
@@ -79,122 +72,107 @@ export async function POST(request: Request) {
 
   lat.endPhase('task_setup');
 
-  // Stream response via SSE
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-
       let streamClosed = false;
-      // Track pending rewriter promises so we can flush before closing the stream.
-      // Without this, async rewriter .then() fires AFTER controller.close() → message lost.
-      const pendingRewrites: Promise<void>[] = [];
 
       function send(type: string, payload: Record<string, unknown>) {
         if (streamClosed) return;
         try {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type, payload })}\n\n`)
-          );
-          // Track time-to-first-message
-          if (type === 'message') {
-            lat.addMarker('first_message_sent');
-          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, payload })}\n\n`));
+          if (type === 'message') lat.addMarker('first_message_sent');
         } catch {
-          // Stream already closed (browser disconnected, timeout, etc.)
           streamClosed = true;
         }
       }
 
       function sendKeepAlive() {
         if (streamClosed) return;
-        try {
-          controller.enqueue(encoder.encode(`: keepalive\n\n`));
-        } catch {
-          streamClosed = true;
-        }
+        try { controller.enqueue(encoder.encode(`: keepalive\n\n`)); }
+        catch { streamClosed = true; }
       }
 
-      // SSE heartbeat — prevents keepAliveTimeout from killing the connection
-      // while the laptop is executing the task (Chrome launching, page loading, etc.)
       const heartbeatTimer = setInterval(sendKeepAlive, 15_000);
 
-      // Cleanup function to remove task event listener
-      let taskEventCleanup: (() => void) | null = null;
-      // Track whether the agent handed off to the laptop browser agent.
-      // When true, the stream must stay open for laptop events (task_progress,
-      // task_complete, task_error) — the finally block must NOT close it.
-      let handoffSent = false;
+      // Construct one BrowserOpsHost per task — owns the per-task session_id.
+      const opsHost = new BrowserOpsHost({
+        client: browserOpsClient,
+        taskId,
+        userRef: `sha256:${userId}`,
+      });
 
-      // ─── SSE disconnect detection ──────────────────────────────────
-      // When the user closes the chat tab or navigates away, request.signal
-      // fires 'abort'. If a handoff is active, send task_cancel to the laptop
-      // so it kills the Copilot CLI + Chrome immediately instead of waiting
-      // for the 10-minute task timeout.
       request.signal.addEventListener('abort', () => {
-        console.log('[execute] taskId=%s SSE client disconnected (request aborted)', taskId);
+        console.log('[execute] taskId=%s SSE client disconnected', taskId);
         streamClosed = true;
-
-        if (handoffSent) {
-          try {
-            const cancelMsg: TaskCancelMessage = {
-              id: randomUUID(),
-              type: 'task_cancel',
-              taskId,
-              reason: 'client_disconnected',
-            };
-            remoteMcpHost.sendTaskMessage(cancelMsg);
-            console.log('[execute] taskId=%s sent task_cancel to laptop relay', taskId);
-          } catch (e) {
-            console.warn('[execute] taskId=%s failed to send task_cancel:', taskId, e);
-          }
-        }
-
-        // Clean up SSE resources
         clearInterval(heartbeatTimer);
-        if (taskEventCleanup) taskEventCleanup();
+        opsHost.closeSession().catch(() => {});
         workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
         try { controller.close(); } catch { /* already closed */ }
       });
 
       try {
-        // Don't eagerly connect relay — chat LLM can ask clarifying questions without it.
-        // Relay is only needed when handoff_to_browser_agent or browse_website is called.
-        console.log('[execute] taskId=%s starting (relay connection deferred)', taskId);
-
-        // Send taskId to frontend so it can cancel the task explicitly
         send('task_started', { taskId });
-        // ─── Phase: skill_match ──────────────────────────────────────
+
+        // ─── Skill match ──────────────────────────────────────────
         lat.startPhase('skill_match');
-        // Match a skill for the user's request
         let matchedSkill = matchSkill(skills, message);
-
-        // Skill continuity fallback: if no skill matched, use the previous task's skill
         if (!matchedSkill && previousCtx.lastSkillId) {
-          const fallbackSkill = skills.find(s => s.name === previousCtx.lastSkillId);
-          if (fallbackSkill) {
-            matchedSkill = fallbackSkill;
-            console.log('[execute] taskId=%s skill fallback from previous task: %s', taskId, fallbackSkill.name);
-          }
+          const fallback = skills.find(s => s.name === previousCtx.lastSkillId);
+          if (fallback) matchedSkill = fallback;
         }
-
-        // Persist matched skill for future context lookups
         if (matchedSkill) {
           workflowEngine.setTaskSkill(taskId, matchedSkill.name).catch((err) =>
-            console.warn('[execute] Failed to persist matchedSkillId:', err)
-          );
+            console.warn('[execute] persist matchedSkillId failed:', err));
+        }
+        lat.endPhase('skill_match', { skillName: matchedSkill?.name || 'none' });
+
+        // ─── Browser ops setup ────────────────────────────────────
+        // Connect to runner + fetch tool catalogue. This is fast (< 200ms warm).
+        lat.startPhase('browser_ops_setup');
+        try {
+          await opsHost.connect();
+          await opsHost.loadTools();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[execute] taskId=%s browser-ops connect failed:', taskId, msg);
+          send('error', { message: 'Browser service unavailable. Please ensure the runner is up.', detail: msg });
+          await workflowEngine.updateTaskStatus(taskId, 'failed');
+          clearInterval(heartbeatTimer);
+          try { controller.close(); } catch {}
+          return;
         }
 
-        lat.endPhase('skill_match', { skillName: matchedSkill?.name || 'none' });
-        console.log('[execute] taskId=%s matched skill: %s', taskId, matchedSkill?.name || 'none');
+        // Open a browser session for the matched skill's site (if grocery/food/etc).
+        // Chat-only / no-skill tasks skip session.open.
+        const site = siteForSkill(matchedSkill?.name);
+        if (site) {
+          try {
+            const snap = await opsHost.openSession({
+              site,
+              user_ref: `sha256:${userId}`,
+              region: 'in-mumbai',
+              device: 'desktop',
+            });
+            console.log('[execute] taskId=%s session=%s warm=%s site=%s', taskId, snap.session_id, snap.warm, site);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error('[execute] taskId=%s session.open failed:', taskId, msg);
+            send('message', { content: `I can't reach **${site}** right now. The browser service may be offline or this site isn't supported yet.` });
+            send('task_complete', { summary: 'Browser unavailable' });
+            await workflowEngine.updateTaskStatus(taskId, 'failed');
+            clearInterval(heartbeatTimer);
+            try { controller.close(); } catch {}
+            return;
+          }
+        }
+        lat.endPhase('browser_ops_setup');
 
-        // ─── Chat LLM gathers requirements, then hands off ─────────
-        // Use AgentExecutor in "chat-only" mode — it will call handoff_to_browser_agent
-        // when it has gathered enough info from the user.
-
+        // ─── Agent ────────────────────────────────────────────────
         const injector = new CredentialInjector(vault, userId);
 
         const agent = new AgentExecutor({
-          mcpHost: remoteMcpHost,
+          mcpHost: opsHost,
           credentialInjector: injector,
           skills,
           vault,
@@ -215,21 +193,14 @@ export async function POST(request: Request) {
             addressLabels: profile?.addresses
               ? (JSON.parse(profile.addresses) as Array<{ label: string }>).map((a) => a.label)
               : [],
-            credentialLabels: credentials.map((c) => ({
-              id: c.id,
-              label: c.label,
-              type: c.type,
-            })),
+            credentialLabels: credentials.map((c) => ({ id: c.id, label: c.label, type: c.type })),
             preferences: profile?.preferences ? JSON.parse(profile.preferences) : {},
           },
           onSaveAddress: async (targetUserId: string, address: Record<string, unknown>) => {
             try {
               const existingProfile = await prisma.profile.findUnique({ where: { userId: targetUserId } });
               let addresses: Array<Record<string, unknown>> = [];
-              if (existingProfile?.addresses) {
-                addresses = JSON.parse(existingProfile.addresses);
-              }
-              // Always append with unique ID — never overwrite by label
+              if (existingProfile?.addresses) addresses = JSON.parse(existingProfile.addresses);
               const label = (address.label as string) || 'Home';
               addresses.push({ ...address, id: crypto.randomUUID(), label });
               await prisma.profile.upsert({
@@ -237,638 +208,128 @@ export async function POST(request: Request) {
                 update: { addresses: JSON.stringify(addresses) },
                 create: { userId: targetUserId, addresses: JSON.stringify(addresses), phone: '', preferences: '{}' },
               });
-              console.log('[execute] Address saved for user=%s label=%s count=%d', targetUserId, label, addresses.length);
               return { saved: true, addressCount: addresses.length };
             } catch (error) {
-              const errMsg = error instanceof Error ? error.message : 'Unknown DB error';
-              console.error('[execute] Failed to save address for user=%s:', targetUserId, errMsg);
-              return { saved: false, error: errMsg };
+              return { saved: false, error: error instanceof Error ? error.message : 'DB error' };
             }
           },
         });
 
-        // ─── Handle task events from laptop ──────────────────────────
-        // When the laptop sends task_progress, task_input_required, etc.,
-        // forward them as SSE events to the frontend.
-        const pauseManager = workflowEngine.getPauseManager();
-
-        // Accumulate progress messages for InputEnricher context
-        const progressMessages: string[] = [];
-
-        const handleTaskEvent = async (msg: TaskRelayMessage) => {
-          // Only handle events for this task
-          if ('taskId' in msg && msg.taskId !== taskId) return;
-
-          switch (msg.type) {
-            case 'task_progress':
-              // Only forward LLM text messages (no step field) as chat bubbles.
-              // Tool call progress (has step field) goes only to MCP logs, not to the user.
-              if (!msg.step) {
-                // Accumulate raw messages for InputEnricher context
-                progressMessages.push(msg.message);
-
-                // Detect product presentation text → convert to interactive product_card widget
-                const isShopSkill = matchedSkill && SHOPPING_SKILLS.has(matchedSkill.name);
-                if (isShopSkill && looksLikeProductPresentation(msg.message)) {
-                  const enrichP = (async () => {
-                    try {
-                      const enriched = await getInputEnricher().enrich(
-                        { question: msg.message, inputType: 'text' as import('@shofferai/shared').RichInputType },
-                        { skillName: matchedSkill?.name, progressMessages },
-                      );
-                      if (enriched.enriched && (enriched.inputType === 'product_card' || enriched.inputType === 'carousel')) {
-                        const stepId = `auto_product_${Date.now()}`;
-                        console.log('[execute] taskId=%s product detected in task_progress → %s', taskId, enriched.inputType);
-                        send('input_required', {
-                          taskId,
-                          stepId,
-                          question: enriched.question,
-                          inputType: enriched.inputType,
-                          product: enriched.product,
-                          cards: enriched.cards,
-                        });
-                        // Wait for user interaction (Add to Cart, etc.)
-                        // Don't forward to relay — this was a task_progress, not task_input_required
-                        pauseManager.waitForInput({
-                          taskId,
-                          stepId,
-                          question: enriched.question,
-                          inputType: enriched.inputType,
-                          timeout: 600_000,
-                        }).then((response) => {
-                          console.log('[execute] taskId=%s product widget response: %s', taskId, response.value);
-                          workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
-                            type: 'product_widget_response', stepId,
-                          }).catch(e => console.error('[execute] DB addMessage(product_widget) failed:', e));
-                        }).catch((err) => {
-                          if (err instanceof UserInputTimeoutError) {
-                            console.log('[execute] taskId=%s product widget input timed out (OK)', taskId);
-                          }
-                        });
-                        return; // Skip rewriter — we sent input_required instead
-                      }
-                    } catch (err) {
-                      console.warn('[execute] taskId=%s product enrichment failed, falling through:', taskId, err);
-                    }
-                    // Enrichment failed or didn't match — fall through to normal rewriter
-                    const rewritten = await getMessageRewriter().rewrite(msg.message);
-                    if (rewritten) {
-                      send('message', { content: rewritten });
-                      workflowEngine.addMessage(taskId, 'assistant', rewritten)
-                        .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
-                    }
-                  })();
-                  pendingRewrites.push(enrichP);
-                } else {
-                  // Two-tier filter: regex fast path + AI rewrite layer
-                  const rewriteP = getMessageRewriter().rewrite(msg.message).then(rewritten => {
-                    if (rewritten) {
-                      send('message', { content: rewritten });
-                      workflowEngine.addMessage(taskId, 'assistant', rewritten)
-                        .catch(e => console.error('[execute] DB addMessage(task_progress) failed:', e));
-                    }
-                  }).catch(err => {
-                    console.error('[execute] taskId=%s rewriter error:', taskId, err);
-                    // Safety: suppress on rewriter failure — never leak unfiltered agent messages
-                    console.warn('[execute] taskId=%s suppressed message (rewriter failed): %s', taskId, msg.message?.slice(0, 100));
-                  });
-                  pendingRewrites.push(rewriteP);
-                }
-              }
-              break;
-
-            case 'task_input_required': {
-              console.log('[execute] taskId=%s TASK_INPUT_REQUIRED stepId=%s q=%s', taskId, msg.stepId, msg.question?.slice(0, 80));
-
-              // Enrich bare text inputs into structured types (product_card, carousel)
-              // using accumulated progress messages as context. Fast path for
-              // already-structured inputs (~0ms); LLM enrichment for bare text (~300ms).
-              const sendEnrichedInput = async () => {
-                const enriched = await getInputEnricher().enrich(
-                  {
-                    question: msg.question,
-                    inputType: msg.inputType,
-                    options: msg.options,
-                    cards: msg.cards,
-                    product: msg.product,
-                  },
-                  {
-                    skillName: matchedSkill?.name,
-                    progressMessages,
-                  },
-                );
-                if (enriched.enriched) {
-                  console.log('[execute] taskId=%s input enriched: %s → %s', taskId, msg.inputType, enriched.inputType);
-                }
-
-                send('input_required', {
-                  taskId,
-                  stepId: msg.stepId,
-                  question: enriched.question,
-                  inputType: enriched.inputType,
-                  options: enriched.options ?? msg.options,
-                  cards: enriched.cards ?? msg.cards,
-                  show_quantity: msg.show_quantity,
-                  allow_custom: msg.allow_custom,
-                  multi_select: msg.multi_select,
-                  saved: msg.saved,
-                  mode: msg.mode,
-                  shortcuts: msg.shortcuts,
-                  counters: msg.counters,
-                  min: msg.min,
-                  max: msg.max,
-                  step: msg.step,
-                  presets: msg.presets,
-                  placeholder: msg.placeholder,
-                  format_hint: msg.format_hint,
-                  sections: msg.sections,
-                  product: enriched.product ?? msg.product,
-                });
-                workflowEngine.addMessage(taskId, 'assistant', enriched.question, {
-                  type: 'input_required', inputType: enriched.inputType, stepId: msg.stepId,
-                  options: enriched.options ?? msg.options, cards: enriched.cards ?? msg.cards,
-                  product: enriched.product ?? msg.product, saved: msg.saved,
-                  counters: msg.counters, sections: msg.sections,
-                  show_quantity: msg.show_quantity, multi_select: msg.multi_select,
-                }).catch(e => console.error('[execute] DB addMessage(task_input_required) failed:', e));
-              };
-
-              sendEnrichedInput().catch(err => {
-                console.error('[execute] taskId=%s enricher error, sending original:', taskId, err);
-                send('input_required', {
-                  taskId, stepId: msg.stepId, question: msg.question,
-                  inputType: msg.inputType, options: msg.options, cards: msg.cards,
-                  show_quantity: msg.show_quantity, allow_custom: msg.allow_custom,
-                  multi_select: msg.multi_select, saved: msg.saved, mode: msg.mode,
-                  shortcuts: msg.shortcuts, counters: msg.counters,
-                  min: msg.min, max: msg.max, step: msg.step,
-                  presets: msg.presets, placeholder: msg.placeholder,
-                  format_hint: msg.format_hint, sections: msg.sections, product: msg.product,
-                });
-              });
-
-              // Wait for user input then send back to laptop
-              // Browsing-heavy inputs (carousel, card_grid, product_card) get 10 min like payments
-              const EXTENDED_INPUT_TYPES = new Set(['carousel', 'card_grid', 'product_card']);
-              const inputTimeout = EXTENDED_INPUT_TYPES.has(msg.inputType) ? 600_000 : undefined;
-              pauseManager.waitForInput({
-                taskId,
-                stepId: msg.stepId,
-                question: msg.question,
-                inputType: msg.inputType,
-                ...(inputTimeout && { timeout: inputTimeout }),
-              }).then((response) => {
-                console.log('[execute] taskId=%s input received for stepId=%s', taskId, msg.stepId);
-                // Persist the user's response
-                workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
-                  type: 'input_response', stepId: msg.stepId, inputType: msg.inputType,
-                  shownOptions: msg.options, shownCards: msg.cards, shownProduct: msg.product,
-                }).catch(e => console.error('[execute] DB addMessage(task_input_response) failed:', e));
-
-                const inputMsg: TaskInputResponseMessage = {
-                  id: randomUUID(),
-                  type: 'task_input_response',
-                  taskId,
-                  stepId: msg.stepId,
-                  value: response.value,
-                };
-                remoteMcpHost.sendTaskMessage(inputMsg);
-              }).catch((err) => {
-                console.error('[execute] taskId=%s input error:', taskId, err);
-                if (err instanceof UserInputTimeoutError) {
-                  send('error', { error: err.message, taskId, code: 'INPUT_TIMEOUT' });
-                  workflowEngine.addMessage(taskId, 'assistant', err.message, { type: 'task_error' })
-                    .catch(e => console.error('[execute] DB addMessage(input-timeout) failed:', e));
-                  workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
-                  // Cancel the relay task so TaskManager cleans up browser resources
-                  remoteMcpHost.sendTaskMessage({ id: randomUUID(), type: 'task_cancel', taskId });
-                  taskTimer.end({ success: false, metadata: { error: 'input_timeout' } });
-                  lat.endPhase('browser_execution');
-                  lat.finish(false, { error: 'input_timeout', completedVia: 'browser' });
-                  clearInterval(heartbeatTimer);
-                  if (taskEventCleanup) taskEventCleanup();
-                  try { controller.close(); } catch { /* already closed */ }
-                }
-              });
-              break;
-            }
-
-            case 'task_payment_required': {
-              console.log('[execute] taskId=%s TASK_PAYMENT_REQUIRED amount=%d', taskId, msg.amount);
-              const relaySummary = typeof msg.bookingSummary === 'string'
-                ? msg.bookingSummary
-                : msg.bookingSummary ? JSON.stringify(msg.bookingSummary) : undefined;
-              send('payment_required', {
-                taskId,
-                stepId: msg.stepId,
-                bookingSummary: relaySummary,
-                amountCents: Math.round(msg.amount * 100),
-                serviceFeeCents: 0,
-                description: msg.description,
-              });
-              // Persist the payment request
-              workflowEngine.addMessage(taskId, 'assistant',
-                `Payment required: ₹${msg.amount}${relaySummary ? '\n' + relaySummary : ''}`,
-                { type: 'payment_required', amount: msg.amount, stepId: msg.stepId },
-              ).catch(e => console.error('[execute] DB addMessage(task_payment_required) failed:', e));
-
-              pauseManager.waitForInput({
-                taskId,
-                stepId: msg.stepId,
-                question: 'Waiting for payment',
-                inputType: 'payment',
-                timeout: 600000,
-              }).then(async (response) => {
-                console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
-                // Persist the payment confirmation/decline
-                workflowEngine.addMessage(taskId, 'user',
-                  response.value === 'confirmed' ? 'Payment confirmed' : 'Payment declined',
-                  { type: 'payment_response', stepId: msg.stepId },
-                ).catch(e => console.error('[execute] DB addMessage(task_payment_response) failed:', e));
-
-                // Send order_confirmed SSE if an Order was created by the verify route
-                if (response.value === 'confirmed') {
-                  try {
-                    const order = await prisma.order.findFirst({
-                      where: { taskId },
-                      orderBy: { createdAt: 'desc' },
-                    });
-                    if (order) {
-                      send('order_confirmed', {
-                        orderId: order.id,
-                        orderNumber: order.orderNumber,
-                        items: safeParseJSON(order.items),
-                        productAmountCents: order.productAmountCents,
-                        serviceFeeCents: order.serviceFeeCents,
-                        totalCents: order.totalCents,
-                        targetSite: order.targetSite,
-                        status: order.status,
-                      });
-                    }
-                  } catch (e) {
-                    console.error('[execute] taskId=%s failed to send order_confirmed SSE:', taskId, e);
-                  }
-                }
-
-                const paymentMsg: TaskPaymentResponseMessage = {
-                  id: randomUUID(),
-                  type: 'task_payment_response',
-                  taskId,
-                  stepId: msg.stepId,
-                  confirmed: response.value === 'confirmed',
-                };
-                remoteMcpHost.sendTaskMessage(paymentMsg);
-              }).catch((err) => {
-                console.error('[execute] taskId=%s payment error:', taskId, err);
-                if (err instanceof UserInputTimeoutError) {
-                  send('error', { error: err.message, taskId, code: 'INPUT_TIMEOUT' });
-                  workflowEngine.addMessage(taskId, 'assistant', err.message, { type: 'task_error' })
-                    .catch(e => console.error('[execute] DB addMessage(payment-timeout) failed:', e));
-                  workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
-                  remoteMcpHost.sendTaskMessage({ id: randomUUID(), type: 'task_cancel', taskId });
-                  taskTimer.end({ success: false, metadata: { error: 'payment_timeout' } });
-                  lat.endPhase('browser_execution');
-                  lat.finish(false, { error: 'payment_timeout', completedVia: 'browser' });
-                  clearInterval(heartbeatTimer);
-                  if (taskEventCleanup) taskEventCleanup();
-                  try { controller.close(); } catch { /* already closed */ }
-                }
-              });
-              break;
-            }
-
-            case 'task_complete':
-              console.log('[execute] taskId=%s TASK_COMPLETE: %s', taskId, msg.summary?.slice(0, 120));
-              // Flush pending rewriter promises so no messages are lost
-              if (pendingRewrites.length > 0) {
-                await Promise.allSettled(pendingRewrites);
-              }
-              send('complete', { summary: msg.summary, taskId });
-              workflowEngine.addMessage(taskId, 'assistant', msg.summary, { type: 'task_complete' })
-                .catch(e => console.error('[execute] DB addMessage(task_complete) failed:', e));
-              workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB error:', e));
-              taskTimer.end({ success: true, metadata: { skillName: matchedSkill?.name } });
-              lat.endPhase('browser_execution');
-              lat.finish(true, { skillName: matchedSkill?.name, completedVia: 'browser' });
-              clearInterval(heartbeatTimer);
-              if (taskEventCleanup) taskEventCleanup();
-              try { controller.close(); } catch { /* already closed */ }
-              break;
-
-            case 'task_error':
-              console.error('[execute] taskId=%s TASK_ERROR: %s', taskId, msg.error);
-              // Flush pending rewriter promises so no messages are lost
-              if (pendingRewrites.length > 0) {
-                await Promise.allSettled(pendingRewrites);
-              }
-              send('error', { error: msg.error, taskId, code: 'BROWSER_ERROR' });
-              workflowEngine.addMessage(taskId, 'assistant', `Error: ${msg.error}`, {
-                type: 'task_error', recoverable: msg.recoverable,
-              }).catch(e => console.error('[execute] DB addMessage(task_error) failed:', e));
-              workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB error:', e));
-              taskTimer.end({ success: false, metadata: { error: msg.error } });
-              lat.endPhase('browser_execution');
-              lat.finish(false, { error: msg.error, completedVia: 'browser' });
-              clearInterval(heartbeatTimer);
-              if (taskEventCleanup) taskEventCleanup();
-              try { controller.close(); } catch { /* already closed */ }
-              break;
-          }
-        };
-
-        remoteMcpHost.onTaskEvent(handleTaskEvent, taskId);
-        taskEventCleanup = () => {
-          remoteMcpHost.removeTaskEventHandler(taskId);
-        };
-
-        // ─── AgentExecutor callbacks (chat-only mode) ────────────────
         const callbacks: AgentCallbacks = {
-          onMessage(content) {
-            console.log('[execute] taskId=%s message: %s', taskId, content?.slice(0, 100));
-            // Two-tier filter: regex fast path + AI rewrite layer
-            const rewriteP = getMessageRewriter().rewrite(content).then(rewritten => {
-              if (rewritten) {
-                send('message', { content: rewritten });
-                workflowEngine.addMessage(taskId, 'assistant', rewritten).catch(e => console.error('[execute] DB addMessage failed:', e));
-              }
-            }).catch(err => {
-              console.error('[execute] taskId=%s rewriter error in onMessage:', taskId, err);
-              // Safety: suppress on rewriter failure — never leak unfiltered agent messages
-              console.warn('[execute] taskId=%s suppressed message (rewriter failed): %s', taskId, content?.slice(0, 100));
-            });
-            pendingRewrites.push(rewriteP);
+          onMessage: (content: string) => {
+            send('message', { content });
+            workflowEngine.addMessage(taskId, 'assistant', content)
+              .catch(e => console.error('[execute] addMessage(assistant) failed:', e));
           },
-          onStepUpdate(step) {
-            console.log('[execute] taskId=%s step_update: %o', taskId, step);
-            send('step_update', step);
-
-            // Process order status updates — update DB (fire-and-forget)
-            if (step.status === 'order_placed' || step.status === 'order_failed' || step.status === 'order_status') {
-              try {
-                const orderData = JSON.parse(step.action);
-                if (orderData._type === 'order_status_update') {
-                  // Find the order for this task
-                  prisma.order.findFirst({ where: { taskId }, orderBy: { createdAt: 'desc' } })
-                    .then(async (order) => {
-                      if (!order) return;
-                      if (step.status === 'order_placed') {
-                        await handleCheckoutSuccess(order.id, {
-                          targetOrderId: orderData.targetOrderId,
-                          targetOrderUrl: orderData.targetOrderUrl,
-                          targetTrackingUrl: orderData.targetTrackingUrl,
-                          estimatedDelivery: orderData.estimatedDelivery,
-                        });
-                      } else if (step.status === 'order_failed') {
-                        await handleCheckoutFailure(order.id, orderData.failureReason || 'Checkout failed');
-                      } else if (step.status === 'order_status') {
-                        await handleOrderStatusUpdate(order.id, orderData.status, {
-                          trackingNumber: orderData.trackingNumber,
-                          courierName: orderData.courierName,
-                          targetTrackingUrl: orderData.targetTrackingUrl,
-                          message: orderData.message,
-                        });
-                      }
-                    })
-                    .catch(e => console.error('[execute] order status DB update failed:', e));
-                }
-              } catch { /* not JSON — ignore */ }
-            }
-
-            // Persist step to DB for audit trail (fire-and-forget)
-            const status = step.status === 'completed' ? 'completed'
-              : step.status === 'error' ? 'failed' : 'running';
+          onStepUpdate: (step) => {
+            const stepNumber = ++stepCounter;
+            send('step_update', { step: { ...step, number: stepNumber } });
             prisma.taskStep.create({
               data: {
-                taskId,
-                stepNumber: ++stepCounter,
-                action: step.action,
-                status,
+                taskId, stepNumber, action: step.action, status: step.status,
                 startedAt: new Date(),
-                completedAt: status === 'completed' ? new Date() : undefined,
+                completedAt: step.status === 'completed' || step.status === 'failed' ? new Date() : null,
               },
-            }).catch(e => console.error('[execute] DB step write failed:', e));
+            }).catch(e => console.error('[execute] taskStep.create failed:', e));
           },
-          async onInputRequired(request) {
-            console.log('[execute] taskId=%s INPUT_REQUIRED stepId=%s type=%s q=%s', taskId, request.stepId, request.inputType, request.question?.slice(0, 80));
-            // Save the ask_user prompt with full rich UI context for task-analyser
-            workflowEngine.addMessage(taskId, 'assistant', request.question || '[input requested]', {
-              inputType: request.inputType, stepId: request.stepId,
-              options: request.options, cards: request.cards, product: request.product,
-              saved: request.saved, counters: request.counters, sections: request.sections,
-              show_quantity: request.show_quantity, multi_select: request.multi_select,
-            }).catch(e => console.error('[execute] DB addMessage(ask) failed:', e));
-            send('input_required', {
-              taskId,
-              stepId: request.stepId,
-              question: request.question,
-              inputType: request.inputType,
+          onInputRequired: async (request) => {
+            send('input_required', request as unknown as Record<string, unknown>);
+            workflowEngine.addMessage(taskId, 'assistant', request.question, {
+              type: 'input_required', stepId: request.stepId, inputType: request.inputType,
               options: request.options,
-              cards: request.cards,
-              show_quantity: request.show_quantity,
-              allow_custom: request.allow_custom,
-              multi_select: request.multi_select,
-              saved: request.saved,
-              mode: request.mode,
-              shortcuts: request.shortcuts,
-              counters: request.counters,
-              min: request.min,
-              max: request.max,
-              step: request.step,
-              presets: request.presets,
-              placeholder: request.placeholder,
-              format_hint: request.format_hint,
-              sections: request.sections,
-              product: request.product,
-            });
-            lat.startPhase('user_input_wait');
-            // Browsing-heavy inputs get 10 min timeout (same as payments)
-            const EXTENDED_AGENT_INPUT_TYPES = new Set(['carousel', 'card_grid', 'product_card']);
-            const agentInputTimeout = EXTENDED_AGENT_INPUT_TYPES.has(request.inputType) ? 600_000 : undefined;
-            const response = await pauseManager.waitForInput({
-              ...request,
-              taskId,
-              ...(agentInputTimeout && { timeout: agentInputTimeout }),
-            });
-            lat.endPhase('user_input_wait', { inputType: request.inputType, stepId: request.stepId });
-            console.log('[execute] taskId=%s input received for stepId=%s', taskId, request.stepId);
-            // Save user's response with context about what was shown
-            workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
-              stepId: request.stepId, inputType: request.inputType,
-              shownOptions: request.options, shownCards: request.cards, shownProduct: request.product,
-            }).catch(e => console.error('[execute] DB addMessage(input) failed:', e));
-            return response;
+            }).catch(e => console.error('[execute] addMessage(input_required) failed:', e));
+
+            const pauseManager = workflowEngine.getPauseManager();
+            try {
+              const response = await pauseManager.waitForInput({
+                taskId, stepId: request.stepId,
+                question: request.question, inputType: request.inputType,
+                timeout: 600_000,
+              });
+              workflowEngine.addMessage(taskId, 'user', response.value || '[no response]', {
+                type: 'input_response', stepId: request.stepId,
+              }).catch(e => console.error('[execute] addMessage(user response) failed:', e));
+              return response;
+            } catch (err) {
+              if (err instanceof UserInputTimeoutError) {
+                send('input_timeout', { stepId: request.stepId });
+                return { taskId, stepId: request.stepId, value: '', cancelled: true };
+              }
+              throw err;
+            }
           },
-          async onConfirmRequired(details) {
-            console.log('[execute] taskId=%s CONFIRM_REQUIRED: %s', taskId, details.action?.slice(0, 80));
-            const confirmQuestion = `${details.action}\n\n${details.description}`;
-            workflowEngine.addMessage(taskId, 'assistant', confirmQuestion, { type: 'confirmation' }).catch(e => console.error('[execute] DB addMessage(confirm-ask) failed:', e));
-            send('input_required', {
-              taskId,
-              stepId: 'confirm',
-              question: confirmQuestion,
-              inputType: 'confirmation',
-            });
-            const response = await pauseManager.waitForInput({
-              taskId,
-              stepId: 'confirm',
-              question: details.action,
-              inputType: 'confirmation',
-            });
-            console.log('[execute] taskId=%s confirm response=%s', taskId, response.value);
-            workflowEngine.addMessage(taskId, 'user', response.value === 'yes' ? 'Yes, confirmed' : 'No, cancelled', { type: 'confirmation' }).catch(e => console.error('[execute] DB addMessage(confirm-resp) failed:', e));
-            return response.value === 'yes';
-          },
-          async onPaymentRequired(details: { bookingSummary: string; amountInr: number; description: string }) {
-            console.log('[execute] taskId=%s PAYMENT_REQUIRED amount=₹%d', taskId, details.amountInr);
-            const chatSummary = typeof details.bookingSummary === 'string'
-              ? details.bookingSummary
-              : details.bookingSummary ? JSON.stringify(details.bookingSummary) : '';
-            workflowEngine.addMessage(taskId, 'assistant', `Payment required: ₹${details.amountInr}\n${chatSummary}`, { type: 'payment', amountInr: details.amountInr }).catch(e => console.error('[execute] DB addMessage(payment-ask) failed:', e));
-            send('payment_required', {
-              taskId,
-              bookingSummary: chatSummary,
-              amountCents: Math.round(details.amountInr * 100),
-              serviceFeeCents: 0,
+          onConfirmRequired: async (details) => {
+            const stepId = `confirm_${Date.now()}`;
+            send('confirm_required', {
+              stepId,
+              action: details.action,
               description: details.description,
             });
-            const response = await pauseManager.waitForInput({
-              taskId,
-              stepId: 'payment',
-              question: 'Waiting for payment confirmation',
-              inputType: 'payment',
-              timeout: 600000,
-            });
-            console.log('[execute] taskId=%s payment response=%s', taskId, response.value);
-            workflowEngine.addMessage(taskId, 'user', response.value === 'confirmed' ? 'Payment confirmed' : 'Payment declined', { type: 'payment' }).catch(e => console.error('[execute] DB addMessage(payment-resp) failed:', e));
-
-            // Send order_confirmed SSE if an Order was created by the verify route
-            if (response.value === 'confirmed') {
-              try {
-                const order = await prisma.order.findFirst({
-                  where: { taskId },
-                  orderBy: { createdAt: 'desc' },
-                });
-                if (order) {
-                  send('order_confirmed', {
-                    orderId: order.id,
-                    orderNumber: order.orderNumber,
-                    items: safeParseJSON(order.items),
-                    productAmountCents: order.productAmountCents,
-                    serviceFeeCents: order.serviceFeeCents,
-                    totalCents: order.totalCents,
-                    targetSite: order.targetSite,
-                    status: order.status,
-                  });
-                }
-              } catch (e) {
-                console.error('[execute] taskId=%s failed to send order_confirmed SSE:', taskId, e);
-              }
-            }
-
-            return response.value === 'confirmed';
-          },
-          onComplete(summary) {
-            if (handoffSent) {
-              // Handoff is active — the laptop will send task_complete.
-              // Don't mark completed here (the LLM's "I've handed this off" is just a text message).
-              console.log('[execute] taskId=%s onComplete suppressed (handoff active)', taskId);
-              return;
-            }
-            console.log('[execute] taskId=%s COMPLETE: %s', taskId, summary?.slice(0, 120));
-            send('complete', { summary, taskId });
-            workflowEngine.updateTaskStatus(taskId, 'completed').catch(e => console.error('[execute] DB updateStatus failed:', e));
-            taskTimer.end({ success: true, metadata: { skillName: agent.matchedSkill?.name } });
-            lat.endPhase('llm_chat');
-            lat.finish(true, { skillName: agent.matchedSkill?.name, completedVia: 'chat' });
-          },
-          onError(error) {
-            console.error('[execute] taskId=%s ERROR: %s', taskId, error);
-            send('error', { error, taskId, code: 'AGENT_ERROR' });
-            workflowEngine.updateTaskStatus(taskId, 'failed').catch(e => console.error('[execute] DB updateStatus failed:', e));
-            taskTimer.end({ success: false, metadata: { error } });
-            lat.finish(false, { error, completedVia: 'chat' });
-          },
-
-          // ─── Task handoff callback ─────────────────────────────────
-          // Called by AgentExecutor when it decides to hand off to the
-          // browser agent (Copilot CLI on the laptop).
-          async onTaskHandoff(handoff: {
-            description: string;
-            skill?: { name: string; siteUrl: string; instructions: string; requiresAuth: boolean; params: Array<{ name: string; required: boolean; hint: string }> };
-            extractedParams: Record<string, string>;
-            conversationContext?: string;
-          }) {
-            console.log('[execute] taskId=%s TASK_HANDOFF to laptop', taskId);
-            send('step_update', { action: 'Handing off to browser agent...', status: 'running' });
-
-            // ─── Phase: handoff_setup ──────────────────────────────────
-            lat.endPhase('llm_chat');  // end chat phase
-            lat.startPhase('handoff_setup');
-
-            // Lazy relay connection — only connect when we actually need the laptop
+            const pauseManager = workflowEngine.getPauseManager();
             try {
-              await ensureRelayConnected();
-            } catch (relayErr) {
-              const msg = relayErr instanceof Error ? relayErr.message : 'Relay connection failed';
-              console.error('[execute] taskId=%s relay connect failed during handoff: %s', taskId, msg);
-              lat.endPhase('handoff_setup', { error: msg });
-              // Throw so the agent knows the handoff failed and can tell the user
-              throw new Error(`Cannot reach browser agent: ${msg}. Make sure the laptop relay is running.`);
+              const response = await pauseManager.waitForInput({
+                taskId, stepId,
+                question: details.action,
+                inputType: 'confirmation',
+                timeout: 600_000,
+              });
+              return Boolean(response.value && /^(yes|y|true|confirm)/i.test(response.value));
+            } catch {
+              return false;
             }
-
-            const handoffMsg: TaskHandoffMessage = {
-              id: randomUUID(),
-              type: 'task_handoff',
-              taskId,
-              userId,
-              description: handoff.description,
-              skill: handoff.skill,
-              extractedParams: handoff.extractedParams,
-              conversationContext: handoff.conversationContext,
-            };
-
-            remoteMcpHost.sendTaskMessage(handoffMsg);
-            handoffSent = true;
-            lat.endPhase('handoff_setup', { skill: handoff.skill?.name });
-            lat.startPhase('browser_execution');  // starts when handoff sent, ends on task_complete/error
-
-            // Instant feedback — user sees progress immediately instead of 5-6s silence
-            send('step_update', { action: `Browsing ${handoff.skill?.name ? handoff.skill.name.split('-')[0] : 'the web'}...`, status: 'running' });
-            // Don't close the stream — keep it open for task events from the laptop
+          },
+          onPaymentRequired: async (details) => {
+            const stepId = `payment_${Date.now()}`;
+            send('payment_required', {
+              stepId,
+              bookingSummary: details.bookingSummary,
+              amountInr: details.amountInr,
+              description: details.description,
+            });
+            const pauseManager = workflowEngine.getPauseManager();
+            try {
+              const response = await pauseManager.waitForInput({
+                taskId, stepId,
+                question: details.description, inputType: 'confirmation',
+                timeout: 600_000,
+              });
+              return Boolean(response.value && /^(paid|confirmed|yes|true)/i.test(response.value));
+            } catch {
+              return false;
+            }
+          },
+          onComplete: async (summary: string) => {
+            send('task_complete', { summary });
+            await workflowEngine.updateTaskStatus(taskId, 'completed');
+            taskTimer.end({ success: true });
+            lat.finish(true);
+            track({ event: 'task_completed', category: 'task', userId, taskId, success: true });
+          },
+          onError: async (error: string) => {
+            send('error', { message: error });
+            await workflowEngine.updateTaskStatus(taskId, 'failed');
+            taskTimer.end({ success: false });
+            lat.finish(false);
+            track({ event: 'task_failed', category: 'task', userId, taskId, success: false, metadata: { error: error.slice(0, 500) } });
           },
         };
 
-        await workflowEngine.addMessage(taskId, 'user', message);
-        console.log('[execute] taskId=%s starting agent.execute()', taskId);
-        lat.startPhase('llm_chat');  // LLM conversation phase (ends on handoff or completion)
         await agent.execute(message, callbacks);
-        console.log('[execute] taskId=%s agent.execute() finished', taskId);
 
-      } catch (error) {
-        const isInputTimeout = error instanceof UserInputTimeoutError;
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        const errorCode = isInputTimeout ? 'INPUT_TIMEOUT' : 'FATAL_ERROR';
-        const stack = error instanceof Error ? error.stack : '';
-        console.error('[execute] taskId=%s %s: %s\n%s', taskId, errorCode, errorMsg, stack);
-        send('error', { error: errorMsg, taskId, code: errorCode });
+        // Always release the browser session at the end of the task
+        await opsHost.closeSession();
+
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        console.error('[execute] taskId=%s fatal:', taskId, err);
+        send('error', { message: msg });
         await workflowEngine.updateTaskStatus(taskId, 'failed');
-        taskTimer.end({ success: false, metadata: { error: errorMsg } });
-        lat.finish(false, { error: errorMsg, completedVia: isInputTimeout ? 'input_timeout' : 'fatal_error' });
+        taskTimer.end({ success: false });
+        await opsHost.closeSession();
       } finally {
-        if (handoffSent) {
-          // Handoff was sent to laptop — keep the stream, heartbeat, and event listener alive.
-          // task_complete or task_error from the laptop will close the stream.
-          console.log('[execute] taskId=%s agent.execute() finished, handoff active — stream stays open (heartbeat running)', taskId);
-        } else {
-          // Flush any pending rewriter promises before closing — prevents the race
-          // where async rewriter .then() fires after controller.close()
-          if (pendingRewrites.length > 0) {
-            await Promise.allSettled(pendingRewrites);
-          }
-          clearInterval(heartbeatTimer);
-          if (taskEventCleanup) taskEventCleanup();
-          console.log('[execute] taskId=%s stream closing', taskId);
-          try { controller.close(); } catch { /* already closed */ }
+        clearInterval(heartbeatTimer);
+        if (!streamClosed) {
+          try { controller.close(); } catch {}
         }
       }
     },
@@ -877,8 +338,9 @@ export async function POST(request: Request) {
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
     },
   });
 }

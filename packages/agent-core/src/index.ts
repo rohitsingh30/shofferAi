@@ -6,8 +6,5 @@ export { ConversationManager } from './conversation';
 export { SYSTEM_PROMPT, buildSystemPrompt } from './prompts/system';
 export { loadSkills, matchSkill } from './skills/loader';
 export type { SkillMetadata, SkillParam, LessonEntry, LessonStore } from './skills/types';
-export { ScriptRecorder, ScriptPlayer, ScriptStore } from './scripts';
-export type { RecordedAction, SkillScript } from './scripts';
-export { MessageRewriter, getMessageRewriter } from './message-rewriter';
 export { ParamExtractor } from './param-extractor';
 export { InputEnricher, getInputEnricher } from './input-enricher';

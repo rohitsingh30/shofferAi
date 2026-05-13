@@ -1,8 +1,0 @@
-{
-  "skillName": "salad-days",
-  "siteUrl": "https://www.saladdays.co",
-  "crawledAt": "2026-03-16T14:32:23.548Z",
-  "success": false,
-  "selectors": {},
-  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.saladdays.co/\", waiting until \"domcontentloaded\"\u001b[22m\n"
-}

@@ -57,3 +57,6 @@ docker-data/
 .claude/
 .mcp.json
 .vscode/
+
+# TypeScript build info
+*.tsbuildinfo

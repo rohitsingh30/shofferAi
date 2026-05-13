@@ -1,8 +1,0 @@
-{
-  "skillName": "bira91-beer",
-  "siteUrl": "https://www.bira91.com",
-  "crawledAt": "2026-03-16T13:30:59.468Z",
-  "success": false,
-  "selectors": {},
-  "error": "page.goto: net::ERR_NAME_NOT_RESOLVED at https://www.bira91.com/\nCall log:\n\u001b[2m  - navigating to \"https://www.bira91.com/\", waiting until \"domcontentloaded\"\u001b[22m\n"
-}

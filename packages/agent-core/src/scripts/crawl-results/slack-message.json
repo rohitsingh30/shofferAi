@@ -1,8 +1,0 @@
-{
-  "skillName": "slack-message",
-  "siteUrl": "https://app.slack.com",
-  "crawledAt": "2026-03-16T14:36:15.559Z",
-  "success": false,
-  "selectors": {},
-  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://app.slack.com/\", waiting until \"domcontentloaded\"\u001b[22m\n"
-}

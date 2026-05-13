@@ -226,14 +226,14 @@ export async function GET(request: Request) {
   }
 
   if (view === 'chrome') {
-    // Live status from relay (lazy import to avoid breaking other views)
-    let liveStatus = null;
+    // Live status from browser-ops runner. The runner exposes /v1/health and a
+    // bearer-protected /status endpoint; we surface a minimal connected/idle view here.
+    let liveStatus: { connected: boolean; tasks?: unknown[] } | null = null;
     try {
-      const { remoteMcpHost } = await import('@/lib/singletons');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      liveStatus = (remoteMcpHost as any)?.getRelayStatus?.() || null;
+      const { browserOpsClient } = await import('@/lib/singletons');
+      liveStatus = { connected: browserOpsClient.isConnected() };
     } catch {
-      // Relay bridge may not be available (dev mode uses RemoteMCPHost)
+      liveStatus = null;
     }
 
     // Historical: recent task executions with user info

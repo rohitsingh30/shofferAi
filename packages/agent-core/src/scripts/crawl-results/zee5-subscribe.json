@@ -1,8 +1,0 @@
-{
-  "skillName": "zee5-subscribe",
-  "siteUrl": "https://www.zee5.com",
-  "crawledAt": "2026-03-16T14:59:22.774Z",
-  "success": false,
-  "selectors": {},
-  "error": "page.goto: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"https://www.zee5.com/\", waiting until \"domcontentloaded\"\u001b[22m\n"
-}

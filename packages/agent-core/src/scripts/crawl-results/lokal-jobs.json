@@ -1,8 +1,0 @@
-{
-  "skillName": "lokal-jobs",
-  "siteUrl": "https://www.getlokal.app",
-  "crawledAt": "2026-03-16T14:08:20.410Z",
-  "success": false,
-  "selectors": {},
-  "error": "page.goto: net::ERR_CERT_COMMON_NAME_INVALID at https://www.getlokal.app/\nCall log:\n\u001b[2m  - navigating to \"https://www.getlokal.app/\", waiting until \"domcontentloaded\"\u001b[22m\n"
-}
