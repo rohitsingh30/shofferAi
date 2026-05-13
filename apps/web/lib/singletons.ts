@@ -47,8 +47,25 @@ export const vault = g.vault || new CredentialVault(prisma);
 export const lessonStore: LessonStore = g.lessonStore || new PrismaLessonStore(prisma);
 
 if (!g.skills) {
-  const skillsDir = process.env.SKILLS_DIR
-    || require('path').join(process.cwd(), 'packages', 'agent-core', 'src', 'skills');
+  // Resolve skills directory robustly:
+  //   1. Explicit SKILLS_DIR env (preferred — set in apps/web/.env.local for dev,
+  //      Dockerfile copies SKILL.md files to /app/skills in prod)
+  //   2. Walk up from cwd looking for packages/agent-core/src/skills
+  //      (handles cwd=apps/web vs cwd=monorepo-root)
+  let skillsDir = process.env.SKILLS_DIR;
+  if (!skillsDir) {
+    const path = require('path');
+    const fs = require('fs');
+    let dir = process.cwd();
+    for (let i = 0; i < 4; i++) {
+      const candidate = path.join(dir, 'packages', 'agent-core', 'src', 'skills');
+      if (fs.existsSync(candidate)) { skillsDir = candidate; break; }
+      dir = path.dirname(dir);
+    }
+    if (!skillsDir) {
+      skillsDir = path.join(process.cwd(), 'packages', 'agent-core', 'src', 'skills');
+    }
+  }
   g.skills = loadSkills(skillsDir);
   console.log('[singletons] Loaded %d skills from %s', g.skills.length, skillsDir);
 }
