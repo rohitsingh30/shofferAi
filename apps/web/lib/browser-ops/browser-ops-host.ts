@@ -38,77 +38,135 @@ export interface BrowserOpsHostConfig {
 }
 
 export class BrowserOpsHost implements MCPHostLike {
-  private session: SessionSnapshot | null = null;
+  /** Sessions keyed by site (e.g. 'bigbasket' → snapshot). One BrowserOpsHost
+   *  per task may open MANY sessions when the LLM is calling tools across
+   *  multiple sites in parallel (cross-store comparison). */
+  private sessions: Map<string, SessionSnapshot> = new Map();
+  /** Set of sites currently being opened (so concurrent callTool for the same
+   *  site coalesce instead of double-opening). */
+  private opening: Map<string, Promise<SessionSnapshot>> = new Map();
   private idempotencyCounter = 0;
   private toolsCache: MCPTool[] | null = null;
 
   constructor(private readonly config: BrowserOpsHostConfig) {}
 
-  /** Open a browser session for `(operator, site)`. Idempotent — call once per task per site. */
+  /** Open a browser session for `(operator, site)`. Idempotent — returns the
+   *  existing session if one is already open for this site. */
   async openSession(input: OpenSessionInput): Promise<SessionSnapshot> {
-    if (this.session) return this.session;
-
-    const result = await this.config.client.callTool(
-      'session.open',
-      {
-        site: input.site,
-        user_ref: input.user_ref ?? this.config.userRef,
-        operator_id: input.operator_id,
-        region: input.region,
-        device: input.device,
-        force_fresh: input.force_fresh,
-        options: input.options,
-        limits: input.limits,
-      },
-      {
-        meta: this.buildMeta('session.open'),
-        timeoutMs: SESSION_OPEN_TIMEOUT_MS,
-      },
-    );
-
-    if (result.isError) {
-      throw this.errorFrom(result);
-    }
-    const snap = (result.structuredContent ?? {}) as SessionSnapshot;
-    if (!snap.session_id) {
-      throw new Error('session.open: no session_id in response');
-    }
-    this.session = snap;
-    return snap;
+    return this.openSessionForSite(input.site, input);
   }
 
+  /** Internal: open or return an existing session for a specific site. */
+  private async openSessionForSite(
+    site: string,
+    input?: Partial<OpenSessionInput>,
+  ): Promise<SessionSnapshot> {
+    const existing = this.sessions.get(site);
+    if (existing) return existing;
+    const inFlight = this.opening.get(site);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+      const result = await this.config.client.callTool(
+        'session.open',
+        {
+          site,
+          user_ref: input?.user_ref ?? this.config.userRef,
+          operator_id: input?.operator_id,
+          region: input?.region,
+          device: input?.device,
+          force_fresh: input?.force_fresh,
+          options: input?.options,
+          limits: input?.limits,
+        },
+        {
+          meta: this.buildMeta('session.open'),
+          timeoutMs: SESSION_OPEN_TIMEOUT_MS,
+        },
+      );
+
+      if (result.isError) {
+        throw this.errorFrom(result);
+      }
+      const snap = (result.structuredContent ?? {}) as SessionSnapshot;
+      if (!snap.session_id) {
+        throw new Error('session.open: no session_id in response');
+      }
+      this.sessions.set(site, snap);
+      return snap;
+    })();
+
+    this.opening.set(site, promise);
+    try {
+      return await promise;
+    } finally {
+      this.opening.delete(site);
+    }
+  }
+
+  /** Backward-compat: returns the most-recently-opened session_id, or the
+   *  bigbasket session if any exist. Multi-session callers should use the
+   *  per-site lookup in callTool() instead. */
   get sessionId(): SessionId | null {
-    return this.session?.session_id ?? null;
+    if (this.sessions.size === 0) return null;
+    // Prefer bigbasket if present (most common single-site flow), else first.
+    const bb = this.sessions.get('bigbasket');
+    if (bb) return bb.session_id;
+    const first = this.sessions.values().next().value;
+    return first?.session_id ?? null;
   }
 
   get cartNamespace(): CartNamespace | null {
-    return this.session?.cart_namespace ?? null;
+    if (this.sessions.size === 0) return null;
+    const bb = this.sessions.get('bigbasket');
+    if (bb) return bb.cart_namespace ?? null;
+    const first = this.sessions.values().next().value;
+    return first?.cart_namespace ?? null;
+  }
+
+  /** Get the open session_id for a specific site, if one exists. */
+  sessionIdForSite(site: string): SessionId | null {
+    const snap = this.sessions.get(site);
+    return snap ? snap.session_id : null;
   }
 
   async closeSession(): Promise<void> {
-    if (!this.session) return;
-    const sessionId = this.session.session_id;
-    this.session = null;
-    try {
-      await this.config.client.callTool(
-        'session.close',
-        { session_id: sessionId },
-        { meta: this.buildMeta('session.close'), timeoutMs: 10_000 },
-      );
-    } catch { /* best-effort — session may have already TTL'd out */ }
+    // Close ALL open sessions (tasks may have multiple in cross-store flow).
+    const allSites = Array.from(this.sessions.keys());
+    for (const site of allSites) {
+      const snap = this.sessions.get(site);
+      if (!snap) continue;
+      this.sessions.delete(site);
+      try {
+        await this.config.client.callTool(
+          'session.close',
+          { session_id: snap.session_id },
+          { meta: this.buildMeta('session.close'), timeoutMs: 10_000 },
+        );
+      } catch { /* best-effort */ }
+    }
   }
 
   async getSnapshot(): Promise<SessionSnapshot | null> {
-    if (!this.session) return null;
+    // Backward-compat: returns the snapshot of the first/bigbasket session
+    // if any exist. For multi-session flows, callers should track their own
+    // sessions of interest.
+    const bb = this.sessions.get('bigbasket');
+    const target = bb ?? this.sessions.values().next().value ?? null;
+    if (!target) return null;
     const r = await this.config.client.callTool(
       'session.snapshot',
-      { session_id: this.session.session_id },
+      { session_id: target.session_id },
       { meta: this.buildMeta('session.snapshot'), timeoutMs: 10_000 },
     );
-    if (r.isError) return this.session;
+    if (r.isError) return target;
     const fresh = (r.structuredContent ?? {}) as SessionSnapshot;
-    this.session = { ...this.session, ...fresh };
-    return this.session;
+    const merged = { ...target, ...fresh };
+    // Update the cached entry so subsequent reads see the fresh data.
+    for (const [site, snap] of this.sessions.entries()) {
+      if (snap.session_id === target.session_id) this.sessions.set(site, merged);
+    }
+    return merged;
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -213,19 +271,35 @@ export class BrowserOpsHost implements MCPHostLike {
     const start = Date.now();
     mcpEventBus.emitToolStart(this.config.taskId, name, args);
 
+    // Identify which site this tool belongs to (e.g. "bigbasket.search" → "bigbasket"),
+    // open a session for that site if one isn't already open, and inject its session_id.
+    // This is what enables cross-store flows: each tool call routes to (or lazily
+    // opens) its own per-site session.
+    const site = this.siteForTool(name);
+    let sessionForCall: SessionSnapshot | null = null;
+    if (site) {
+      try {
+        sessionForCall = await this.openSessionForSite(site);
+      } catch (err) {
+        const duration = Date.now() - start;
+        mcpEventBus.emitToolError(this.config.taskId, name, duration, err);
+        throw err;
+      }
+    } else {
+      // Tools without a site prefix (e.g. pageInfo) — fall back to any active
+      // session, otherwise the runner will reject without a session_id.
+      sessionForCall = this.sessions.values().next().value ?? null;
+    }
+
     // Re-envelope flat LLM args back into the runner's expected shape.
-    // The runner tools follow `{ session_id, input: { ... } }`. The LLM only
-    // sees the inner properties (see flattenSchemaForLLM above), so we wrap
-    // here on the way out.
     const wrappedArgs: Record<string, unknown> = {};
-    if (this.session) {
-      wrappedArgs.session_id = this.session.session_id;
+    if (sessionForCall) {
+      wrappedArgs.session_id = sessionForCall.session_id;
     }
     // Pull session_id out of args if the LLM somehow set it (we ignore it
-    // and use the active session instead). Everything else goes under `input`.
+    // and use the routed session instead). Everything else goes under `input`.
     const { session_id: _ignoredSessionId, input: existingInput, ...rest } = args;
     if (existingInput && typeof existingInput === 'object' && !Array.isArray(existingInput)) {
-      // LLM accidentally still sent an `input` wrapper — merge it.
       wrappedArgs.input = { ...(existingInput as object), ...rest };
     } else if (Object.keys(rest).length > 0) {
       wrappedArgs.input = rest;
@@ -252,6 +326,18 @@ export class BrowserOpsHost implements MCPHostLike {
 
     mcpEventBus.emitToolEnd(this.config.taskId, name, duration, result.structuredContent);
     return result.structuredContent ?? { ok: true };
+  }
+
+  /** Map a tool name to the site it operates on. Tool names follow
+   *  `<site>.<verb>` (e.g. "bigbasket.search" → "bigbasket"). For tools
+   *  without a site prefix (e.g. "pageInfo"), returns null. */
+  private siteForTool(toolName: string): string | null {
+    const dot = toolName.indexOf('.');
+    if (dot < 0) return null;
+    const prefix = toolName.slice(0, dot);
+    // Skip lifecycle tools (session.*) — they shouldn't reach callTool anyway.
+    if (prefix === 'session') return null;
+    return prefix;
   }
 
   // ──────────────────────────────────────────────────────────────────

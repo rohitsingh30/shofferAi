@@ -31,6 +31,8 @@ export const dynamic = 'force-dynamic';
 /** Map a skill name → site id understood by the runner. */
 function siteForSkill(skillId: string | undefined): string | null {
   if (!skillId) return null;
+  // Cross-store skill opens sessions lazily per tool call (multi-site flow).
+  if (skillId === 'cross-store-grocery') return null;
   if (skillId.startsWith('bigbasket')) return 'bigbasket';
   if (skillId.startsWith('blinkit'))   return 'blinkit';
   if (skillId.startsWith('zepto'))     return 'zepto';
