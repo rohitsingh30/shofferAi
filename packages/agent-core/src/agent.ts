@@ -418,7 +418,7 @@ export class AgentExecutor {
 
           // Plain text → send to user as message
           for (const block of textBlocks) {
-            const text = block.text.trim();
+            const text = stripAndExtractChips(block.text.trim(), callbacks);
             if (text) callbacks.onMessage(text);
           }
           callbacks.onComplete(fullText);
@@ -427,7 +427,7 @@ export class AgentExecutor {
 
         // Send any text blocks that came alongside tool calls
         for (const block of textBlocks) {
-          const text = block.text.trim();
+          const text = stripAndExtractChips(block.text.trim(), callbacks);
           if (text) callbacks.onMessage(text);
         }
 
@@ -702,4 +702,57 @@ export class AgentExecutor {
 
 function errMsg(err: unknown, fallback = 'unknown error'): string {
   return err instanceof Error ? err.message : fallback;
+}
+
+/**
+ * Defensive: the LLM sometimes inlines the suggest_replies tool's JSON as text
+ * instead of issuing a structured tool_use block (especially Claude Sonnet
+ * variants when a previous turn went through the same tool). When detected,
+ * extract the chips, fire onSuggestions, and strip the JSON from visible text.
+ *
+ * Pattern matches both:
+ *   - Bare JSON object:  {"chips":["a","b"]}
+ *   - Code-fenced JSON:  ```json\n{"chips":[...]}\n```
+ *   - Tool-call mimic:   suggest_replies({"chips":[...]})
+ */
+function stripAndExtractChips(text: string, callbacks: AgentCallbacks): string {
+  if (!text || !text.includes('chips')) return text;
+
+  // Match a JSON object containing a "chips" array, optionally wrapped in
+  // code fences or a fake tool-call invocation.
+  const patterns = [
+    /```json\s*(\{\s*"chips"\s*:\s*\[[^\]]*\]\s*\})\s*```/g,
+    /```\s*(\{\s*"chips"\s*:\s*\[[^\]]*\]\s*\})\s*```/g,
+    /suggest_replies\s*\(\s*(\{\s*"chips"\s*:\s*\[[^\]]*\]\s*\})\s*\)/g,
+    /(\{\s*"chips"\s*:\s*\[[^\]]*\]\s*\})/g,
+  ];
+
+  let cleaned = text;
+  const collected: string[] = [];
+
+  for (const pattern of patterns) {
+    cleaned = cleaned.replace(pattern, (_match, json) => {
+      if (collected.length === 0) {
+        try {
+          const parsed = JSON.parse(json) as { chips?: unknown };
+          if (Array.isArray(parsed.chips)) {
+            for (const c of parsed.chips) {
+              if (typeof c === 'string' && collected.length < 6) {
+                collected.push(c.slice(0, 60));
+              }
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      }
+      return ''; // strip from text
+    });
+  }
+
+  if (collected.length > 0 && callbacks.onSuggestions) {
+    callbacks.onSuggestions(collected);
+  }
+
+  return cleaned.trim();
 }
