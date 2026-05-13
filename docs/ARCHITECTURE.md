@@ -838,7 +838,7 @@ Profile 3 is pre-authenticated on **12 P0 websites**: Blinkit, Swiggy, Zomato, B
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Next.js Chat UI** | ✅ Deployed | `shofferai-27188185100.asia-south1.run.app` |
+| **Next.js Chat UI** | ✅ Deployed | `shofferai-666049409637.asia-south1.run.app` |
 | **Auth (NextAuth v5)** | ✅ Live | Credentials + Google OAuth |
 | **AgentExecutor** | ✅ Live | Azure OpenAI LLM loop with skill matching |
 | **RelayBridge** | ✅ Live | Accepts laptop WS connections (`RELAY_MODE=cloud`) |

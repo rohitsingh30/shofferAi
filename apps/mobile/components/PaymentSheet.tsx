@@ -17,7 +17,7 @@ const TIP_OPTIONS = [0, 100, 200, 500];
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ||
-  'https://shofferai-27188185100.asia-south1.run.app';
+  'https://shofferai-666049409637.asia-south1.run.app';
 
 interface PaymentSheetProps {
   taskId: string;

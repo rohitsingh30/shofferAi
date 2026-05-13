@@ -19,6 +19,12 @@ COPY packages/ packages/
 # Generate Prisma client
 RUN npx prisma generate
 
+# Build-time public env vars (Next.js inlines NEXT_PUBLIC_* during build)
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_RAZORPAY_KEY_ID
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_RAZORPAY_KEY_ID=${NEXT_PUBLIC_RAZORPAY_KEY_ID}
+
 # Build all packages and Next.js
 RUN npx turbo build --filter=@shofferai/web
 

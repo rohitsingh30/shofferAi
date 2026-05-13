@@ -1,8 +1,8 @@
 steps:
-  # Build + Push with Kaniko (automatic layer caching — caches ALL intermediate
-  # layers including npm ci and prisma generate in Artifact Registry).
-  # Combines build + push into one step, eliminating the separate push overhead.
+  # Build + Push with Kaniko (automatic layer caching).
+  # Pass NEXT_PUBLIC_* as build-args so Next.js can inline them into the client bundle.
   - name: 'gcr.io/kaniko-project/executor:latest'
+    id: build
     args:
       - '--dockerfile=Dockerfile'
       - '--context=.'
@@ -12,38 +12,50 @@ steps:
       - '--cache-ttl=168h'
       - '--snapshot-mode=redo'
       - '--use-new-run'
+      - '--build-arg=NEXT_PUBLIC_APP_URL=${_APP_URL}'
+      - '--build-arg=NEXT_PUBLIC_RAZORPAY_KEY_ID=${_RAZORPAY_PUBLIC_KEY_ID}'
 
-  # Deploy to Cloud Run.
-  # No more --max-instances=1 pin — that was needed when the WebSocket relay
-  # tied a task to a specific instance. With browser ops over plain HTTPS+MCP,
-  # any instance can serve any task.
-  - name: 'gcr.io/cloud-builders/gcloud'
+  # Deploy to Cloud Run with full configuration.
+  # Uses a shell step so we can fetch DATABASE_PASSWORD from Secret Manager and
+  # compose it into DATABASE_URL (Cloud SQL Unix socket connection string).
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    id: deploy
+    entrypoint: 'bash'
     args:
-      - 'run'
-      - 'deploy'
-      - 'shofferai'
-      - '--image'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/shofferai:${_TAG}'
-      - '--region'
-      - '${_REGION}'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
-      - '--memory'
-      - '512Mi'
-      - '--cpu'
-      - '1'
-      - '--min-instances'
-      - '0'
-      - '--max-instances'
-      - '5'
-      - '--timeout'
-      - '3600'
+      - '-c'
+      - |
+        set -euo pipefail
+        DB_PW=$(gcloud secrets versions access latest --secret=DATABASE_PASSWORD)
+        SOCKET_PATH="/cloudsql/${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE}"
+        DATABASE_URL="postgresql://postgres:$${DB_PW}@localhost/shofferai?host=$${SOCKET_PATH}&schema=public"
+
+        gcloud run deploy shofferai \
+          --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/shofferai:${_TAG} \
+          --region=${_REGION} \
+          --platform=managed \
+          --allow-unauthenticated \
+          --memory=512Mi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=5 \
+          --timeout=3600 \
+          --service-account=${_RUNTIME_SA} \
+          --add-cloudsql-instances=${PROJECT_ID}:${_REGION}:${_SQL_INSTANCE} \
+          --set-env-vars="^~^NODE_ENV=production~RELAY_MODE=cloud~LOG_LEVEL=info~AUTH_TRUST_HOST=true~AUTH_URL=${_APP_URL}~NEXT_PUBLIC_APP_URL=${_APP_URL}~DATABASE_URL=$${DATABASE_URL}~LLM_MODEL=gpt-5.1-chat~REWRITER_MODEL=gpt-4o-mini~AZURE_OPENAI_ENDPOINT=${_AZURE_OPENAI_ENDPOINT}~AZURE_OPENAI_API_VERSION=2024-10-21~AUTH_GOOGLE_ID=${_AUTH_GOOGLE_ID}~RAZORPAY_KEY_ID=${_RAZORPAY_KEY_ID}~NEXT_PUBLIC_RAZORPAY_KEY_ID=${_RAZORPAY_PUBLIC_KEY_ID}~AGENT_MODE=relay~SKILLS_DIR=/app/skills" \
+          --set-secrets="AUTH_SECRET=AUTH_SECRET:latest,CREDENTIAL_ENCRYPTION_KEY=CREDENTIAL_ENCRYPTION_KEY:latest,RELAY_AUTH_TOKEN=RELAY_AUTH_TOKEN:latest,AZURE_OPENAI_API_KEY=AZURE_OPENAI_API_KEY:latest,AUTH_GOOGLE_SECRET=AUTH_GOOGLE_SECRET:latest,RAZORPAY_KEY_SECRET=RAZORPAY_KEY_SECRET:latest" \
+          --quiet
 
 substitutions:
   _REGION: asia-south1
   _REPO: shofferai
   _TAG: latest
+  _SQL_INSTANCE: shofferai-db
+  _RUNTIME_SA: shofferai-runtime@shofferai-prod.iam.gserviceaccount.com
+  _APP_URL: https://shofferai-666049409637.asia-south1.run.app
+  _AZURE_OPENAI_ENDPOINT: https://testshoffer.openai.azure.com
+  _AUTH_GOOGLE_ID: 27188185100-ddn0je28aqr3c4v4jgu9253euqh9llnp.apps.googleusercontent.com
+  _RAZORPAY_KEY_ID: rzp_test_STwV5jDPFJLnkh
+  _RAZORPAY_PUBLIC_KEY_ID: rzp_test_STwV5jDPFJLnkh
 
 options:
   logging: CLOUD_LOGGING_ONLY

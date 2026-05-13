@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-PROD_URL="https://shofferai-27188185100.asia-south1.run.app"
+PROD_URL="https://shofferai-666049409637.asia-south1.run.app"
 COOKIE_JAR="/tmp/shofferai-cookies.txt"
 MAX_AGE_SECONDS=86400  # re-auth if cookie jar > 24h old
 

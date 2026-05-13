@@ -106,6 +106,6 @@ Also remind the user:
 
 - The mobile app is at `apps/mobile/` — an Expo Router app with React Native
 - App config: `apps/mobile/app.json` (slug: `shofferai`, scheme: `shofferai`)
-- The app connects to **production Cloud Run** (`https://shofferai-27188185100.asia-south1.run.app`) for API calls, not localhost
+- The app connects to **production Cloud Run** (`https://shofferai-666049409637.asia-south1.run.app`) for API calls, not localhost
 - Dev login: `demo@shofferai.com` / `demo1234` (via the "Dev Login" button)
 - Google OAuth needs `EXPO_PUBLIC_GOOGLE_CLIENT_ID` in `apps/mobile/.env`

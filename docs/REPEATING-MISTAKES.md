@@ -248,7 +248,7 @@ Other filter gates still active:
 - Agent tested message flow on localhost instead of just deploying and testing on prod
 - Multiple sessions wasted time starting `npx next dev` for visual testing when prod was already deployed
 
-**Rule:** For UI/visual testing, ALWAYS use production: `https://shofferai-27188185100.asia-south1.run.app`. Deploy first, then test on prod. Only use localhost for rapid iteration on CSS/layout (no need to send actual messages). For testing the full agent flow (sending messages, seeing steps, input prompts), ALWAYS use prod where the relay is connected.
+**Rule:** For UI/visual testing, ALWAYS use production: `https://shofferai-666049409637.asia-south1.run.app`. Deploy first, then test on prod. Only use localhost for rapid iteration on CSS/layout (no need to send actual messages). For testing the full agent flow (sending messages, seeing steps, input prompts), ALWAYS use prod where the relay is connected.
 
 ---
 
@@ -339,7 +339,7 @@ Other filter gates still active:
 
 **Why layers 1-4 weren't enough (FM2 — the draining instance bug):** After deploy, the OLD Cloud Run instance enters "draining" mode but stays alive (up to 3600s) because the WS is an active connection. It keeps sending `{ type: 'ping' }` every 15s — these are REAL JSON application-level messages, so `lastAppMessageAt` keeps updating and the stale check NEVER fires. Meanwhile all HTTP requests go to the NEW instance which has NO relay. The `server_draining` message (layer 3) helps on clean shutdowns, but if the laptop reconnects to the old instance BEFORE SIGTERM fires, it's stuck. Only layer 5 (HTTP verify) catches this because it uses a fundamentally different network path.
 
-**Rule:** After deploying to Cloud Run, the relay should auto-heal within 30s (HTTP verify cycle). If it doesn't, the laptop relay may need a restart to pick up new code. Always verify relay status with `curl -H "Authorization: Bearer shofferai-relay-2026" https://shofferai-27188185100.asia-south1.run.app/api/admin/relay-status` after deploy.
+**Rule:** After deploying to Cloud Run, the relay should auto-heal within 30s (HTTP verify cycle). If it doesn't, the laptop relay may need a restart to pick up new code. Always verify relay status with `curl -H "Authorization: Bearer shofferai-relay-2026" https://shofferai-666049409637.asia-south1.run.app/api/admin/relay-status` after deploy.
 
 ---
 

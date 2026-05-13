@@ -3,7 +3,7 @@ import EventSource from 'react-native-sse';
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ||
-  'https://shofferai-27188185100.asia-south1.run.app';
+  'https://shofferai-666049409637.asia-south1.run.app';
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';

@@ -115,16 +115,16 @@ Run this FIRST to triage which layer is broken:
 ```bash
 echo "=== QUICK HEALTH CHECK ==="
 echo -n "HTTP: "
-curl -s --max-time 5 -o /dev/null -w '%{http_code} (%{time_total}s)' https://shofferai-27188185100.asia-south1.run.app 2>/dev/null
+curl -s --max-time 5 -o /dev/null -w '%{http_code} (%{time_total}s)' https://shofferai-666049409637.asia-south1.run.app 2>/dev/null
 echo ""
 
 echo -n "DB:   "
 curl -s --max-time 5 -H "Authorization: Bearer $(grep RELAY_AUTH_TOKEN /Users/rohit/shofferAi/.env 2>/dev/null | cut -d= -f2)" \
-  "https://shofferai-27188185100.asia-south1.run.app/api/health/db" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('✓ OK' if d.get('ok') else '✗ FAILED: ' + d.get('error','unknown'))" 2>/dev/null || echo "✗ unreachable"
+  "https://shofferai-666049409637.asia-south1.run.app/api/health/db" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('✓ OK' if d.get('ok') else '✗ FAILED: ' + d.get('error','unknown'))" 2>/dev/null || echo "✗ unreachable"
 
 echo -n "Relay: "
 curl -s --max-time 5 -H "Authorization: Bearer $(grep RELAY_AUTH_TOKEN /Users/rohit/shofferAi/.env 2>/dev/null | cut -d= -f2)" \
-  "https://shofferai-27188185100.asia-south1.run.app/api/admin/relay-status" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('✓ connected' if d.get('connected') else '✗ NOT connected')" 2>/dev/null || echo "✗ unreachable"
+  "https://shofferai-666049409637.asia-south1.run.app/api/admin/relay-status" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print('✓ connected' if d.get('connected') else '✗ NOT connected')" 2>/dev/null || echo "✗ unreachable"
 
 echo -n "Cloud SQL: "
 gcloud sql instances describe shofferai-db --format="value(state)" 2>/dev/null || echo "✗ can't check"
@@ -174,7 +174,7 @@ echo "Chrome debug instances: $CHROME_COUNT"
 echo ""
 echo "=== PROD STATUS ==="
 echo -n "HTTP: "
-curl -s --max-time 5 -o /dev/null -w '%{http_code} (%{time_total}s)' https://shofferai-27188185100.asia-south1.run.app 2>/dev/null
+curl -s --max-time 5 -o /dev/null -w '%{http_code} (%{time_total}s)' https://shofferai-666049409637.asia-south1.run.app 2>/dev/null
 echo ""
 ```
 
@@ -210,7 +210,7 @@ sleep 15
 echo ""
 echo "=== Verifying DB connectivity ==="
 curl -s --max-time 10 -H "Authorization: Bearer $(grep RELAY_AUTH_TOKEN /Users/rohit/shofferAi/.env 2>/dev/null | cut -d= -f2)" \
-  "https://shofferai-27188185100.asia-south1.run.app/api/health/db" 2>/dev/null | python3 -m json.tool 2>/dev/null
+  "https://shofferai-666049409637.asia-south1.run.app/api/health/db" 2>/dev/null | python3 -m json.tool 2>/dev/null
 ```
 
 If DB is still down after restart, check:
@@ -227,7 +227,7 @@ echo "=== PHANTOM CONNECTION TEST ==="
 echo "Asking Cloud Run if relay is connected..."
 RESULT=$(curl -s -X POST \
   -H "Authorization: Bearer shofferai-relay-2026" \
-  https://shofferai-27188185100.asia-south1.run.app/api/admin/release-relay 2>/dev/null)
+  https://shofferai-666049409637.asia-south1.run.app/api/admin/release-relay 2>/dev/null)
 echo "$RESULT" | python3 -m json.tool 2>/dev/null
 
 WAS_CONNECTED=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('wasConnected','?'))" 2>/dev/null)
@@ -301,11 +301,11 @@ grep -rh -E 'ECONNREFUSED|ECONNRESET|EPIPE|ETIMEDOUT|socket hang up|relay.*error
 
 ```bash
 echo "=== DNS RESOLUTION ==="
-dig +short shofferai-27188185100.asia-south1.run.app 2>/dev/null | head -4
+dig +short shofferai-666049409637.asia-south1.run.app 2>/dev/null | head -4
 
 echo ""
 echo "=== TCP CONNECTIVITY ==="
-curl -s --max-time 5 -o /dev/null -w 'HTTP %{http_code} (connect: %{time_connect}s, total: %{time_total}s)\n' https://shofferai-27188185100.asia-south1.run.app 2>/dev/null
+curl -s --max-time 5 -o /dev/null -w 'HTTP %{http_code} (connect: %{time_connect}s, total: %{time_total}s)\n' https://shofferai-666049409637.asia-south1.run.app 2>/dev/null
 
 echo ""
 echo "=== WS UPGRADE TEST ==="
@@ -313,7 +313,7 @@ curl -s --max-time 5 -o /dev/null -w 'HTTP %{http_code}\n' \
   -H "Upgrade: websocket" -H "Connection: Upgrade" \
   -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
   -H "Sec-WebSocket-Version: 13" \
-  https://shofferai-27188185100.asia-south1.run.app/api/relay/ws 2>/dev/null
+  https://shofferai-666049409637.asia-south1.run.app/api/relay/ws 2>/dev/null
 echo "(401 = auth works. 404 = path issue. 502/503 = instance down)"
 ```
 
@@ -323,17 +323,17 @@ To verify the relay is truly working end-to-end, send a real task via the API:
 
 ```bash
 # Login and get session
-CSRF=$(curl -s -c /tmp/rd-cookies.txt https://shofferai-27188185100.asia-south1.run.app/api/auth/csrf | python3 -c "import sys,json; print(json.load(sys.stdin)['csrfToken'])")
-curl -s -b /tmp/rd-cookies.txt -c /tmp/rd-cookies.txt -X POST https://shofferai-27188185100.asia-south1.run.app/api/auth/dev-login > /dev/null
+CSRF=$(curl -s -c /tmp/rd-cookies.txt https://shofferai-666049409637.asia-south1.run.app/api/auth/csrf | python3 -c "import sys,json; print(json.load(sys.stdin)['csrfToken'])")
+curl -s -b /tmp/rd-cookies.txt -c /tmp/rd-cookies.txt -X POST https://shofferai-666049409637.asia-south1.run.app/api/auth/dev-login > /dev/null
 curl -s -b /tmp/rd-cookies.txt -c /tmp/rd-cookies.txt -L -X POST \
-  "https://shofferai-27188185100.asia-south1.run.app/api/auth/callback/credentials" \
+  "https://shofferai-666049409637.asia-south1.run.app/api/auth/callback/credentials" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "csrfToken=${CSRF}&email=demo%40shofferai.com&password=demo1234" -o /dev/null
 
 # Send a test task and capture first SSE events (5s timeout)
 echo "=== E2E TEST: Sending task ==="
 timeout 15 curl -s -N -b /tmp/rd-cookies.txt \
-  -X POST "https://shofferai-27188185100.asia-south1.run.app/api/agent/execute" \
+  -X POST "https://shofferai-666049409637.asia-south1.run.app/api/agent/execute" \
   -H "Content-Type: application/json" \
   -d '{"message":"hello"}' 2>/dev/null | head -10
 

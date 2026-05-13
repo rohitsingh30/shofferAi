@@ -41,12 +41,12 @@ curl -s -o /dev/null -w '%{http_code}' http://localhost:3000 2>/dev/null || echo
 
 ### 5. Production
 ```bash
-curl -s -o /dev/null -w '%{http_code}' https://shofferai-27188185100.asia-south1.run.app 2>/dev/null || echo "DOWN"
+curl -s -o /dev/null -w '%{http_code}' https://shofferai-666049409637.asia-south1.run.app 2>/dev/null || echo "DOWN"
 ```
 
 ### 6. Production relay health
 ```bash
-curl -s https://shofferai-27188185100.asia-south1.run.app/api/relay/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "Relay health endpoint not available"
+curl -s https://shofferai-666049409637.asia-south1.run.app/api/relay/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "Relay health endpoint not available"
 ```
 
 ### 7. Database

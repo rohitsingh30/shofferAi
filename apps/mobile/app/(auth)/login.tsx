@@ -70,7 +70,7 @@ export default function LoginScreen() {
     try {
       // Ensure dev user exists
       await fetch(
-        (process.env.EXPO_PUBLIC_API_URL || 'https://shofferai-27188185100.asia-south1.run.app') +
+        (process.env.EXPO_PUBLIC_API_URL || 'https://shofferai-666049409637.asia-south1.run.app') +
           '/api/auth/dev-login',
         { method: 'POST' }
       );

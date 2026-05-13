@@ -380,7 +380,7 @@ A running log of every Copilot CLI development session. Each entry captures what
 **Goal**: Visually verify on production that clicking "New Chat" correctly closes the L2 cart panel, clears cart state, and resets chat to the welcome screen.
 
 **What was done**:
-- Logged into prod (`shofferai-27188185100.asia-south1.run.app`) as Demo User via Dev Login
+- Logged into prod (`shofferai-666049409637.asia-south1.run.app`) as Demo User via Dev Login
 - Injected mock cart state (3 Blinkit items: Amul Milk ₹68, Britannia Bread ₹45, Tata Tea ₹199 = ₹312 total) via Chrome DevTools Protocol — connected directly to Chrome CDP endpoint to call `addItem()` and `openCart()` on React context providers through fiber tree traversal
 - Took "before" screenshot showing L2 Cart panel open (40% right split, 3 items, "Proceed to Buy · ₹312")
 - Clicked "New Chat" in sidebar

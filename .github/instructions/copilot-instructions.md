@@ -89,7 +89,7 @@ gcloud builds submit --config cloudbuild.yaml  # Deploy to Cloud Run
 
 ## Testing — ALWAYS on Production
 
-- **Prod URL**: `https://shofferai-27188185100.asia-south1.run.app`
+- **Prod URL**: `https://shofferai-666049409637.asia-south1.run.app`
 - Deploy first (`/deploy`), then test on prod. NEVER test on localhost for functional flows.
 - localhost is ONLY for rapid CSS/layout iteration — no message sending, no agent flows.
 - After deploy, wait 30 seconds before E2E testing (relay auto-heals but needs a few seconds to reconnect).

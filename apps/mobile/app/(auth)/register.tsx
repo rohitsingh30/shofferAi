@@ -14,7 +14,7 @@ import { colors, spacing, fontSize, borderRadius } from '../../lib/theme';
 
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ||
-  'https://shofferai-27188185100.asia-south1.run.app';
+  'https://shofferai-666049409637.asia-south1.run.app';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');

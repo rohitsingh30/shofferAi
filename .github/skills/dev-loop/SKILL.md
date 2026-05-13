@@ -13,7 +13,7 @@ This skill has five modes:
 
 Ask the user which mode, or infer from context.
 
-> ⚠️ **MANDATORY FOR ALL MODES EXCEPT A**: Testing MUST go through the **ShofferAI chat interface** (prod: `https://shofferai-27188185100.asia-south1.run.app`). NEVER open target websites (swiggy.com, booking.com, etc.) directly in the browser. The pipeline is: **User → Chat UI → Agent → Relay → Chrome → Target Site**. Skipping to the target site tests nothing.
+> ⚠️ **MANDATORY FOR ALL MODES EXCEPT A**: Testing MUST go through the **ShofferAI chat interface** (prod: `https://shofferai-666049409637.asia-south1.run.app`). NEVER open target websites (swiggy.com, booking.com, etc.) directly in the browser. The pipeline is: **User → Chat UI → Agent → Relay → Chrome → Target Site**. Skipping to the target site tests nothing.
 
 ---
 
@@ -43,7 +43,7 @@ For each page in the app:
 
 Use the **production URL** for E2E testing. Use localhost only for UI iteration.
 
-**Production**: `https://shofferai-27188185100.asia-south1.run.app`
+**Production**: `https://shofferai-666049409637.asia-south1.run.app`
 **Local dev**: `http://localhost:3000`
 
 | Page | Prod URL | What to test |
@@ -58,7 +58,7 @@ Use the **production URL** for E2E testing. Use localhost only for UI iteration.
 
 ### Chat Interface Test
 
-**Always test on production**: `https://shofferai-27188185100.asia-south1.run.app/dashboard`
+**Always test on production**: `https://shofferai-666049409637.asia-south1.run.app/dashboard`
 
 After logging in, navigate to the dashboard and actually **use the chat**:
 
@@ -216,7 +216,7 @@ Report:
 
 Browse each skill's website **through the ShofferAI chat interface**, record the real UI flow, and compile production-ready Playwright scripts with actual selectors.
 
-> 🚫 **DO NOT** open target websites directly. Test through the chat UI: `https://shofferai-27188185100.asia-south1.run.app`
+> 🚫 **DO NOT** open target websites directly. Test through the chat UI: `https://shofferai-666049409637.asia-south1.run.app`
 
 ```
 For each skill (sequential):
@@ -307,7 +307,7 @@ npx turbo build --filter=@shofferai/agent-core
 Pick ONE existing skill and improve it by testing E2E through the **real ShofferAI production app**.
 
 > 🚫 **DO NOT** open the target website directly (e.g. swiggy.com, booking.com, amazon.in).
-> ✅ **ALWAYS** start from the ShofferAI chat interface: `https://shofferai-27188185100.asia-south1.run.app`
+> ✅ **ALWAYS** start from the ShofferAI chat interface: `https://shofferai-666049409637.asia-south1.run.app`
 > The full pipeline is: **User → Chat UI → Agent → Relay → Chrome → Target Site**.
 > If you navigate to the target site directly, you are testing nothing useful. STOP and go to the chat UI.
 
@@ -355,7 +355,7 @@ Read the skill's SKILL.md and compiled .ts script. Score it (out of 5):
 
 **This is the core of Mode D. You test by USING the app as a real user would.**
 
-1. **Navigate to prod**: `https://shofferai-27188185100.asia-south1.run.app`
+1. **Navigate to prod**: `https://shofferai-666049409637.asia-south1.run.app`
 2. **Log in** if needed (Google OAuth or credentials)
 3. **Go to dashboard** → the chat interface
 4. **Type a realistic user message** that should trigger the skill:

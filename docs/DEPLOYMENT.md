@@ -67,13 +67,13 @@ Everything in the Docker container. **No browser, no Playwright.**
 | **Tier** | `db-f1-micro` (shared CPU, 614 MB RAM) |
 | **Region** | `asia-south1` (same as Cloud Run) |
 | **Disk** | 10 GB SSD |
-| **Connection name** | `docx-healthcare:asia-south1:shofferai-db` |
+| **Connection name** | `shofferai-prod:asia-south1:shofferai-db` |
 | **Database** | `shofferai` |
 | **User** | `postgres` |
 | **Public IP** | Enabled (no authorized networks — access via Cloud SQL connector only) |
 | **SSL** | Allow unencrypted (Cloud Run uses Unix socket, not TCP) |
 
-**Cloud Run connects via Unix socket** (`/cloudsql/docx-healthcare:asia-south1:shofferai-db`) — no public IP access needed. The `cloudsql-instances` annotation on the Cloud Run service enables this automatically.
+**Cloud Run connects via Unix socket** (`/cloudsql/shofferai-prod:asia-south1:shofferai-db`) — no public IP access needed. The `cloudsql-instances` annotation on the Cloud Run service enables this automatically.
 
 **Tables (13):** User, Account, Session, VerificationToken, Profile, Credential, Task, TaskStep, Message, Payment, SkillLesson, TelemetryEvent, PendingInput
 
@@ -267,7 +267,7 @@ cd apps/web && npx next dev
 |----------|----------|-------------|
 | `RELAY_MODE` | ✅ | **`cloud`** — uses RelayBridge (accepts laptop WS) |
 | `RELAY_AUTH_TOKEN` | ✅ | Shared secret — **must match laptop** |
-| `DATABASE_URL` | ✅ | Cloud SQL via Unix socket: `postgresql://postgres:<pw>@localhost/shofferai?host=/cloudsql/docx-healthcare:asia-south1:shofferai-db` |
+| `DATABASE_URL` | ✅ | Cloud SQL via Unix socket: `postgresql://postgres:<pw>@localhost/shofferai?host=/cloudsql/shofferai-prod:asia-south1:shofferai-db` |
 | `AZURE_OPENAI_ENDPOINT` | ✅ | Azure OpenAI resource URL |
 | `AZURE_OPENAI_API_KEY` | ✅ | Azure OpenAI API key |
 | `LLM_MODEL` | ✅ | Azure deployment name (e.g. `gpt-4o-mini`) |

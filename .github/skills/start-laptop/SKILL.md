@@ -54,7 +54,7 @@ The operator verifies by checking the relay startup logs in the terminal where t
 curl -s http://localhost:8765 2>/dev/null | python3 -m json.tool && echo "(server mode)" || true
 
 # Production: check Cloud Run health
-curl -s https://shofferai-27188185100.asia-south1.run.app/api/relay/health 2>/dev/null || echo "Check Cloud Run logs directly"
+curl -s https://shofferai-666049409637.asia-south1.run.app/api/relay/health 2>/dev/null || echo "Check Cloud Run logs directly"
 ```
 
 ### Step 4: Report status

@@ -34,7 +34,7 @@ This creates `/tmp/shofferai-cookies.txt` (curl `-b` compatible). Valid for 24h;
 ```bash
 TASK_ID="<the task id>"
 curl -s -b /tmp/shofferai-cookies.txt \
-  "https://shofferai-27188185100.asia-south1.run.app/api/admin/telemetry?view=task-detail&taskId=${TASK_ID}" \
+  "https://shofferai-666049409637.asia-south1.run.app/api/admin/telemetry?view=task-detail&taskId=${TASK_ID}" \
   | python3 -m json.tool > /tmp/task-analysis-${TASK_ID}.json
 ```
 

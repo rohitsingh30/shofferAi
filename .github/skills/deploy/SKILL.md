@@ -119,6 +119,6 @@ Include rollback instructions if the post-deploy health check fails.
 - `RELAY_MODE=cloud` is set automatically by cloudbuild.yaml
 - Database (Cloud SQL) connection string must be set in Cloud Run env vars
 - Razorpay, Auth, and API keys must be configured in Cloud Run secrets/env vars
-- **Project ID**: `docx-healthcare` (GCP project)
-- **Artifact Registry**: `asia-south1-docker.pkg.dev/docx-healthcare/shofferai`
-- **Prod URL**: `https://shofferai-27188185100.asia-south1.run.app`
+- **Project ID**: `shofferai-prod` (GCP project)
+- **Artifact Registry**: `asia-south1-docker.pkg.dev/shofferai-prod/shofferai`
+- **Prod URL**: `https://shofferai-666049409637.asia-south1.run.app`

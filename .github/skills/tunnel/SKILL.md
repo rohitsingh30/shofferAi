@@ -12,7 +12,7 @@ Connect the local Chrome Pool relay to production Cloud Run.
 If `RELAY_CLOUD_URL` is set when running `npm run laptop`, the laptop connects directly to Cloud Run via WSS — no tunnel needed. See `/start-laptop` (Option A).
 
 ```bash
-RELAY_CLOUD_URL=wss://shofferai-27188185100.asia-south1.run.app/api/relay/ws \
+RELAY_CLOUD_URL=wss://shofferai-666049409637.asia-south1.run.app/api/relay/ws \
 RELAY_AUTH_TOKEN=<token> \
 npm run laptop
 ```
@@ -48,7 +48,7 @@ Check relay logs — should see: `Relay client connected from <cloud-run-ip>`
 
 Or check prod health:
 ```bash
-curl -s https://shofferai-27188185100.asia-south1.run.app/api/relay/health
+curl -s https://shofferai-666049409637.asia-south1.run.app/api/relay/health
 ```
 
 ### Step 4: Report
