@@ -18,6 +18,9 @@ interface CarouselInputProps {
   cards: CardData[];
   multiSelect?: boolean;
   allowCustom?: boolean;
+  /** When true, each card shows a per-card ADD button. Tapping it fires
+   *  onSubmit immediately with that card's id (no submit-bar wait). */
+  instantAdd?: boolean;
   onSubmit: (value: string) => void;
 }
 
@@ -39,9 +42,11 @@ export function CarouselInput({
   cards,
   multiSelect = false,
   allowCustom = false,
+  instantAdd = false,
   onSubmit,
 }: CarouselInputProps) {
   const [selected, setSelected] = useState<string[]>([]);
+  const [justAdded, setJustAdded] = useState<Set<string>>(new Set());
   const [customText, setCustomText] = useState('');
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
@@ -105,6 +110,26 @@ export function CarouselInput({
     );
   }
 
+  /** Instant-add: tap ADD on a single card → submit immediately as a
+   *  single-item array (consistent with multi-select shape so the cloud
+   *  agent always receives [{id, qty}]). Visual: card flashes "✓ Added"
+   *  for 1.2s so the user has feedback before the next agent message. */
+  function handleInstantAdd(id: string) {
+    setJustAdded((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    onSubmit(JSON.stringify([{ id, qty: 1 }]));
+    setTimeout(() => {
+      setJustAdded((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 1500);
+  }
+
   /* ─── Product Mode: large image cards ─── */
   if (productMode) {
     return (
@@ -161,18 +186,28 @@ export function CarouselInput({
           >
             {cards.map((card, i) => {
               const isSelected = selected.includes(card.id);
+              const wasJustAdded = justAdded.has(card.id);
               const showImg = card.image && !imgErrors.has(card.image);
               const { price, detail } = parseSubtitle(card.subtitle);
 
+              // In instantAdd mode, the whole card is non-toggleable; only
+              // the explicit ADD button submits. In normal mode, the card is
+              // a toggle button that drives the bottom submit bar.
+              const CardEl = instantAdd ? 'div' : 'button';
+              const cardProps = instantAdd
+                ? {}
+                : { type: 'button' as const, onClick: () => toggle(card.id) };
+
               return (
-                <button
+                <CardEl
                   key={card.id}
-                  type="button"
-                  onClick={() => toggle(card.id)}
-                  className={`carousel-card snap-start shrink-0 w-[156px] flex flex-col overflow-hidden rounded-2xl border transition-all duration-200 cursor-pointer group ${
-                    isSelected
-                      ? 'border-primary/70 bg-primary/[0.06] ring-2 ring-primary/25 shadow-lg shadow-primary/10 scale-[1.02]'
-                      : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20'
+                  {...(cardProps as Record<string, unknown>)}
+                  className={`carousel-card snap-start shrink-0 w-[156px] flex flex-col overflow-hidden rounded-2xl border transition-all duration-200 group ${
+                    instantAdd
+                      ? 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20'
+                      : isSelected
+                      ? 'border-primary/70 bg-primary/[0.06] ring-2 ring-primary/25 shadow-lg shadow-primary/10 scale-[1.02] cursor-pointer'
+                      : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 cursor-pointer'
                   }`}
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
@@ -185,9 +220,18 @@ export function CarouselInput({
                       </span>
                     )}
 
-                    {/* Selected check */}
-                    {isSelected && (
+                    {/* Selected check (toggle mode only) */}
+                    {!instantAdd && isSelected && (
                       <span className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/30">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    )}
+
+                    {/* Just-added flash (instant mode) */}
+                    {instantAdd && wasJustAdded && (
+                      <span className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/30 animate-fade-in">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                           <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
@@ -219,21 +263,40 @@ export function CarouselInput({
                       </span>
                     )}
 
-                    {/* Price */}
-                    {price && (
-                      <span className="mt-auto pt-1 text-[15px] font-bold text-primary">
-                        {price}
-                      </span>
-                    )}
+                    {/* Price + ADD row */}
+                    <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+                      {price ? (
+                        <span className="text-[15px] font-bold text-primary">
+                          {price}
+                        </span>
+                      ) : !price && card.subtitle ? (
+                        <span className="text-[11px] font-medium text-primary/70">
+                          {card.subtitle}
+                        </span>
+                      ) : <span />}
 
-                    {/* Subtitle fallback (no price parsed) */}
-                    {!price && card.subtitle && (
-                      <span className="mt-auto pt-1 text-[11px] font-medium text-primary/70">
-                        {card.subtitle}
-                      </span>
-                    )}
+                      {/* Per-card ADD button (instant mode only) */}
+                      {instantAdd && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleInstantAdd(card.id);
+                          }}
+                          disabled={wasJustAdded}
+                          className={`shrink-0 rounded-lg px-3 py-1 text-[11px] font-bold tracking-wide transition-all ${
+                            wasJustAdded
+                              ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                              : 'bg-primary/15 text-primary hover:bg-primary/25 active:scale-95 ring-1 ring-primary/30'
+                          }`}
+                          aria-label={wasJustAdded ? `${card.label} added to cart` : `Add ${card.label} to cart`}
+                        >
+                          {wasJustAdded ? '✓ ADDED' : 'ADD'}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </button>
+                </CardEl>
               );
             })}
           </div>
@@ -264,8 +327,8 @@ export function CarouselInput({
           />
         )}
 
-        {/* Submit bar */}
-        {(selected.length > 0 || (allowCustom && customText.trim())) && (
+        {/* Submit bar — only relevant in toggle mode (instantAdd has per-card ADD) */}
+        {!instantAdd && (selected.length > 0 || (allowCustom && customText.trim())) && (
           <div className="flex items-center gap-3 rounded-xl bg-primary/[0.08] p-3 ring-1 ring-primary/20 animate-fade-in">
             <div className="min-w-0 flex-1">
               {selected.length > 0 && (

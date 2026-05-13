@@ -221,6 +221,9 @@ export async function POST(request: Request) {
             workflowEngine.addMessage(taskId, 'assistant', content)
               .catch(e => console.error('[execute] addMessage(assistant) failed:', e));
           },
+          onSuggestions: (chips: string[]) => {
+            send('suggestions', { chips });
+          },
           onStepUpdate: (step) => {
             const stepNumber = ++stepCounter;
             send('step_update', { step: { ...step, number: stepNumber } });

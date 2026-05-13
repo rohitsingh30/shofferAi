@@ -26,6 +26,8 @@ interface InputPromptProps {
   show_quantity?: boolean;
   allow_custom?: boolean;
   multi_select?: boolean;
+  /** Per-card ADD button on carousel/card_grid; tap fires immediately. */
+  instant_add?: boolean;
   saved?: Array<{ label: string; address: string }>;
   mode?: 'single' | 'range';
   shortcuts?: string[];
@@ -154,6 +156,7 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
             cards={richProps.cards || []}
             multiSelect={richProps.multi_select}
             allowCustom={richProps.allow_custom}
+            instantAdd={richProps.instant_add}
             onSubmit={onSubmit}
           />
         );

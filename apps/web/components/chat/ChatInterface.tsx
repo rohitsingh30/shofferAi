@@ -50,6 +50,7 @@ function ChatInterfaceInner() {
     show_quantity?: boolean;
     allow_custom?: boolean;
     multi_select?: boolean;
+    instant_add?: boolean;
     saved?: Array<{ label: string; address: string }>;
     mode?: 'single' | 'range';
     shortcuts?: string[];
@@ -193,6 +194,24 @@ function ChatInterfaceInner() {
         ]);
         break;
       }
+      case 'suggestions': {
+        // Attach quick-reply chips to the most recent assistant message.
+        const chips = event.payload.chips as string[] | undefined;
+        if (Array.isArray(chips) && chips.length > 0) {
+          setMessages((prev) => {
+            // Find the last assistant message and append suggestions to it.
+            for (let i = prev.length - 1; i >= 0; i--) {
+              if (prev[i].role === 'assistant') {
+                const next = [...prev];
+                next[i] = { ...next[i], suggestions: chips };
+                return next;
+              }
+            }
+            return prev;
+          });
+        }
+        break;
+      }
       case 'step_update': {
         const action = event.payload.action as string;
         const status = event.payload.status as string;
@@ -309,6 +328,7 @@ function ChatInterfaceInner() {
           show_quantity: p.show_quantity as boolean | undefined,
           allow_custom: p.allow_custom as boolean | undefined,
           multi_select: p.multi_select as boolean | undefined,
+          instant_add: p.instant_add as boolean | undefined,
           saved: p.saved as typeof pendingInput extends null ? never : NonNullable<typeof pendingInput>['saved'],
           mode: p.mode as 'single' | 'range' | undefined,
           shortcuts: p.shortcuts as string[] | undefined,
@@ -539,9 +559,25 @@ function ChatInterfaceInner() {
       pendingInput.cards?.length
     ) {
       try {
-        // Extract store name from question text (e.g., "from Blinkit", "on Flipkart")
-        const storeMatch = pendingInput.question.match(/(?:from|on|at)\s+([A-Z][a-zA-Z]+)/);
-        const store = storeMatch?.[1] || 'Cart';
+        // Detect store name from question text. Match (a) explicit prepositions
+        // ("from Blinkit", "on Flipkart") OR (b) any known grocery/shopping store
+        // name appearing anywhere (case-insensitive). Prefer named store over
+        // the generic "Cart" fallback so per-store cart sections render correctly.
+        const KNOWN_STORES = ['BigBasket', 'Blinkit', 'Zepto', 'Swiggy Instamart', 'Swiggy', 'Zomato', 'Flipkart', 'Amazon', 'Myntra', 'Nykaa', 'Tata Cliq'];
+        let store = 'Cart';
+        const explicitMatch = pendingInput.question.match(/(?:from|on|at|to your)\s+([A-Z][a-zA-Z\s]+?)(?:\s+(?:cart|order|catalog|results)|[,.:!?])/);
+        if (explicitMatch) {
+          store = explicitMatch[1].trim();
+        } else {
+          // Scan for any known store name in the question text.
+          const lowerQ = pendingInput.question.toLowerCase();
+          for (const s of KNOWN_STORES) {
+            if (lowerQ.includes(s.toLowerCase())) {
+              store = s;
+              break;
+            }
+          }
+        }
 
         const parsePrice = (s?: string): number => {
           if (!s) return 0;
@@ -588,6 +624,23 @@ function ChatInterfaceInner() {
     if (pendingInput.question) {
       const ts = Date.now();
       const selectionLabel = formatSelectionLabel(pendingInput, value);
+      // For carousel/card_grid, snapshot the cards so the user can re-expand
+      // them later (item 3 — carousel auto-collapse on next message).
+      const carouselSnapshot =
+        (pendingInput.inputType === 'carousel' || pendingInput.inputType === 'card_grid') &&
+        pendingInput.cards &&
+        pendingInput.cards.length > 0
+          ? {
+              inputType: pendingInput.inputType as 'carousel' | 'card_grid',
+              cards: pendingInput.cards.map((c) => ({
+                id: c.id,
+                label: c.label,
+                image: c.image,
+                subtitle: c.subtitle,
+                badge: c.badge,
+              })),
+            }
+          : undefined;
       setMessages((prev) => [
         ...prev,
         {
@@ -595,6 +648,7 @@ function ChatInterfaceInner() {
           role: 'assistant',
           content: pendingInput!.question,
           selection: selectionLabel,
+          ...(carouselSnapshot ? { carouselSnapshot } : {}),
         },
       ]);
     }
@@ -707,7 +761,10 @@ function ChatInterfaceInner() {
             <div className="space-y-5">
               {messages.map((message, i) => (
                 <div key={message.id} className="animate-fade-in" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
-                  <MessageBubble message={message} />
+                  <MessageBubble
+                    message={message}
+                    onSuggestionClick={(text) => sendMessage(text)}
+                  />
                 </div>
               ))}
 
@@ -733,6 +790,7 @@ function ChatInterfaceInner() {
                     show_quantity={pendingInput.show_quantity}
                     allow_custom={pendingInput.allow_custom}
                     multi_select={pendingInput.multi_select}
+                    instant_add={pendingInput.instant_add}
                     saved={pendingInput.saved}
                     mode={pendingInput.mode}
                     shortcuts={pendingInput.shortcuts}

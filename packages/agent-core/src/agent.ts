@@ -43,6 +43,9 @@ export interface AgentCallbacks {
   onPaymentRequired?: (details: { bookingSummary: string; amountInr: number; description: string }) => Promise<boolean>;
   onComplete: (summary: string) => void;
   onError: (error: string) => void;
+  /** Optional: called when LLM emits suggest_replies. Frontend renders chips
+   *  on the most recent assistant message. */
+  onSuggestions?: (chips: string[]) => void;
 }
 
 export type TelemetryTracker = (data: {
@@ -96,6 +99,7 @@ const CLOUD_TOOLS: Tool[] = [
         cards:       { type: 'array', items: { type: 'object' }, description: 'Visual cards for card_grid / carousel' },
         show_quantity: { type: 'boolean' },
         multi_select:  { type: 'boolean' },
+        instant_add:   { type: 'boolean', description: 'When true on carousel/card_grid, each card shows a per-card ADD button that fires immediately (no submit-bar wait). Use for grocery / shopping flows where one-tap-to-cart is expected.' },
         saved:       { type: 'array', items: { type: 'object' }, description: 'Saved addresses (address type)' },
         mode:        { type: 'string', enum: ['single','range'], description: 'Calendar mode' },
         shortcuts:   { type: 'array', items: { type: 'string' } },
@@ -209,6 +213,24 @@ const CLOUD_TOOLS: Tool[] = [
         message:            { type: 'string' },
       },
       required: ['status'],
+    },
+  },
+  {
+    name: 'suggest_replies',
+    description:
+      'Attach 2-4 quick-reply chips to your most recent assistant message so the user can keep the conversation flowing without typing. Use this after every meaningful agent response (showing search results, after a cart action, after a confirmation, etc.). Chips should be short imperative phrases the user might naturally say next. Examples: "Add Amul Gold 1L", "Show cheaper options", "Compare with Zepto", "Remove from cart", "Show my cart". Do NOT include questions ("Want to see more?") — chips are user actions, not agent questions.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        chips: {
+          type: 'array',
+          items: { type: 'string' },
+          description: '2-4 short imperative phrases the user might tap as their next message. Each ≤ 40 chars.',
+          minItems: 1,
+          maxItems: 6,
+        },
+      },
+      required: ['chips'],
     },
   },
 ];
@@ -498,6 +520,7 @@ export class AgentExecutor {
           cards: args.cards as never,
           show_quantity: args.show_quantity as boolean | undefined,
           multi_select: args.multi_select as boolean | undefined,
+          instant_add: args.instant_add as boolean | undefined,
           saved: args.saved as never,
           mode: args.mode as 'single' | 'range' | undefined,
           shortcuts: args.shortcuts as string[] | undefined,
@@ -591,6 +614,16 @@ export class AgentExecutor {
       // Same — frontend reads from SSE stream.
       this.emitToolCallEvent(name, callStart, true);
       return { reported: true };
+    }
+    if (name === 'suggest_replies') {
+      // Frontend listens for the tool_use event in SSE — see route.ts onToolStart.
+      // Agent loop just acknowledges so the LLM can continue or end the turn.
+      const chips = Array.isArray(args.chips) ? (args.chips as string[]).slice(0, 6).map(s => String(s).slice(0, 60)) : [];
+      this.emitToolCallEvent(name, callStart, true, { chips });
+      if (callbacks.onSuggestions && chips.length > 0) {
+        callbacks.onSuggestions(chips);
+      }
+      return { ok: true };
     }
 
     // ── MCP tool — delegate to the host (browser ops service) ──

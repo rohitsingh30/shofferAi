@@ -148,6 +148,11 @@ export interface InputSection {
   show_quantity?: boolean;
   allow_custom?: boolean;
   multi_select?: boolean;
+  /** When true on carousel/card_grid, each card shows a per-card ADD button.
+   *  Tapping ADD instantly returns the picked id to the agent (no submit
+   *  bar wait). Used for grocery / shopping where one-tap-to-cart is the
+   *  expected UX. */
+  instant_add?: boolean;
   // address props
   saved?: InputSavedAddress[];
   // calendar props
@@ -179,6 +184,9 @@ export interface UserInputRequest {
   show_quantity?: boolean;
   allow_custom?: boolean;
   multi_select?: boolean;
+  /** When true, carousel/card_grid renders a per-card ADD button that
+   *  fires immediately on tap (no submit-bar dance). */
+  instant_add?: boolean;
   saved?: InputSavedAddress[];
   mode?: 'single' | 'range';
   shortcuts?: string[];

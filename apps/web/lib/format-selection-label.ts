@@ -17,6 +17,24 @@ export function formatSelectionLabel(
 ): string {
   // Card-based inputs (card_grid, carousel, product_card)
   if (pendingInput.cards?.length) {
+    // Instant-add response shape: '[{"id":"...","qty":1},...]' — multi-pick array.
+    if (value.startsWith('[')) {
+      try {
+        const arr = JSON.parse(value) as Array<{ id: string; qty?: number }>;
+        if (Array.isArray(arr) && arr.length > 0) {
+          const labels = arr.map((sel) => {
+            const c = pendingInput.cards!.find((card) => card.id === sel.id);
+            const name = c?.label ?? sel.id;
+            const qty = sel.qty && sel.qty > 1 ? ` ×${sel.qty}` : '';
+            return `${name}${qty}`;
+          });
+          return `🛒 Added: ${labels.join(', ')}`;
+        }
+      } catch {
+        // fall through
+      }
+    }
+    // Single id (legacy carousel-pick mode)
     const card = pendingInput.cards.find((c) => c.id === String(value));
     if (card) return card.label;
   }
@@ -77,6 +95,29 @@ export function formatSelectionLabel(
     if (value === 'false' || value === 'no') return '❌ No';
   }
 
+  // Layout — unwrap section values and format the first readable one
+  if (pendingInput.inputType === 'layout') {
+    try {
+      const sections = JSON.parse(value) as Record<string, unknown>;
+      const labels: string[] = [];
+      for (const val of Object.values(sections)) {
+        if (typeof val === 'string') {
+          labels.push(val);
+        } else if (typeof val === 'object' && val !== null) {
+          const obj = val as Record<string, unknown>;
+          if (obj.label && obj.address) labels.push(`📍 ${obj.label} — ${obj.address}`);
+          else if (obj.address && typeof obj.address === 'string') labels.push(`📍 ${obj.address}`);
+          else if (obj.label) labels.push(String(obj.label));
+          else if (obj.name) labels.push(String(obj.name));
+          else if (Array.isArray(val)) labels.push(val.map((x: unknown) => (x as Record<string, unknown>).label || String(x)).join(', '));
+        }
+      }
+      if (labels.length) return labels.join(' · ');
+    } catch {
+      // not JSON — fall through
+    }
+  }
+
   // Fallback: if value looks like JSON, try to extract something readable
   if (value.startsWith('{') || value.startsWith('[')) {
     try {
@@ -89,7 +130,7 @@ export function formatSelectionLabel(
       // Object with label/name/address → pick the most readable field
       if (obj.label) return String(obj.label);
       if (obj.name) return String(obj.name);
-      if (obj.address) return String(obj.address);
+      if (obj.address) return typeof obj.address === 'string' ? String(obj.address) : (obj.label ? String(obj.label) : JSON.stringify(obj.address));
     } catch {
       // not valid JSON — fall through
     }

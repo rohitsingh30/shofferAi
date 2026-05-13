@@ -78,10 +78,11 @@ function CartItemRow({ item, onUpdateQty, onRemove }: {
 }
 
 export function L2CartPanel() {
-  const { items, store, taskId: cartTaskId, total, isEmpty, updateQuantity, removeItem, clearCart } = useCart();
+  const { items, byStore, totalByStore, stores, taskId: cartTaskId, total, isEmpty, updateQuantity, removeItem, clearCart, clearStore } = useCart();
   const { closeCart, pendingConfirm, clearPendingConfirm } = useL2Cart();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [payingStore, setPayingStore] = useState<string | null>(null);
 
   const handleCheckoutConfirm = useCallback(() => {
     if (!pendingConfirm) return;
@@ -90,31 +91,33 @@ export function L2CartPanel() {
     closeCart();
   }, [pendingConfirm, clearPendingConfirm, closeCart]);
 
-  const handlePayNow = useCallback(async () => {
-    if (isEmpty) return;
+  const handlePayStore = useCallback(async (targetStore: string) => {
+    const storeItems = byStore[targetStore] ?? [];
+    if (storeItems.length === 0) return;
+    const storeTotal = totalByStore[targetStore] ?? 0;
+    setPayingStore(targetStore);
     setLoading(true);
     setError(null);
 
     try {
       const taskId = cartTaskId || `cart-${Date.now()}`;
       const summary = JSON.stringify({
-        store,
-        items: items.map((item) => ({
+        store: targetStore,
+        items: storeItems.map((item) => ({
           name: item.name,
           quantity: item.quantity,
           price: formatPrice(item.price),
           subtotal: formatPrice(item.price * item.quantity),
         })),
-        total: formatPrice(total),
+        total: formatPrice(storeTotal),
       });
 
-      // Create Razorpay order
       const orderRes = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskId,
-          amountCents: total * 100,
+          amountCents: Math.round(storeTotal * 100),
           serviceFeeCents: 0,
           bookingSummary: summary,
         }),
@@ -127,7 +130,6 @@ export function L2CartPanel() {
 
       const { orderId, amount, currency, key } = await orderRes.json();
 
-      // Load and open Razorpay Checkout
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
       script.onload = () => {
@@ -137,7 +139,7 @@ export function L2CartPanel() {
           currency,
           order_id: orderId,
           name: 'ShofferAI',
-          description: `${store} order`,
+          description: `${targetStore} order`,
           handler: async (response: {
             razorpay_order_id: string;
             razorpay_payment_id: string;
@@ -150,7 +152,7 @@ export function L2CartPanel() {
                 body: JSON.stringify({
                   ...response,
                   taskId,
-                  stepId: 'cart-payment',
+                  stepId: `cart-payment-${targetStore}`,
                 }),
               });
 
@@ -158,17 +160,23 @@ export function L2CartPanel() {
                 throw new Error('Payment verification failed');
               }
 
-              // Success — clear cart and close panel
-              clearCart();
-              closeCart();
+              // Success — clear THIS store only; other stores' carts remain.
+              clearStore(targetStore);
+              setPayingStore(null);
+              setLoading(false);
+              if (Object.keys(byStore).filter((s) => s !== targetStore).length === 0) {
+                closeCart();
+              }
             } catch (err) {
               setError(err instanceof Error ? err.message : 'Verification failed');
               setLoading(false);
+              setPayingStore(null);
             }
           },
           modal: {
             ondismiss: () => {
               setLoading(false);
+              setPayingStore(null);
             },
           },
           theme: { color: '#7c3aed' },
@@ -182,8 +190,9 @@ export function L2CartPanel() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed');
       setLoading(false);
+      setPayingStore(null);
     }
-  }, [items, store, total, cartTaskId, isEmpty, clearCart, closeCart]);
+  }, [byStore, totalByStore, cartTaskId, clearStore, closeCart]);
 
   if (isEmpty) {
     return (
@@ -205,7 +214,7 @@ export function L2CartPanel() {
         <div>
           <h2 className="text-lg font-semibold text-white">Your Cart</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {store} · {items.length} {items.length === 1 ? 'item' : 'items'}
+            {stores.length} {stores.length === 1 ? 'store' : 'stores'} · {items.length} {items.length === 1 ? 'item' : 'items'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -227,46 +236,70 @@ export function L2CartPanel() {
         </div>
       </div>
 
-      {/* Items */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <div className="space-y-2.5">
-          {items.map((item) => (
-            <CartItemRow
-              key={item.id}
-              item={item}
-              onUpdateQty={(qty) => updateQuantity(item.id, qty)}
-              onRemove={() => removeItem(item.id)}
-            />
-          ))}
-        </div>
+      {/* Per-store sections */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+        {stores.map((storeName) => {
+          const storeItems = byStore[storeName] ?? [];
+          const storeTotal = totalByStore[storeName] ?? 0;
+          const isThisStorePaying = payingStore === storeName;
+          return (
+            <section key={storeName} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3">
+              {/* Store header */}
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5 mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">{storeName}</h3>
+                  <p className="text-[11px] text-zinc-500">
+                    {storeItems.length} {storeItems.length === 1 ? 'item' : 'items'} · {formatPrice(storeTotal)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => clearStore(storeName)}
+                  className="text-[11px] text-zinc-500 transition-colors hover:text-red-400"
+                  aria-label={`Clear ${storeName} cart`}
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Items */}
+              <div className="space-y-2">
+                {storeItems.map((item) => (
+                  <CartItemRow
+                    key={item.id}
+                    item={item}
+                    onUpdateQty={(qty) => updateQuantity(item.id, qty)}
+                    onRemove={() => removeItem(item.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Per-store pay button */}
+              {!pendingConfirm && (
+                <button
+                  onClick={() => handlePayStore(storeName)}
+                  disabled={loading}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-primary/90 py-2.5 text-xs font-semibold text-white transition-all hover:bg-primary hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {isThisStorePaying ? 'Processing...' : `Pay ${storeName} · ${formatPrice(storeTotal)}`}
+                </button>
+              )}
+            </section>
+          );
+        })}
       </div>
 
-      {/* Price breakdown + Pay button */}
-      <div className="border-t border-border/50 px-5 py-4 space-y-4">
-        {/* Breakdown */}
-        <div className="space-y-2">
-          {items.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span className="text-zinc-400 truncate pr-2">
-                {item.name} × {item.quantity}
-              </span>
-              <span className="shrink-0 text-zinc-300">{formatPrice(item.price * item.quantity)}</span>
-            </div>
-          ))}
-          <div className="border-t border-white/[0.06] pt-2">
-            <div className="flex justify-between text-base font-semibold">
-              <span className="text-white">Total</span>
-              <span className="text-emerald-400">{formatPrice(total)}</span>
-            </div>
-          </div>
+      {/* Footer — grand total + (optional) confirm flow */}
+      <div className="border-t border-border/50 px-5 py-4 space-y-3">
+        <div className="flex justify-between text-base font-semibold">
+          <span className="text-white">Grand Total</span>
+          <span className="text-emerald-400">{formatPrice(total)}</span>
         </div>
 
         {error && (
           <p className="text-sm text-red-400 text-center">{error}</p>
         )}
 
-        {/* Action button: "Proceed to Checkout" (confirmation) or "Pay Now" (direct payment) */}
-        {pendingConfirm ? (
+        {pendingConfirm && (
           <button
             onClick={handleCheckoutConfirm}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-semibold text-white transition-all hover:bg-emerald-500 hover:shadow-lg hover:shadow-emerald-500/25 active:scale-[0.98]"
@@ -276,31 +309,13 @@ export function L2CartPanel() {
             </svg>
             Proceed to Checkout · {formatPrice(total)}
           </button>
-        ) : (
-          <button
-            onClick={handlePayNow}
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-semibold text-white transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 active:scale-[0.98] disabled:opacity-50"
-          >
-            {loading ? (
-              'Processing...'
-            ) : (
-              <>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                </svg>
-                Pay Now · {formatPrice(total)}
-              </>
-            )}
-          </button>
         )}
 
-        {/* Trust badge */}
         <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-600">
           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
-          Secured by Razorpay · UPI, Cards, Net Banking
+          Secured by Razorpay · UPI, Cards, Net Banking · Each store paid separately
         </div>
       </div>
     </div>
