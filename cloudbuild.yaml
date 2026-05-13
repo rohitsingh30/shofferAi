@@ -53,7 +53,7 @@ substitutions:
   _RUNTIME_SA: shofferai-runtime@shofferai-prod.iam.gserviceaccount.com
   _APP_URL: https://shofferai-666049409637.asia-south1.run.app
   _AZURE_OPENAI_ENDPOINT: https://testshoffer.openai.azure.com
-  _AUTH_GOOGLE_ID: 27188185100-ddn0je28aqr3c4v4jgu9253euqh9llnp.apps.googleusercontent.com
+  _AUTH_GOOGLE_ID: 666049409637-n5u3ebupmmhgumenrmqss01i68i20hkn.apps.googleusercontent.com
   _RAZORPAY_KEY_ID: rzp_test_STwV5jDPFJLnkh
   _RAZORPAY_PUBLIC_KEY_ID: rzp_test_STwV5jDPFJLnkh
 
