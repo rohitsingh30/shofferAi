@@ -48,7 +48,13 @@ export async function POST(request: Request) {
   if (!authUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const { message } = await request.json();
+  let body: { message?: unknown } = {};
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Body must be valid JSON' }, { status: 400 });
+  }
+  const message = typeof body.message === 'string' ? body.message : null;
   if (!message) {
     return NextResponse.json({ error: 'Message is required' }, { status: 400 });
   }

@@ -89,7 +89,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Password cannot be only whitespace' }, { status: 400 });
     }
 
-    const safeName = (typeof name === 'string' ? name.trim() : '').slice(0, MAX_NAME);
+    // Strip HTML/control chars from name to prevent stored XSS via the
+    // dashboard greeting render. Cap length too.
+    const rawName = typeof name === 'string' ? name : '';
+    const safeName = rawName
+      .replace(/<[^>]*>/g, '')                   // strip HTML tags
+      .replace(/[\u0000-\u001F\u007F]+/g, '')    // strip control chars
+      .trim()
+      .slice(0, MAX_NAME);
 
     const lowerEmail = trimmedEmail.toLowerCase();
     const existing = await prisma.user.findUnique({ where: { email: lowerEmail } });
