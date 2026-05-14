@@ -55,6 +55,11 @@ export async function POST(request: Request) {
   const { taskId, store, productId, productUrl } = body;
   const qty = Math.max(1, Math.min(99, Number(body.qty) || 1));
 
+  console.log(
+    '[instant-add] received taskId=%s store=%s productId=%s productUrl=%s qty=%d',
+    taskId, store, productId, productUrl ?? '<missing>', qty,
+  );
+
   if (!taskId || !store || !productId) {
     return NextResponse.json(
       { error: 'taskId, store, productId required' },
