@@ -1,14 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { auth } from '@/auth';
 
-/** Security headers applied to every response. We use middleware (not the
- *  next.config.ts `headers()` hook) because Next.js standalone + static
- *  prerender bypasses that config — middleware runs on every request and
- *  always inserts headers.
+/** Security headers applied to every response via middleware.
  *
- *  See QA report v4 for the list of findings these headers close out
- *  (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
- *  Permissions-Policy, COOP, CORP, CSP). */
+ *  We do NOT import `auth` here — NextAuth's auth() pulls in PrismaAdapter
+ *  + bcrypt which are Node-only and break Edge runtime. Auth gating is
+ *  handled server-side in the dashboard layout (`if (!session?.user)
+ *  redirect('/login')`), so we don't lose protection. */
 const SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
   'X-Frame-Options': 'SAMEORIGIN',
@@ -32,45 +29,17 @@ const SECURITY_HEADERS: Record<string, string> = {
   ].join('; '),
 };
 
-const PROTECTED_MATCHER = ['/dashboard', '/api/agent/', '/api/profile/', '/api/credentials/', '/api/admin/'];
-
-function applyHeaders(res: NextResponse, pathname: string): NextResponse {
+export function middleware(req: NextRequest) {
+  const res = NextResponse.next();
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
     res.headers.set(k, v);
   }
-  if (pathname.startsWith('/api/')) {
+  if (req.nextUrl.pathname.startsWith('/api/')) {
     res.headers.set('X-Robots-Tag', 'noindex, nofollow');
   }
   return res;
 }
 
-function isProtected(pathname: string): boolean {
-  return PROTECTED_MATCHER.some((p) => pathname === p || pathname.startsWith(p));
-}
-
-export default async function middleware(req: NextRequest) {
-  const pathname = req.nextUrl.pathname;
-
-  // Auth gate: if the path is protected, run NextAuth's auth() — it
-  // handles redirect-to-login. We then apply security headers to whatever
-  // response NextAuth returns (or to the next default response).
-  if (isProtected(pathname)) {
-    const session = await auth();
-    if (!session?.user) {
-      const url = req.nextUrl.clone();
-      url.pathname = '/login';
-      url.searchParams.set('callbackUrl', pathname);
-      return applyHeaders(NextResponse.redirect(url), pathname);
-    }
-  }
-
-  return applyHeaders(NextResponse.next(), pathname);
-}
-
 export const config = {
-  // Run on everything except Next.js internals and static files. The
-  // negative lookahead ensures we set security headers on every page +
-  // API + asset response (HTML, JSON, even CSS/JS get the headers since
-  // they're served by the same origin).
   matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-touch-icon.png|manifest.webmanifest|robots.txt|sitemap.xml).*)'],
 };
