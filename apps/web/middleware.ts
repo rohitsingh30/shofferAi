@@ -43,3 +43,4 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-touch-icon.png|manifest.webmanifest|robots.txt|sitemap.xml).*)'],
 };
+// build-marker: 2026-05-14T11:07:14
