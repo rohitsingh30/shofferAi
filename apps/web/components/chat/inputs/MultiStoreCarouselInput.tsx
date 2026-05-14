@@ -26,6 +26,10 @@ export interface StoreCard {
   id: string;
   label: string;
   image?: string;
+  /** Product URL from <store>.search — required by some stores (e.g. Zepto)
+   *  to add to cart. Pass through verbatim; the side-channel /api/cart/instant-add
+   *  forwards it as `product_url`. */
+  url?: string;
   subtitle?: string;
   badge?: string;
 }

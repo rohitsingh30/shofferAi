@@ -76,7 +76,10 @@ interface InputPromptProps {
   /** Side-channel hook for multi_store_carousel: each per-card ADD calls
    *  this, the parent (ChatInterface) hits /api/cart/instant-add and
    *  updates the local CartContext. */
-  onInstantAdd?: (store: string, card: { id: string; label: string; subtitle?: string; image?: string }) => Promise<void>;
+  onInstantAdd?: (
+    store: string,
+    card: { id: string; label: string; subtitle?: string; image?: string; url?: string },
+  ) => Promise<void>;
 }
 
 export function InputPrompt({ question, inputType, options, onSubmit, ...richProps }: InputPromptProps) {

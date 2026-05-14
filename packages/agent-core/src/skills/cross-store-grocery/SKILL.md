@@ -94,6 +94,7 @@ Anthropic Claude / GPT-5 will execute these in parallel since they're in one too
           "id": "<zepto product_id>",
           "label": "<product.name>",
           "image": "<product.imageUrl>",
+          "url": "<product.url>",
           "subtitle": "₹<product.priceInr> · <product.pack>",
           "badge": "<discountPct >= 5 ? '<discountPct>% off' : ''>"
         }
@@ -104,7 +105,7 @@ Anthropic Claude / GPT-5 will execute these in parallel since they're in one too
       "icon": "🛒",
       "delivery": "scheduled",
       "cards": [
-        { "id": "...", "label": "...", "image": "...", "subtitle": "₹83 · 1 L" }
+        { "id": "...", "label": "...", "image": "...", "url": "<product.url>", "subtitle": "₹83 · 1 L" }
       ]
     }
   ]
@@ -167,6 +168,7 @@ After showing comparison results, ALWAYS call `suggest_replies` with action chip
 - **NEVER skip the address ask** — prices change per pincode.
 - **ALWAYS use `multi_store_carousel`** for cross-store results. Never use multiple separate `carousel` calls — that breaks the comparison UX.
 - **ALWAYS call site searches in PARALLEL** — concurrent tool_use blocks in one response. Sequential = slow.
+- **ALWAYS include `url` on every card** — pass `product.url` from each `<store>.search` result verbatim. Zepto's `add_to_cart` requires it; without it the side-channel ADD will fail.
 - **NEVER mix products across stores in the same store section** — each store's products go in its own `stores[].cards` array.
 - **NEVER** invent product IDs.
 - **NEVER** call `place_order`, `submit_otp`, or `confirm_payment` — they are stubs.

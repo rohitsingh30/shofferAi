@@ -49,9 +49,10 @@ export async function POST(request: Request) {
     taskId?: string;
     store?: string;
     productId?: string;
+    productUrl?: string;
     qty?: number;
   };
-  const { taskId, store, productId } = body;
+  const { taskId, store, productId, productUrl } = body;
   const qty = Math.max(1, Math.min(99, Number(body.qty) || 1));
 
   if (!taskId || !store || !productId) {
@@ -87,12 +88,15 @@ export async function POST(request: Request) {
   const toolName = `${site}.add_to_cart`;
   try {
     // BrowserOpsHost.callTool wraps args in `{input: ...}`. The runner's
-    // add_to_cart accepts {product_id, quantity}. We pass both `qty` and
-    // `quantity` to be tolerant of any future renamings.
-    const result = await opsHost.callTool(toolName, {
+    // add_to_cart accepts {product_id, quantity} for bigbasket; Zepto
+    // additionally requires product_url (the slug from search). Pass it
+    // through whenever we have it.
+    const args: Record<string, unknown> = {
       product_id: productId,
       quantity: qty,
-    });
+    };
+    if (productUrl) args.product_url = productUrl;
+    const result = await opsHost.callTool(toolName, args);
     console.log(
       '[instant-add] taskId=%s store=%s product=%s qty=%d → ok',
       taskId,

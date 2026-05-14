@@ -583,7 +583,7 @@ function ChatInterfaceInner() {
   const handleInstantAdd = useCallback(
     async (
       store: string,
-      card: { id: string; label: string; subtitle?: string; image?: string },
+      card: { id: string; label: string; subtitle?: string; image?: string; url?: string },
     ) => {
       const taskId = pendingInput?.taskId ?? taskIdRef.current;
       if (!taskId) {
@@ -607,7 +607,13 @@ function ChatInterfaceInner() {
       const res = await fetch('/api/cart/instant-add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, store, productId: card.id, qty: 1 }),
+        body: JSON.stringify({
+          taskId,
+          store,
+          productId: card.id,
+          productUrl: card.url,
+          qty: 1,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
