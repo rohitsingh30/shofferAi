@@ -66,9 +66,48 @@ function serveStaticFile(filePath, res) {
   fs.createReadStream(filePath).pipe(res);
 }
 
+// ─── Security headers (formerly in middleware.ts — but Next.js middleware
+//     is BYPASSED when `customServer: true`, so we apply them here). ───
+const SECURITY_HEADERS = {
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(self)',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    "img-src 'self' data: blob: https://*.bbassets.com https://cdn.zeptonow.com https://blinkit.com https://*.blinkit.com https://*.swiggy.com https://*.googleusercontent.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.razorpay.com",
+    "connect-src 'self' https://api.razorpay.com https://*.razorpay.com https://api.openai.com https://*.openai.com https://*.googleapis.com https://accounts.google.com",
+    "frame-src 'self' https://api.razorpay.com https://*.razorpay.com https://accounts.google.com",
+  ].join('; '),
+};
+
+function applySecurityHeaders(res, pathname) {
+  for (const k of Object.keys(SECURITY_HEADERS)) {
+    res.setHeader(k, SECURITY_HEADERS[k]);
+  }
+  // /api/* should not be search-indexed.
+  if (pathname && pathname.startsWith('/api/')) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  }
+}
+
 const httpServer = createServer((req, res) => {
   const parsedUrl = parse(req.url, true);
   const pathname = parsedUrl.pathname;
+
+  // ─── Security headers (set on every response — middleware.ts is bypassed
+  //     when customServer: true, so we set them here directly). ────────
+  applySecurityHeaders(res, pathname);
 
   if (pathname.startsWith('/_next/static/')) {
     const relPath = decodeURIComponent(pathname.slice('/_next/static/'.length));
