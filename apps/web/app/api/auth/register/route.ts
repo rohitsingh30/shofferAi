@@ -90,10 +90,16 @@ export async function POST(request: Request) {
     }
 
     // Strip HTML/control chars from name to prevent stored XSS via the
-    // dashboard greeting render. Cap length too.
+    // dashboard greeting render. Also reject outright if the input
+    // contained HTML tags (better signal to the user than silent strip).
     const rawName = typeof name === 'string' ? name : '';
+    if (/<[^>]+>/.test(rawName)) {
+      return NextResponse.json(
+        { error: 'Name cannot contain HTML tags' },
+        { status: 400 },
+      );
+    }
     const safeName = rawName
-      .replace(/<[^>]*>/g, '')                   // strip HTML tags
       .replace(/[\u0000-\u001F\u007F]+/g, '')    // strip control chars
       .trim()
       .slice(0, MAX_NAME);

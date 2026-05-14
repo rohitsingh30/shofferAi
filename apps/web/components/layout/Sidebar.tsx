@@ -171,6 +171,15 @@ export function Sidebar({ user }: SidebarProps) {
             </div>
           )}
         </div>
+        {!collapsed && (
+          <nav aria-label="Legal" className="mt-1 px-3 pb-1 flex items-center gap-3 text-[10px] text-zinc-600">
+            <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
+            <span>·</span>
+            <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms</Link>
+            <span>·</span>
+            <a href="mailto:support@docx.co.in" className="hover:text-zinc-300 transition-colors">Help</a>
+          </nav>
+        )}
       </div>
     </aside>
   );
