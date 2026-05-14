@@ -13,10 +13,16 @@ function formatPrice(amount: number): string {
 }
 
 export function CartBar() {
-  const { items, store, itemCount, total, isEmpty } = useCart();
+  const { itemCount, total, isEmpty, stores, byStore } = useCart();
   const { openCart } = useL2Cart();
 
   if (isEmpty) return null;
+
+  // Build a multi-store summary like "2 BB · 1 Zepto" so a cart spanning
+  // multiple merchants doesn't mislead the user with a single store name.
+  const storeBreakdown = stores
+    .map((s) => `${(byStore[s] ?? []).length} ${s}`)
+    .join(' · ');
 
   return (
     <div className="animate-slide-up mx-auto w-full max-w-3xl px-4 pb-2">
@@ -32,14 +38,14 @@ export function CartBar() {
         </div>
 
         {/* Info */}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-sm font-medium text-white">
+        <div className="flex min-w-0 flex-1 items-center gap-2 truncate">
+          <span className="text-sm font-medium text-white shrink-0">
             {itemCount} {itemCount === 1 ? 'item' : 'items'}
           </span>
-          {store && (
+          {stores.length > 0 && (
             <>
-              <span className="text-zinc-600">·</span>
-              <span className="text-sm text-zinc-400">{store}</span>
+              <span className="text-zinc-600 shrink-0">·</span>
+              <span className="text-sm text-zinc-400 truncate">{storeBreakdown}</span>
             </>
           )}
         </div>

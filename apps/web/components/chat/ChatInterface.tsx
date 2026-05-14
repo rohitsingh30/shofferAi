@@ -76,7 +76,7 @@ function ChatInterfaceInner() {
   const taskIdRef = useRef<string | null>(null);
   const { openL2, closeL2 } = useL2Payment();
   const { closeCart } = useL2Cart();
-  const { clearCart, setTaskId: setCartTaskId, syncFromAgent, addItem } = useCart();
+  const { clearCart, setTaskId: setCartTaskId, syncFromAgent, addItem, removeItem } = useCart();
 
   // Pick suggestions on client mount only — avoids hydration mismatch
   const [suggestions, setSuggestions] = useState(ALL_SUGGESTIONS.slice(0, 4));
@@ -596,32 +596,40 @@ function ChatInterfaceInner() {
         return m ? parseFloat(m[1].replace(/,/g, '')) : 0;
       };
       const price = parsePrice(card.subtitle);
+      const optimisticId = `instant-${store}-${card.id}-${Date.now()}`;
       addItem({
-        id: `instant-${store}-${card.id}-${Date.now()}`,
+        id: optimisticId,
         name: card.label,
         price,
         store,
         image: card.image,
       });
       // Side-channel: commit to the merchant's real cart via the runner.
-      const res = await fetch('/api/cart/instant-add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId,
-          store,
-          productId: card.id,
-          productUrl: card.url,
-          qty: 1,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        const msg = (body as { error?: string }).error || `HTTP ${res.status}`;
-        throw new Error(msg);
+      try {
+        const res = await fetch('/api/cart/instant-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId,
+            store,
+            productId: card.id,
+            productUrl: card.url,
+            qty: 1,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          const msg = (body as { error?: string }).error || `HTTP ${res.status}`;
+          throw new Error(msg);
+        }
+      } catch (err) {
+        // Roll back the optimistic local add so the cart bar matches the
+        // merchant cart (no phantom items when add_to_cart was rejected).
+        removeItem(optimisticId);
+        throw err;
       }
     },
-    [pendingInput?.taskId, addItem],
+    [pendingInput?.taskId, addItem, removeItem],
   );
 
   const handleInputResponse = async (value: string) => {
