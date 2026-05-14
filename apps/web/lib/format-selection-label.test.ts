@@ -176,6 +176,66 @@ describe('formatSelectionLabel', () => {
     });
   });
 
+  // ── Layout (single-section and multi-section) ──
+  describe('layout selection', () => {
+    it('formats single-section layout with address', () => {
+      const value = JSON.stringify({
+        address: {
+          label: 'Home',
+          address: 'C 502, Honer Aquantis, Tellapur, K.V.Rangareddy, Telangana, 500019',
+        },
+      });
+      expect(
+        formatSelectionLabel({ inputType: 'layout' }, value),
+      ).toBe('📍 Home — C 502, Honer Aquantis, Tellapur, K.V.Rangareddy, Telangana, 500019');
+    });
+
+    it('formats address without label in layout', () => {
+      const value = JSON.stringify({
+        address: { address: '42 MG Road, Bengaluru, 560001' },
+      });
+      expect(
+        formatSelectionLabel({ inputType: 'layout' }, value),
+      ).toBe('📍 42 MG Road, Bengaluru, 560001');
+    });
+
+    it('never shows [object Object] for nested address', () => {
+      const value = JSON.stringify({
+        address: { label: 'Office', flatNo: 'B-301', address: '123 Tech Park' },
+      });
+      const result = formatSelectionLabel({ inputType: 'layout' }, value);
+      expect(result).not.toContain('[object Object]');
+      expect(result).toContain('Office');
+    });
+
+    it('formats multi-section layout with address and cuisine', () => {
+      const value = JSON.stringify({
+        address: { label: 'Home', address: '123 Main St' },
+        cuisine: 'Biryani',
+      });
+      const result = formatSelectionLabel({ inputType: 'layout' }, value);
+      expect(result).toContain('Home');
+      expect(result).toContain('Biryani');
+    });
+
+    it('falls back for malformed layout JSON', () => {
+      expect(
+        formatSelectionLabel({ inputType: 'layout' }, '{broken'),
+      ).toBe('{broken');
+    });
+  });
+
+  // ── Fallback: nested address object (safety net) ──
+  describe('fallback with nested address object', () => {
+    it('does not show [object Object] when address is nested', () => {
+      const value = JSON.stringify({
+        address: { label: 'Home', address: '123 Main St' },
+      });
+      const result = formatSelectionLabel({ inputType: 'unknown_type' }, value);
+      expect(result).not.toContain('[object Object]');
+    });
+  });
+
   // ── Plain text passthrough ──
   describe('plain text', () => {
     it('passes through plain text unchanged', () => {

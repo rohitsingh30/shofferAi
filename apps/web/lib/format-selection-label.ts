@@ -9,12 +9,37 @@ interface PendingInputLike {
   inputType: string;
   options?: string[];
   cards?: Array<{ id: string; label: string }>;
+  stores?: Array<{
+    store: string;
+    cards?: Array<{ id: string; label: string }>;
+  }>;
 }
 
 export function formatSelectionLabel(
   pendingInput: PendingInputLike,
   value: string,
 ): string {
+  // Multi-store carousel: value is '[{"store":"BigBasket","id":"...","qty":1},...]'
+  if (pendingInput.inputType === 'multi_store_carousel' && value.startsWith('[')) {
+    try {
+      const arr = JSON.parse(value) as Array<{ store?: string; id: string; qty?: number }>;
+      if (Array.isArray(arr) && arr.length > 0) {
+        const stores = pendingInput.stores || [];
+        const labels = arr.map((sel) => {
+          const section = stores.find((s) => s.store === sel.store);
+          const card = section?.cards?.find((c) => c.id === sel.id);
+          const name = card?.label ?? sel.id;
+          const qty = sel.qty && sel.qty > 1 ? ` ×${sel.qty}` : '';
+          const storeLabel = sel.store ? ` from ${sel.store}` : '';
+          return `${name}${qty}${storeLabel}`;
+        });
+        return `🛒 Added: ${labels.join(', ')}`;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
   // Card-based inputs (card_grid, carousel, product_card)
   if (pendingInput.cards?.length) {
     // Instant-add response shape: '[{"id":"...","qty":1},...]' — multi-pick array.

@@ -128,6 +128,7 @@ export type RichInputType =
   | 'payment'
   | 'card_grid'
   | 'carousel'
+  | 'multi_store_carousel'
   | 'chip_bar'
   | 'address'
   | 'calendar'
@@ -136,6 +137,17 @@ export type RichInputType =
   | 'text'
   | 'layout'
   | 'product_card';
+
+/** One store's section in a multi_store_carousel input. */
+export interface MultiStoreSection {
+  store: string;
+  icon?: string;
+  delivery?: string;
+  badge?: string;
+  /** When set, this store's section renders as an inline error notice. */
+  error?: string;
+  cards: CardItem[];
+}
 
 export interface InputSection {
   name: string;
@@ -199,6 +211,10 @@ export interface UserInputRequest {
   format_hint?: string;
   // Layout composite
   sections?: InputSection[];
+  // Multi-store carousel
+  stores?: MultiStoreSection[];
+  /** Optional global summary line shown above multi-store sections. */
+  summary?: string;
   // Product card widget
   product?: ProductCardData;
 }

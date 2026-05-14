@@ -76,25 +76,46 @@ Do NOT call `set_delivery_address` on any site (not yet implemented to switch). 
 
 Anthropic Claude / GPT-5 will execute these in parallel since they're in one tool_use response. The runner's slot pool handles the parallelism (RUNNER_SLOT_COUNT=3 supports up to 3 concurrent sites).
 
-**Step 2 — Render results in a STACKED carousel layout.** For each store, emit a separate `ask_user(carousel, instant_add: true)` widget with that store's products. The user sees one carousel per store, stacked vertically. Each section's question text MUST include the store name + cheapest price + delivery time as a glance summary.
+**Step 2 — Render results in a SINGLE multi_store_carousel widget.** Use ONE `ask_user` call with `input_type: "multi_store_carousel"`, passing all stores' results in the `stores` array. Each store gets its own collapsible carousel section in the rendered UI.
 
-The order of sections should be: cheapest store first → most expensive last. Add a `🥇 Cheapest` badge to the first section's question.
+```json
+{
+  "input_type": "multi_store_carousel",
+  "question": "Comparing amul gold milk across stores",
+  "summary": "Cheapest at Zepto · ₹29 · 8 min delivery",
+  "stores": [
+    {
+      "store": "Zepto",
+      "icon": "⚡",
+      "delivery": "8 min",
+      "badge": "🥇 Cheapest",
+      "cards": [
+        {
+          "id": "<zepto product_id>",
+          "label": "<product.name>",
+          "image": "<product.imageUrl>",
+          "subtitle": "₹<product.priceInr> · <product.pack>",
+          "badge": "<discountPct >= 5 ? '<discountPct>% off' : ''>"
+        }
+      ]
+    },
+    {
+      "store": "BigBasket",
+      "icon": "🛒",
+      "delivery": "scheduled",
+      "cards": [
+        { "id": "...", "label": "...", "image": "...", "subtitle": "₹83 · 1 L" }
+      ]
+    }
+  ]
+}
+```
 
-Example: if user says "compare milk options across bigbasket and zepto", issue 2 successive `ask_user` calls (NOT in one layout — keep them as separate carousels):
+Sort the `stores` array by cheapest first (lowest priceInr in any of that store's cards). Add `🥇 Cheapest` badge to the first store. Other badge ideas: `⚡ Fastest` (shortest delivery), `🆕 New` if 0% discount, etc.
 
-First carousel (cheapest store):
-- input_type: carousel
-- question: "🥇 Zepto · 8 min · cheapest at ₹29"
-- instant_add: true
-- cards: top zepto products
+**Failed store?** If `zepto.search` errored or returned 0 results, INCLUDE its section with `error: "<reason>"` instead of cards. The widget renders an inline notice — better than silently dropping the store.
 
-Second carousel (other store):
-- input_type: carousel
-- question: "🛒 BigBasket · scheduled · from ₹36"
-- instant_add: true
-- cards: top bigbasket products
-
-**Step 3 — Each ADD goes to that store's cart section.** The cart UI groups items by `store` field, so when user taps ADD on a Zepto card → call `zepto.add_to_cart`; on BigBasket card → call `bigbasket.add_to_cart`. Acknowledge with "Added <product> to your <store> cart".
+**Step 3 — Each ADD goes to that store's cart section.** The widget submits a JSON array like `[{"store":"Zepto","id":"abc","qty":1}]` — one entry per ADD tap. The cloud frontend routes each entry to its store's cart section automatically; you (the LLM) don't need to call `<store>.add_to_cart` unless the user explicitly says "checkout" — at which point the cart already has the items. For now, after each ADD, just acknowledge with "Added <product> to your <store> cart" and call `suggest_replies`.
 
 **Step 4 — Per-store checkout.** When user says "checkout" or "show my totals", call `bigbasket.checkout_summary` and `zepto.checkout_summary` in parallel and report each total separately. Tell the user: "You'll need to pay each store separately — that's how the comparison shopping works in v1."
 
@@ -111,10 +132,10 @@ Second carousel (other store):
 
 1. **Address first**, exactly once. Don't re-ask if user already confirmed during this task.
 2. **Parallel search**, NOT sequential. Issuing `<a>.search` then awaiting then `<b>.search` doubles latency. Issue both in one tool_use response.
-3. **Sort sections by price**, cheapest first. Add `🥇 Cheapest` badge.
-4. **Use `instant_add: true`** on every store's carousel — one-tap to add to that store's cart.
-5. **Don't try to merge identical SKUs across stores** — there's no canonical product ID. Show what each store has matching the query.
-6. **Failed store = inline notice** — if `zepto.search` errors, render `⚠️ Couldn't reach Zepto — showing only BigBasket` instead of dropping the whole flow.
+3. **Use `multi_store_carousel`** for the results — ONE `ask_user` call with `stores` array. Do NOT issue multiple separate `carousel` calls (they break the comparison UX).
+4. **Sort stores in the `stores` array by price**, cheapest first. Add `🥇 Cheapest` badge to the first store.
+5. **Don't try to merge identical SKUs across stores** — there's no canonical product ID. Each store's `cards` array shows what THAT store has matching the query.
+6. **Failed store = inline section** — if `zepto.search` errors, include `{ store: "Zepto", error: "Couldn't reach Zepto right now", cards: [] }` instead of dropping it.
 7. **`place_order` is a STUB** on all sites — never call.
 
 ## Domain knowledge
@@ -133,8 +154,9 @@ After showing comparison results, ALWAYS call `suggest_replies` with action chip
 ## Hard rules
 
 - **NEVER skip the address ask** — prices change per pincode.
+- **ALWAYS use `multi_store_carousel`** for cross-store results. Never use multiple separate `carousel` calls — that breaks the comparison UX.
 - **ALWAYS call site searches in PARALLEL** — concurrent tool_use blocks in one response. Sequential = slow.
-- **NEVER mix products across stores in the same carousel** — each store gets its own carousel section so the user knows which store each card belongs to.
+- **NEVER mix products across stores in the same store section** — each store's products go in its own `stores[].cards` array.
 - **NEVER** invent product IDs.
 - **NEVER** call `place_order`, `submit_otp`, or `confirm_payment` — they are stubs.
 - **ALWAYS** show real prices and product images from each store's search result — do not paraphrase or fabricate.

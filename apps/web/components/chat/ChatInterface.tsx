@@ -62,6 +62,8 @@ function ChatInterfaceInner() {
     placeholder?: string;
     format_hint?: string;
     sections?: Array<Record<string, unknown>>;
+    stores?: Array<Record<string, unknown>>;
+    summary?: string;
     product?: ProductCardData;
   } | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -340,6 +342,8 @@ function ChatInterfaceInner() {
           placeholder: p.placeholder as string | undefined,
           format_hint: p.format_hint as string | undefined,
           sections: p.sections as Array<Record<string, unknown>> | undefined,
+          stores: p.stores as Array<Record<string, unknown>> | undefined,
+          summary: p.summary as string | undefined,
           product: p.product as ProductCardData | undefined,
         });
         setIsLoading(false);
@@ -552,12 +556,11 @@ function ChatInterfaceInner() {
   const handleInputResponse = async (value: string) => {
     if (!pendingInput) return;
 
-    // When user confirms selections from card_grid/carousel, sync items to CartContext
-    // so the floating CartBar appears at the bottom.
-    if (
-      (pendingInput.inputType === 'card_grid' || pendingInput.inputType === 'carousel') &&
-      pendingInput.cards?.length
-    ) {
+    // When user confirms selections from card_grid/carousel/multi_store_carousel,
+    // sync items to CartContext so the floating CartBar appears at the bottom.
+    const isCardInput = pendingInput.inputType === 'card_grid' || pendingInput.inputType === 'carousel';
+    const isMultiStore = pendingInput.inputType === 'multi_store_carousel';
+    if ((isCardInput && pendingInput.cards?.length) || (isMultiStore && pendingInput.stores?.length)) {
       try {
         // Detect store name from question text. Match (a) explicit prepositions
         // ("from Blinkit", "on Flipkart") OR (b) any known grocery/shopping store
@@ -585,15 +588,21 @@ function ChatInterfaceInner() {
           return m ? parseFloat(m[1].replace(/,/g, '')) : 0;
         };
 
-        // CardGridInput: [{id, label, qty}], CarouselInput: ["id1"] or "id1"
+        // Parse the response — multi_store_carousel returns
+        // [{store, id, qty}], carousel/card_grid returns [{id, qty}] or [id].
         let parsed: unknown;
         try { parsed = JSON.parse(value); } catch { parsed = value; }
 
-        let selectedIds: Array<{ id: string; qty: number }> = [];
+        type Sel = { id: string; qty: number; store?: string };
+        let selectedIds: Sel[] = [];
         if (Array.isArray(parsed)) {
           selectedIds = parsed.map((item: unknown) =>
             typeof item === 'object' && item !== null && 'id' in item
-              ? { id: (item as { id: string }).id, qty: (item as { qty?: number }).qty || 1 }
+              ? {
+                  id: (item as { id: string }).id,
+                  qty: (item as { qty?: number }).qty || 1,
+                  store: (item as { store?: string }).store,
+                }
               : { id: String(item), qty: 1 },
           );
         } else if (typeof parsed === 'string' && parsed) {
@@ -604,13 +613,25 @@ function ChatInterfaceInner() {
 
         if (selectedIds.length > 0) {
           for (const sel of selectedIds) {
-            const card = pendingInput.cards?.find((c) => c.id === sel.id);
+            // For multi-store: lookup card in the right store section.
+            // For single-carousel: lookup in pendingInput.cards as before.
+            let card: { id: string; label: string; subtitle?: string } | undefined;
+            let resolvedStore = sel.store ?? store;
+            if (isMultiStore && sel.store) {
+              const section = pendingInput.stores?.find((sec) => (sec as { store: string }).store === sel.store) as
+                | { cards?: Array<{ id: string; label: string; subtitle?: string }> }
+                | undefined;
+              card = section?.cards?.find((c) => c.id === sel.id);
+              resolvedStore = sel.store;
+            } else {
+              card = pendingInput.cards?.find((c) => c.id === sel.id);
+            }
             const price = card?.subtitle ? parsePrice(card.subtitle) : 0;
             addItem({
-              id: `input-${sel.id}-${Date.now()}`,
+              id: `input-${resolvedStore}-${sel.id}-${Date.now()}`,
               name: card?.label || sel.id,
               price,
-              store,
+              store: resolvedStore,
             });
           }
         }
@@ -623,24 +644,65 @@ function ChatInterfaceInner() {
     // conversation reads naturally (question with confirmed answer below it).
     if (pendingInput.question) {
       const ts = Date.now();
-      const selectionLabel = formatSelectionLabel(pendingInput, value);
-      // For carousel/card_grid, snapshot the cards so the user can re-expand
-      // them later (item 3 — carousel auto-collapse on next message).
-      const carouselSnapshot =
+      const selectionLabel = formatSelectionLabel({
+        inputType: pendingInput.inputType,
+        options: pendingInput.options,
+        cards: pendingInput.cards,
+        stores: pendingInput.stores as Array<{
+          store: string;
+          cards?: Array<{ id: string; label: string }>;
+        }> | undefined,
+      }, value);
+      // For carousel/card_grid/multi_store_carousel, snapshot the cards so the
+      // user can re-expand them later (carousel auto-collapse on next message).
+      let carouselSnapshot: NonNullable<Message['carouselSnapshot']> | undefined;
+      if (
         (pendingInput.inputType === 'carousel' || pendingInput.inputType === 'card_grid') &&
         pendingInput.cards &&
         pendingInput.cards.length > 0
-          ? {
-              inputType: pendingInput.inputType as 'carousel' | 'card_grid',
-              cards: pendingInput.cards.map((c) => ({
+      ) {
+        carouselSnapshot = {
+          inputType: pendingInput.inputType as 'carousel' | 'card_grid',
+          cards: pendingInput.cards.map((c) => ({
+            id: c.id,
+            label: c.label,
+            image: c.image,
+            subtitle: c.subtitle,
+            badge: c.badge,
+          })),
+        };
+      } else if (
+        pendingInput.inputType === 'multi_store_carousel' &&
+        pendingInput.stores &&
+        pendingInput.stores.length > 0
+      ) {
+        carouselSnapshot = {
+          inputType: 'multi_store_carousel',
+          summary: pendingInput.summary,
+          stores: pendingInput.stores.map((s) => {
+            const sec = s as {
+              store: string;
+              icon?: string;
+              delivery?: string;
+              badge?: string;
+              cards?: Array<{ id: string; label: string; image?: string; subtitle?: string; badge?: string }>;
+            };
+            return {
+              store: sec.store,
+              icon: sec.icon,
+              delivery: sec.delivery,
+              badge: sec.badge,
+              cards: (sec.cards ?? []).map((c) => ({
                 id: c.id,
                 label: c.label,
                 image: c.image,
                 subtitle: c.subtitle,
                 badge: c.badge,
               })),
-            }
-          : undefined;
+            };
+          }),
+        };
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -802,6 +864,8 @@ function ChatInterfaceInner() {
                     placeholder={pendingInput.placeholder}
                     format_hint={pendingInput.format_hint}
                     sections={pendingInput.sections as any}
+                    stores={pendingInput.stores as any}
+                    summary={pendingInput.summary}
                     product={pendingInput.product}
                     onSubmit={handleInputResponse}
                   />

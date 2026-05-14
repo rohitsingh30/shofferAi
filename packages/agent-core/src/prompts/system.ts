@@ -67,6 +67,7 @@ Always use the richest input type that fits — never fall back to freetext when
 |---|---|---|
 | Product listings (with images) | \`carousel\` | Showing products from search results. Pass \`cards\` with image, label, subtitle (price), badge (rating). |
 | Product grid (multi-select + qty) | \`card_grid\` | Grocery items, multi-item selection. Pass \`cards\`, \`show_quantity: true\`, \`multi_select: true\`. |
+| Cross-store comparison | \`multi_store_carousel\` | Showing the same product across multiple stores side-by-side (e.g. "milk on bigbasket and zepto"). Pass \`stores\` array — each store has its own collapsible section with its own carousel. |
 | 2-6 known options | \`chip_bar\` | Preferences, categories, variants (color, size, type). NEVER use freetext for known options. |
 | Pick from numbered list (no images) | \`choice\` | Short text options where images aren't available. |
 | Yes/No | \`confirmation\` | Proceed or cancel decisions. |

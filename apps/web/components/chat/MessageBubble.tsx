@@ -13,11 +13,20 @@ export interface Message {
   content: string;
   /** Inline selection shown below assistant question (e.g. address, date pick) */
   selection?: string;
-  /** Snapshot of the carousel/card_grid that was shown for this message,
-   *  so it can be re-expanded after the user sends a follow-up. */
+  /** Snapshot of the carousel/card_grid/multi_store_carousel that was shown
+   *  for this message, so it can be re-expanded after the user sends a follow-up. */
   carouselSnapshot?: {
-    inputType: 'carousel' | 'card_grid';
-    cards: Array<{ id: string; label: string; image?: string; subtitle?: string; badge?: string }>;
+    inputType: 'carousel' | 'card_grid' | 'multi_store_carousel';
+    cards?: Array<{ id: string; label: string; image?: string; subtitle?: string; badge?: string }>;
+    /** For multi_store_carousel, sections grouped by store. */
+    stores?: Array<{
+      store: string;
+      icon?: string;
+      delivery?: string;
+      badge?: string;
+      cards: Array<{ id: string; label: string; image?: string; subtitle?: string; badge?: string }>;
+    }>;
+    summary?: string;
   };
   /** Quick-reply chips shown below this assistant message. Tapping a chip
    *  sends it as a new user message — keeps the conversation flowing. */
@@ -84,7 +93,11 @@ export function MessageBubble({
         )}
 
         {/* Collapsed carousel snapshot — re-expandable */}
-        {message.carouselSnapshot && message.carouselSnapshot.cards.length > 0 && (
+        {message.carouselSnapshot && (
+          (message.carouselSnapshot.inputType === 'multi_store_carousel'
+            ? (message.carouselSnapshot.stores ?? []).reduce((sum, s) => sum + s.cards.length, 0) > 0
+            : (message.carouselSnapshot.cards ?? []).length > 0)
+        ) && (
           <div className="mt-3 border-t border-white/[0.06] pt-3">
             <button
               type="button"
@@ -97,26 +110,70 @@ export function MessageBubble({
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
-              {carouselExpanded ? 'Hide' : 'Show'} {message.carouselSnapshot.cards.length} option{message.carouselSnapshot.cards.length === 1 ? '' : 's'}
+              {(() => {
+                if (message.carouselSnapshot!.inputType === 'multi_store_carousel') {
+                  const stores = message.carouselSnapshot!.stores ?? [];
+                  const total = stores.reduce((sum, s) => sum + s.cards.length, 0);
+                  return `${carouselExpanded ? 'Hide' : 'Show'} ${total} option${total === 1 ? '' : 's'} across ${stores.length} store${stores.length === 1 ? '' : 's'}`;
+                }
+                const n = (message.carouselSnapshot!.cards ?? []).length;
+                return `${carouselExpanded ? 'Hide' : 'Show'} ${n} option${n === 1 ? '' : 's'}`;
+              })()}
             </button>
             {carouselExpanded && (
-              <div className="mt-3 flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-                {message.carouselSnapshot.cards.map((c) => (
-                  <div key={c.id} className="shrink-0 w-[120px] flex flex-col rounded-xl border border-white/[0.07] bg-white/[0.025] overflow-hidden">
-                    <div className="aspect-[4/3] flex items-center justify-center bg-white/[0.06] p-2">
-                      {c.image && c.image.startsWith('http') ? (
-                        <img src={c.image} alt={c.label} className="h-full w-full object-contain rounded" />
-                      ) : (
-                        <span className="text-2xl">📦</span>
-                      )}
+              message.carouselSnapshot.inputType === 'multi_store_carousel' ? (
+                <div className="mt-3 space-y-3">
+                  {(message.carouselSnapshot.stores ?? []).map((section) => (
+                    <div key={section.store} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
+                      <div className="flex items-center gap-2 px-1 pb-2 mb-2 border-b border-white/[0.05]">
+                        {section.icon && <span className="text-sm">{section.icon}</span>}
+                        <span className="text-[12px] font-semibold text-white/90">{section.store}</span>
+                        {section.delivery && <span className="text-[10px] text-zinc-500">· {section.delivery}</span>}
+                        {section.badge && (
+                          <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold text-amber-400">
+                            {section.badge}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                        {section.cards.map((c) => (
+                          <div key={c.id} className="shrink-0 w-[110px] flex flex-col rounded-lg border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+                            <div className="aspect-[4/3] flex items-center justify-center bg-white/[0.06] p-1.5">
+                              {c.image && c.image.startsWith('http') ? (
+                                <img src={c.image} alt={c.label} className="h-full w-full object-contain rounded" />
+                              ) : (
+                                <span className="text-xl">📦</span>
+                              )}
+                            </div>
+                            <div className="p-1.5">
+                              <p className="line-clamp-2 text-[10px] font-medium text-white/80 leading-tight">{c.label}</p>
+                              {c.subtitle && <p className="mt-0.5 text-[10px] font-semibold text-primary/80">{c.subtitle}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="p-2">
-                      <p className="line-clamp-2 text-[11px] font-medium text-white/80 leading-tight">{c.label}</p>
-                      {c.subtitle && <p className="mt-1 text-[10px] font-semibold text-primary/80">{c.subtitle}</p>}
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-3 flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+                  {(message.carouselSnapshot.cards ?? []).map((c) => (
+                    <div key={c.id} className="shrink-0 w-[120px] flex flex-col rounded-xl border border-white/[0.07] bg-white/[0.025] overflow-hidden">
+                      <div className="aspect-[4/3] flex items-center justify-center bg-white/[0.06] p-2">
+                        {c.image && c.image.startsWith('http') ? (
+                          <img src={c.image} alt={c.label} className="h-full w-full object-contain rounded" />
+                        ) : (
+                          <span className="text-2xl">📦</span>
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <p className="line-clamp-2 text-[11px] font-medium text-white/80 leading-tight">{c.label}</p>
+                        {c.subtitle && <p className="mt-1 text-[10px] font-semibold text-primary/80">{c.subtitle}</p>}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         )}

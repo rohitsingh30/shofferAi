@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { renderMarkdown } from './render-markdown';
 import { CardGridInput } from './inputs/CardGridInput';
 import { CarouselInput } from './inputs/CarouselInput';
+import { MultiStoreCarouselInput } from './inputs/MultiStoreCarouselInput';
 import { ChipBarInput } from './inputs/ChipBarInput';
 import { AddressInput } from './inputs/AddressInput';
 import { CalendarInput } from './inputs/CalendarInput';
@@ -60,6 +61,17 @@ interface InputPromptProps {
     placeholder?: string;
     format_hint?: string;
   }>;
+  /** multi_store_carousel sections — each store gets its own carousel section. */
+  stores?: Array<{
+    store: string;
+    icon?: string;
+    delivery?: string;
+    badge?: string;
+    error?: string;
+    cards: Array<{ id: string; label: string; image?: string; subtitle?: string; badge?: string }>;
+  }>;
+  /** Optional summary line above multi_store_carousel sections. */
+  summary?: string;
   product?: ProductCardData;
 }
 
@@ -157,6 +169,14 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
             multiSelect={richProps.multi_select}
             allowCustom={richProps.allow_custom}
             instantAdd={richProps.instant_add}
+            onSubmit={onSubmit}
+          />
+        );
+      case 'multi_store_carousel':
+        return (
+          <MultiStoreCarouselInput
+            stores={richProps.stores || []}
+            summary={richProps.summary}
             onSubmit={onSubmit}
           />
         );
@@ -369,7 +389,7 @@ export function InputPrompt({ question, inputType, options, onSubmit, ...richPro
   );
 }
 
-const RICH_TYPES = new Set(['card_grid', 'carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'text', 'layout', 'product_card']);
+const RICH_TYPES = new Set(['card_grid', 'carousel', 'multi_store_carousel', 'chip_bar', 'address', 'calendar', 'stepper', 'slider', 'text', 'layout', 'product_card']);
 function isRichType(type: string): boolean {
   return RICH_TYPES.has(type);
 }
