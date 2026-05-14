@@ -158,8 +158,16 @@ export function matchSkill(skills: SkillMetadata[], userMessage: string): SkillM
     let score = 0;
 
     for (const trigger of skill.triggers) {
-      if (msg.includes(trigger.toLowerCase())) {
-        score += 1;
+      const t = trigger.toLowerCase();
+      if (msg.includes(t)) {
+        // Multi-word triggers express richer intent than single-brand
+        // mentions, so weight them higher. Three+ word phrases like
+        // "bigbasket and zepto" / "compare prices on" beat a domain
+        // match (+3) when the user clearly wants cross-store behaviour.
+        const wordCount = t.trim().split(/\s+/).length;
+        if (wordCount >= 3) score += 4;
+        else if (wordCount === 2) score += 2;
+        else score += 1;
       }
     }
 
