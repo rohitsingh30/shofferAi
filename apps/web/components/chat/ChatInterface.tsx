@@ -627,12 +627,16 @@ function ChatInterfaceInner() {
               card = pendingInput.cards?.find((c) => c.id === sel.id);
             }
             const price = card?.subtitle ? parsePrice(card.subtitle) : 0;
-            addItem({
-              id: `input-${resolvedStore}-${sel.id}-${Date.now()}`,
-              name: card?.label || sel.id,
-              price,
-              store: resolvedStore,
-            });
+            // Add `qty` distinct cart rows so the cart count matches what the
+            // user accumulated in the multi-store carousel stepper.
+            for (let i = 0; i < sel.qty; i++) {
+              addItem({
+                id: `input-${resolvedStore}-${sel.id}-${Date.now()}-${i}`,
+                name: card?.label || sel.id,
+                price,
+                store: resolvedStore,
+              });
+            }
           }
         }
       } catch {

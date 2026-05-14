@@ -57,10 +57,27 @@ export function useImagePreloader(
     // Preload each image in parallel
     const images = validUrls.map((url) => {
       const img = new Image();
+      // Many grocery CDNs (Zepto, Blinkit) reject requests based on
+      // referrer or require anonymous origin. Set both to maximize the
+      // chance of a successful preload.
+      try {
+        (img as HTMLImageElement & { referrerPolicy?: string }).referrerPolicy = 'no-referrer';
+      } catch { /* not supported in this env */ }
+      img.crossOrigin = 'anonymous';
       img.onload = check;
       img.onerror = () => {
-        failedSet.add(url);
-        check();
+        // Retry once without crossOrigin — some CDNs serve images but
+        // don't send CORS headers, which fails an anonymous request.
+        const retry = new Image();
+        try {
+          (retry as HTMLImageElement & { referrerPolicy?: string }).referrerPolicy = 'no-referrer';
+        } catch { /* not supported in this env */ }
+        retry.onload = check;
+        retry.onerror = () => {
+          failedSet.add(url);
+          check();
+        };
+        retry.src = url;
       };
       img.src = url;
       return img;
