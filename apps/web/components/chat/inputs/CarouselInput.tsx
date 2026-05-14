@@ -21,13 +21,6 @@ interface CarouselInputProps {
   /** When true, each card shows a per-card ADD button. Tapping it fires
    *  onSubmit immediately with that card's id (no submit-bar wait). */
   instantAdd?: boolean;
-  /** When true, ADD becomes a controlled qty stepper. The parent must own
-   *  `quantities` and `onQtyChange`; onSubmit is NOT fired on ADD. Used by
-   *  MultiStoreCarouselInput to accumulate selections across stores before
-   *  the user taps a global "Done shopping" button. */
-  accumulate?: boolean;
-  quantities?: Record<string, number>;
-  onQtyChange?: (id: string, qty: number) => void;
   onSubmit: (value: string) => void;
 }
 
@@ -50,9 +43,6 @@ export function CarouselInput({
   multiSelect = false,
   allowCustom = false,
   instantAdd = false,
-  accumulate = false,
-  quantities,
-  onQtyChange,
   onSubmit,
 }: CarouselInputProps) {
   const [selected, setSelected] = useState<string[]>([]);
@@ -62,11 +52,6 @@ export function CarouselInput({
   const [showRightArrow, setShowRightArrow] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const productMode = hasImages(cards);
-
-  const getQty = (id: string): number => (quantities?.[id] ?? 0);
-  const setQty = (id: string, qty: number) => {
-    onQtyChange?.(id, Math.max(0, qty));
-  };
 
   // Preload all product images — show shimmer until ready
   const imageUrls = useMemo(() => cards.map((c) => c.image), [cards]);
@@ -205,25 +190,21 @@ export function CarouselInput({
               const showImg = card.image && !imgErrors.has(card.image);
               const { price, detail } = parseSubtitle(card.subtitle);
 
-              // In instantAdd/accumulate mode, the whole card is non-toggleable;
-              // only the explicit ADD button or stepper submits/changes qty.
-              const isReadOnly = instantAdd || accumulate;
-              const CardEl = isReadOnly ? 'div' : 'button';
-              const cardProps = isReadOnly
+              // In instantAdd mode, the whole card is non-toggleable; only
+              // the explicit ADD button submits. In normal mode, the card is
+              // a toggle button that drives the bottom submit bar.
+              const CardEl = instantAdd ? 'div' : 'button';
+              const cardProps = instantAdd
                 ? {}
                 : { type: 'button' as const, onClick: () => toggle(card.id) };
-
-              const accumulatedQty = accumulate ? getQty(card.id) : 0;
 
               return (
                 <CardEl
                   key={card.id}
                   {...(cardProps as Record<string, unknown>)}
                   className={`carousel-card snap-start shrink-0 w-[156px] flex flex-col overflow-hidden rounded-2xl border transition-all duration-200 group ${
-                    isReadOnly
-                      ? accumulatedQty > 0
-                        ? 'border-emerald-500/40 bg-emerald-500/[0.04] ring-1 ring-emerald-500/30 shadow-md shadow-emerald-500/10'
-                        : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20'
+                    instantAdd
+                      ? 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20'
                       : isSelected
                       ? 'border-primary/70 bg-primary/[0.06] ring-2 ring-primary/25 shadow-lg shadow-primary/10 scale-[1.02] cursor-pointer'
                       : 'border-white/[0.07] bg-white/[0.025] hover:border-white/[0.14] hover:bg-white/[0.045] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 cursor-pointer'
@@ -240,7 +221,7 @@ export function CarouselInput({
                     )}
 
                     {/* Selected check (toggle mode only) */}
-                    {!isReadOnly && isSelected && (
+                    {!instantAdd && isSelected && (
                       <span className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-primary shadow-lg shadow-primary/30">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                           <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -254,13 +235,6 @@ export function CarouselInput({
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                           <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                      </span>
-                    )}
-
-                    {/* Accumulated qty badge (accumulate mode) */}
-                    {accumulate && accumulatedQty > 0 && (
-                      <span className="absolute right-2 top-2 z-10 flex h-6 min-w-[24px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-bold text-white shadow-lg shadow-emerald-500/30 tabular-nums">
-                        ×{accumulatedQty}
                       </span>
                     )}
 
@@ -302,50 +276,8 @@ export function CarouselInput({
                         </span>
                       ) : <span />}
 
-                      {/* Per-card ADD button (instant mode) OR qty stepper (accumulate mode) */}
-                      {accumulate ? (
-                        getQty(card.id) === 0 ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setQty(card.id, 1);
-                            }}
-                            className="shrink-0 rounded-lg bg-primary/15 text-primary ring-1 ring-primary/30 px-3 py-1 text-[11px] font-bold tracking-wide transition-all hover:bg-primary/25 active:scale-95"
-                            aria-label={`Add ${card.label} to cart`}
-                          >
-                            ADD
-                          </button>
-                        ) : (
-                          <div className="shrink-0 flex items-center gap-0 rounded-lg bg-emerald-500/15 ring-1 ring-emerald-500/40 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setQty(card.id, getQty(card.id) - 1);
-                              }}
-                              className="flex h-7 w-7 items-center justify-center text-emerald-300 hover:bg-emerald-500/25 active:scale-95 transition-colors text-[14px] font-bold"
-                              aria-label={`Decrease ${card.label}`}
-                            >
-                              −
-                            </button>
-                            <span className="min-w-[20px] text-center text-[12px] font-bold text-emerald-300 tabular-nums">
-                              {getQty(card.id)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setQty(card.id, getQty(card.id) + 1);
-                              }}
-                              className="flex h-7 w-7 items-center justify-center text-emerald-300 hover:bg-emerald-500/25 active:scale-95 transition-colors text-[14px] font-bold"
-                              aria-label={`Increase ${card.label}`}
-                            >
-                              +
-                            </button>
-                          </div>
-                        )
-                      ) : instantAdd && (
+                      {/* Per-card ADD button (instant mode only) */}
+                      {instantAdd && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -396,8 +328,8 @@ export function CarouselInput({
           />
         )}
 
-        {/* Submit bar — only relevant in toggle mode (instantAdd/accumulate handle their own ADD UX) */}
-        {!instantAdd && !accumulate && (selected.length > 0 || (allowCustom && customText.trim())) && (
+        {/* Submit bar — only relevant in toggle mode (instantAdd has per-card ADD) */}
+        {!instantAdd && (selected.length > 0 || (allowCustom && customText.trim())) && (
           <div className="flex items-center gap-3 rounded-xl bg-primary/[0.08] p-3 ring-1 ring-primary/20 animate-fade-in">
             <div className="min-w-0 flex-1">
               {selected.length > 0 && (

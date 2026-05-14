@@ -17,7 +17,7 @@ import { WorkflowEngine } from './workflow-engine';
 import { PrismaLessonStore } from './lesson-store';
 import { loadSkills, type SkillMetadata } from '@shofferai/agent-core';
 import type { LessonStore } from '@shofferai/agent-core';
-import { BrowserOpsMcpClient } from './browser-ops';
+import { BrowserOpsMcpClient, type BrowserOpsHost } from './browser-ops';
 
 const g = globalThis as unknown as {
   browserOpsClient?: BrowserOpsMcpClient;
@@ -25,6 +25,10 @@ const g = globalThis as unknown as {
   vault?: CredentialVault;
   lessonStore?: LessonStore;
   skills?: SkillMetadata[];
+  /** Live BrowserOpsHost per running task — used by side-channel
+   *  endpoints (e.g. /api/cart/instant-add) to call MCP tools on the
+   *  task's existing sessions without going through the agent loop. */
+  opsHostByTask?: Map<string, BrowserOpsHost>;
 };
 
 const BROWSER_OPS_MCP_URL = process.env.BROWSER_OPS_MCP_URL || 'http://127.0.0.1:8787/mcp';
@@ -74,3 +78,8 @@ export const skills = g.skills;
 g.workflowEngine = workflowEngine;
 g.vault = vault;
 g.lessonStore = lessonStore;
+
+if (!g.opsHostByTask) {
+  g.opsHostByTask = new Map();
+}
+export const opsHostByTask = g.opsHostByTask;

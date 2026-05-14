@@ -473,8 +473,35 @@ function ChatInterfaceInner() {
     }
   }, [openL2, syncFromAgent]);
 
+  const handleInputResponseRef = useRef<((value: string) => void | Promise<void>) | null>(null);
+
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
+
+    // If there's a pending ask_user (e.g. multi_store_carousel that's been
+    // sitting open while the user was tapping ADD on cards), the user's
+    // typed text is treated as their answer — submitted to the pending
+    // input rather than starting a brand-new task. This dismisses the
+    // carousel and lets the agent react to the follow-up ("checkout",
+    // "compare more items", etc.).
+    if (pendingInput && handleInputResponseRef.current) {
+      setInput('');
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto';
+      }
+      // Echo the user's message into the chat history so it reads like a
+      // normal turn.
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          role: 'user',
+          content: text.trim(),
+        },
+      ]);
+      handleInputResponseRef.current(text.trim());
+      return;
+    }
 
     if (abortRef.current) {
       abortRef.current.abort();
@@ -553,13 +580,58 @@ function ChatInterfaceInner() {
     }
   }, [isLoading, handleSSEEvent]);
 
+  const handleInstantAdd = useCallback(
+    async (
+      store: string,
+      card: { id: string; label: string; subtitle?: string; image?: string },
+    ) => {
+      const taskId = pendingInput?.taskId ?? taskIdRef.current;
+      if (!taskId) {
+        throw new Error('No active task');
+      }
+      // Optimistic local cart update so the floating CartBar reacts instantly.
+      const parsePrice = (s?: string): number => {
+        if (!s) return 0;
+        const m = s.match(/₹([\d,]+(?:\.\d+)?)/);
+        return m ? parseFloat(m[1].replace(/,/g, '')) : 0;
+      };
+      const price = parsePrice(card.subtitle);
+      addItem({
+        id: `instant-${store}-${card.id}-${Date.now()}`,
+        name: card.label,
+        price,
+        store,
+        image: card.image,
+      });
+      // Side-channel: commit to the merchant's real cart via the runner.
+      const res = await fetch('/api/cart/instant-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, store, productId: card.id, qty: 1 }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = (body as { error?: string }).error || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+    },
+    [pendingInput?.taskId, addItem],
+  );
+
   const handleInputResponse = async (value: string) => {
     if (!pendingInput) return;
 
-    // When user confirms selections from card_grid/carousel/multi_store_carousel,
+    // For multi_store_carousel, items have already been added to local cart
+    // (and merchant cart) via instant-add side channel — no further
+    // cart-syncing is needed when this submits. The value here is just a
+    // plain follow-up like "checkout" or "compare X".
+    const isMultiStoreFollowup = pendingInput.inputType === 'multi_store_carousel';
+
+    // When user confirms selections from card_grid/carousel,
     // sync items to CartContext so the floating CartBar appears at the bottom.
+    // (multi_store_carousel handles its own cart updates via instant-add.)
     const isCardInput = pendingInput.inputType === 'card_grid' || pendingInput.inputType === 'carousel';
-    const isMultiStore = pendingInput.inputType === 'multi_store_carousel';
+    const isMultiStore = pendingInput.inputType === 'multi_store_carousel' && !isMultiStoreFollowup;
     if ((isCardInput && pendingInput.cards?.length) || (isMultiStore && pendingInput.stores?.length)) {
       try {
         // Detect store name from question text. Match (a) explicit prepositions
@@ -756,6 +828,14 @@ function ChatInterfaceInner() {
     setIsLoading(true);
   };
 
+  // Keep the ref pointed at the latest handleInputResponse so sendMessage
+  // (a stable useCallback) can invoke it without stale-closure bugs when
+  // the user types into the chat textarea while a multi_store_carousel is
+  // pending.
+  useEffect(() => {
+    handleInputResponseRef.current = handleInputResponse;
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     sendMessage(input);
@@ -871,6 +951,7 @@ function ChatInterfaceInner() {
                     stores={pendingInput.stores as any}
                     summary={pendingInput.summary}
                     product={pendingInput.product}
+                    onInstantAdd={handleInstantAdd}
                     onSubmit={handleInputResponse}
                   />
                 </div>

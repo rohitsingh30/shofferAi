@@ -18,7 +18,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { AgentExecutor, type AgentCallbacks, matchSkill } from '@shofferai/agent-core';
 import { CredentialInjector } from '@/lib/credential-vault';
-import { browserOpsClient, workflowEngine, vault, skills, lessonStore } from '@/lib/singletons';
+import { browserOpsClient, workflowEngine, vault, skills, lessonStore, opsHostByTask } from '@/lib/singletons';
 import { BrowserOpsHost } from '@/lib/browser-ops';
 import { track, trackTimed } from '@/lib/telemetry';
 import { TaskLatencyTracker } from '@/lib/task-latency-tracker';
@@ -103,12 +103,16 @@ export async function POST(request: Request) {
         taskId,
         userRef: `sha256:${userId}`,
       });
+      // Register so side-channel endpoints (e.g. /api/cart/instant-add)
+      // can dispatch tools through this task's existing sessions.
+      opsHostByTask.set(taskId, opsHost);
 
       request.signal.addEventListener('abort', () => {
         console.log('[execute] taskId=%s SSE client disconnected', taskId);
         streamClosed = true;
         clearInterval(heartbeatTimer);
         opsHost.closeSession().catch(() => {});
+        opsHostByTask.delete(taskId);
         workflowEngine.updateTaskStatus(taskId, 'failed').catch(() => {});
         try { controller.close(); } catch { /* already closed */ }
       });
@@ -323,6 +327,7 @@ export async function POST(request: Request) {
 
         // Always release the browser session at the end of the task
         await opsHost.closeSession();
+        opsHostByTask.delete(taskId);
 
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -331,6 +336,7 @@ export async function POST(request: Request) {
         await workflowEngine.updateTaskStatus(taskId, 'failed');
         taskTimer.end({ success: false });
         await opsHost.closeSession();
+        opsHostByTask.delete(taskId);
       } finally {
         clearInterval(heartbeatTimer);
         if (!streamClosed) {

@@ -4,24 +4,22 @@
  * MultiStoreCarouselInput — stacked store sections, each with its own
  * horizontal carousel. The cross-store grocery comparison UX.
  *
- * Each section has:
- *   - Header: store name + delivery time + result count + optional badge
- *     (🥇 Cheapest, ⚡ Fastest, etc.)
- *   - Collapsible chevron toggle
- *   - Horizontal carousel (re-uses CarouselInput in `accumulate` mode)
- *
- * Per-card ADD increments a local qty stepper. NOTHING is submitted until
- * the user taps the sticky "Done shopping (N items) →" footer bar. This
- * lets users browse + compare across stores in one turn — adding a few
- * items from BigBasket and a few from Zepto before sending the batch.
- *
- * Final submission shape: '[{"store":"Zepto","id":"abc","qty":2}, ...]'.
- * The cloud LLM iterates this and calls each <store>.add_to_cart tool.
+ * UX contract (post user feedback):
+ *   - Each card has an instant ADD button. Tapping it commits IMMEDIATELY:
+ *       1. Hits POST /api/cart/instant-add → runner adds it to that store's
+ *          real cart.
+ *       2. Locally adds an entry to CartContext so the floating CartBar +
+ *          per-store cart panel update right away (no agent round-trip).
+ *   - The carousel STAYS visible across multiple ADDs — the user keeps
+ *     comparing/adding across stores in the same turn.
+ *   - The agent's `ask_user(multi_store_carousel)` remains pending. The
+ *     carousel is only dismissed when the user types a follow-up message
+ *     in the chat textbox (which submits the ask_user with that message).
  *
  * Failed stores render an inline notice ("⚠️ Couldn't reach Zepto") instead
  * of being dropped — honest about coverage.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { CarouselInput } from './CarouselInput';
 
 export interface StoreCard {
@@ -46,10 +44,16 @@ interface MultiStoreCarouselInputProps {
   stores: StoreSection[];
   /** Optional global summary line shown above all sections. */
   summary?: string;
+  /** Called per ADD. Parent handles the actual cart side-effects (POST to
+   *  /api/cart/instant-add + local CartContext update). Returns when the
+   *  add succeeds so we can show "✓ ADDED" feedback. */
+  onInstantAdd?: (store: string, card: StoreCard) => Promise<void>;
+  /** Called when the agent's ask_user should finally be dismissed — e.g.
+   *  if we add an explicit "I'm done" CTA later. Currently unused; the
+   *  user dismisses by typing in the main chat textbox. */
   onSubmit: (value: string) => void;
 }
 
-/* Parse "₹44 · 450 ml" → number price for total estimation */
 function parsePrice(sub?: string): number | null {
   if (!sub) return null;
   const m = sub.match(/₹([\d,]+(?:\.\d+)?)/);
@@ -61,13 +65,14 @@ function parsePrice(sub?: string): number | null {
 export function MultiStoreCarouselInput({
   stores,
   summary,
-  onSubmit,
+  onInstantAdd,
 }: MultiStoreCarouselInputProps) {
   // All sections start expanded — user wanted scannable comparison
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  // Cross-store qty state: { storeName: { cardId: qty } }
-  const [quantities, setQuantities] = useState<Record<string, Record<string, number>>>({});
-  const [submitting, setSubmitting] = useState(false);
+  // Per-card running qty across this carousel instance — shows "x2", "x3"
+  // badges so the user knows how many they've added.
+  const [qtyByKey, setQtyByKey] = useState<Record<string, number>>({});
+  const [errorByStore, setErrorByStore] = useState<Record<string, string>>({});
 
   function toggleCollapse(storeName: string) {
     setCollapsed((prev) => {
@@ -78,75 +83,49 @@ export function MultiStoreCarouselInput({
     });
   }
 
-  function updateQty(storeName: string, cardId: string, qty: number) {
-    setQuantities((prev) => {
-      const next: Record<string, Record<string, number>> = { ...prev };
-      const storeMap = { ...(next[storeName] ?? {}) };
-      if (qty <= 0) {
-        delete storeMap[cardId];
-      } else {
-        storeMap[cardId] = qty;
-      }
-      if (Object.keys(storeMap).length === 0) {
-        delete next[storeName];
-      } else {
-        next[storeName] = storeMap;
-      }
+  async function handleStoreAdd(store: string, raw: string) {
+    // CarouselInput in instantAdd mode submits '[{"id":"...","qty":1}]'.
+    // We unwrap, find the card, and dispatch the side-channel add.
+    let cardId: string | undefined;
+    try {
+      const arr = JSON.parse(raw) as Array<{ id: string }>;
+      if (Array.isArray(arr) && arr.length > 0) cardId = arr[0].id;
+    } catch {
+      cardId = raw;
+    }
+    if (!cardId) return;
+    const section = stores.find((s) => s.store === store);
+    const card = section?.cards.find((c) => c.id === cardId);
+    if (!card) return;
+
+    const key = `${store}::${cardId}`;
+    // Optimistic increment so the UI feels instant
+    setQtyByKey((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
+    setErrorByStore((prev) => {
+      if (!prev[store]) return prev;
+      const next = { ...prev };
+      delete next[store];
       return next;
     });
-  }
 
-  // Aggregate stats for the sticky footer bar
-  const { totalItems, storeBreakdown, estimatedTotal } = useMemo(() => {
-    let items = 0;
-    let priceTotal = 0;
-    let anyPriced = false;
-    const breakdown: Array<{ store: string; count: number }> = [];
-    for (const section of stores) {
-      const storeQtys = quantities[section.store];
-      if (!storeQtys) continue;
-      let storeCount = 0;
-      for (const card of section.cards) {
-        const q = storeQtys[card.id] ?? 0;
-        if (q > 0) {
-          storeCount += q;
-          const p = parsePrice(card.subtitle);
-          if (p !== null) {
-            priceTotal += p * q;
-            anyPriced = true;
-          }
-        }
-      }
-      if (storeCount > 0) {
-        items += storeCount;
-        breakdown.push({ store: section.store, count: storeCount });
-      }
+    try {
+      await onInstantAdd?.(store, card);
+    } catch (err) {
+      // Roll back qty + surface the error inline on the section header
+      setQtyByKey((prev) => {
+        const cur = prev[key] ?? 0;
+        const next = { ...prev };
+        if (cur <= 1) delete next[key];
+        else next[key] = cur - 1;
+        return next;
+      });
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorByStore((prev) => ({ ...prev, [store]: msg }));
     }
-    return {
-      totalItems: items,
-      storeBreakdown: breakdown,
-      estimatedTotal: anyPriced ? priceTotal : null,
-    };
-  }, [stores, quantities]);
-
-  function handleDone() {
-    if (totalItems === 0 || submitting) return;
-    setSubmitting(true);
-    const payload: Array<{ store: string; id: string; qty: number }> = [];
-    for (const section of stores) {
-      const storeQtys = quantities[section.store];
-      if (!storeQtys) continue;
-      for (const [cardId, qty] of Object.entries(storeQtys)) {
-        if (qty > 0) {
-          payload.push({ store: section.store, id: cardId, qty });
-        }
-      }
-    }
-    onSubmit(JSON.stringify(payload));
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-4">
+    <div className="flex flex-col gap-4">
       {summary && (
         <p className="text-sm text-zinc-300 leading-relaxed">{summary}</p>
       )}
@@ -154,8 +133,19 @@ export function MultiStoreCarouselInput({
       {stores.map((section) => {
         const isCollapsed = collapsed.has(section.store);
         const itemCount = section.cards.length;
-        const storeQtyMap = quantities[section.store] ?? {};
-        const storeAddedCount = Object.values(storeQtyMap).reduce((a, b) => a + b, 0);
+        const liveError = errorByStore[section.store];
+        const sectionQtys: Record<string, number> = {};
+        for (const card of section.cards) {
+          const q = qtyByKey[`${section.store}::${card.id}`];
+          if (q) sectionQtys[card.id] = q;
+        }
+        const addedCount = Object.values(sectionQtys).reduce((a, b) => a + b, 0);
+        const addedTotal = section.cards.reduce((sum, c) => {
+          const q = sectionQtys[c.id] ?? 0;
+          if (q === 0) return sum;
+          const p = parsePrice(c.subtitle);
+          return sum + (p ?? 0) * q;
+        }, 0);
         return (
           <section
             key={section.store}
@@ -168,7 +158,6 @@ export function MultiStoreCarouselInput({
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors text-left"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                {/* Collapse chevron */}
                 <svg
                   className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
@@ -192,9 +181,12 @@ export function MultiStoreCarouselInput({
                     Failed
                   </span>
                 )}
-                {storeAddedCount > 0 && (
-                  <span className="ml-1 shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 ring-1 ring-emerald-500/40 tabular-nums">
-                    {storeAddedCount} added
+                {addedCount > 0 && (
+                  <span
+                    className="ml-1 shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 ring-1 ring-emerald-500/40 tabular-nums"
+                    title={addedTotal > 0 ? `~₹${addedTotal.toFixed(addedTotal % 1 === 0 ? 0 : 2)}` : undefined}
+                  >
+                    {addedCount} in cart{addedTotal > 0 ? ` · ~₹${addedTotal.toFixed(0)}` : ''}
                   </span>
                 )}
               </div>
@@ -204,6 +196,12 @@ export function MultiStoreCarouselInput({
                 </span>
               )}
             </button>
+
+            {liveError && (
+              <div className="mx-3 mb-2 rounded-lg bg-red-500/[0.06] px-3 py-2 ring-1 ring-red-500/25">
+                <p className="text-[11px] text-red-300/90">⚠️ {liveError}</p>
+              </div>
+            )}
 
             {/* Section body */}
             {!isCollapsed && (
@@ -219,10 +217,8 @@ export function MultiStoreCarouselInput({
                 ) : (
                   <CarouselInput
                     cards={section.cards}
-                    accumulate={true}
-                    quantities={storeQtyMap}
-                    onQtyChange={(id, qty) => updateQty(section.store, id, qty)}
-                    onSubmit={() => { /* no-op in accumulate mode */ }}
+                    instantAdd={true}
+                    onSubmit={(v) => handleStoreAdd(section.store, v)}
                   />
                 )}
               </div>
@@ -230,32 +226,6 @@ export function MultiStoreCarouselInput({
           </section>
         );
       })}
-
-      {/* Sticky footer — appears once user has added at least one item */}
-      {totalItems > 0 && (
-        <div className="sticky bottom-0 -mx-3 px-3 pt-3 pb-1 z-30 animate-fade-in">
-          <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 shadow-xl shadow-emerald-500/10 backdrop-blur-md">
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-emerald-300 tabular-nums">
-                {totalItems} {totalItems === 1 ? 'item' : 'items'}
-                {estimatedTotal !== null && ` · ~₹${estimatedTotal.toFixed(estimatedTotal % 1 === 0 ? 0 : 2)}`}
-              </p>
-              <p className="truncate text-[11px] text-emerald-200/60 mt-0.5">
-                {storeBreakdown.map((b) => `${b.count} from ${b.store}`).join(' · ')}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleDone}
-              disabled={submitting}
-              className="shrink-0 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-emerald-950 shadow-lg shadow-emerald-500/30 transition-all hover:bg-emerald-400 hover:shadow-xl hover:shadow-emerald-500/40 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label={`Done shopping — add ${totalItems} items to cart`}
-            >
-              {submitting ? 'Adding...' : 'Done shopping →'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

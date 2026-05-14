@@ -115,18 +115,20 @@ Sort the `stores` array by cheapest first (lowest priceInr in any of that store'
 
 **Failed store?** If `zepto.search` errored or returned 0 results, INCLUDE its section with `error: "<reason>"` instead of cards. The widget renders an inline notice — better than silently dropping the store.
 
-**Step 3 — User accumulates selections, then taps "Done shopping".** The widget lets the user tap ADD on multiple cards across multiple stores (each ADD becomes a +/- qty stepper), then taps a sticky "Done shopping (N items) →" footer. Only on Done does the widget submit ONE batch like:
+**Step 3 — User adds items via instant ADD (no agent involvement).** Each tap on a card's ADD button hits a side-channel endpoint (`/api/cart/instant-add`) that calls `<store>.add_to_cart` directly through the task's existing browser session. This means:
 
-```json
-[
-  {"store":"Zepto","id":"abc","qty":2},
-  {"store":"BigBasket","id":"xyz","qty":1}
-]
-```
+- The widget stays visible — the user keeps comparing/adding across stores.
+- The agent does NOT see per-add events (no LLM round-trip per click = fast + cheap).
+- The user dismisses the widget by typing a follow-up message in the chat textbox (which submits the ask_user with that text as the value).
 
-The cloud frontend automatically routes each entry into its store's cart section — you (the LLM) do NOT need to call `<store>.add_to_cart` per item. After receiving the batch, just acknowledge: "Added 3 items: 2× Amul Gold (Zepto), 1× Mother Dairy (BigBasket)" and call `suggest_replies`.
+Your `ask_user(multi_store_carousel)` call will block until the user types something. When you receive a response, treat it as a normal user follow-up — they may ask to compare more items, view a cart, or start checkout.
 
-**Step 4 — Per-store checkout.** When user says "checkout" or "show my totals", call `bigbasket.checkout_summary` and `zepto.checkout_summary` in parallel and report each total separately. Tell the user: "You'll need to pay each store separately — that's how the comparison shopping works in v1."
+**Step 4 — On follow-up, react to the user's intent.** Common follow-ups after an `ask_user(multi_store_carousel)` returns:
+
+- `"checkout"` / `"pay"` / `"show my totals"` → call `bigbasket.checkout_summary` and `zepto.checkout_summary` in parallel and report each total separately. Tell the user: "You'll need to pay each store separately — that's how cross-store shopping works in v1."
+- `"compare X"` (different item) → re-run Step 1 with the new item.
+- `"show my zepto cart"` → call `zepto.get_cart`.
+- Anything else → handle as plain conversation.
 
 ## When to use which store
 
