@@ -1,0 +1,4 @@
+Contact: mailto:security@docx.co.in
+Expires: 2027-12-31T23:59:59Z
+Preferred-Languages: en
+Canonical: https://shofferai-666049409637.asia-south1.run.app/.well-known/security.txt

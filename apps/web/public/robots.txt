@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+
+Sitemap: https://shofferai-666049409637.asia-south1.run.app/sitemap.xml

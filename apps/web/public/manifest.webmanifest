@@ -1,0 +1,14 @@
+{
+  "name": "ShofferAI",
+  "short_name": "ShofferAI",
+  "description": "Your AI that actually does things — compare prices and shop with one tap.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
