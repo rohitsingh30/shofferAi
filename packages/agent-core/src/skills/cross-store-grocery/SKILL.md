@@ -33,10 +33,8 @@ allowed-tools:
   - zepto.add_to_cart
   - zepto.get_cart
   - blinkit.search
-  - blinkit.add_to_cart
   - blinkit.get_cart
   - swiggy_instamart.search
-  - swiggy_instamart.add_to_cart
   - swiggy_instamart.get_cart
 requiresAuth: true
 params:
@@ -69,12 +67,14 @@ For any "compare X across stores" or "find cheapest X" intent. The cloud LLM cal
 
 Do NOT call `set_delivery_address` on any site (not yet implemented to switch). Trust each operator's pre-set address.
 
-**Step 1 — Search ALL chosen stores in PARALLEL.** Default stores: BigBasket + Zepto (operator is signed in to both). Issue all `<store>.search` tool calls **in the same response** so they execute concurrently:
+**Step 1 — Search ALL chosen stores in PARALLEL.** Default stores: BigBasket + Zepto (operator is signed in to both AND both support add-to-cart). Issue all `<store>.search` tool calls **in the same response** so they execute concurrently:
 
 - `bigbasket.search({ query: "<item>", topN: 6 })`
 - `zepto.search({ query: "<item>", topN: 6 })`
 
-Anthropic Claude / GPT-5 will execute these in parallel since they're in one tool_use response. The runner's slot pool handles the parallelism (RUNNER_SLOT_COUNT=3 supports up to 3 concurrent sites).
+Optionally include `blinkit.search` / `swiggy_instamart.search` for price visibility — but those stores DON'T have an `add_to_cart` tool yet (v1 limitation). If the user explicitly asks "all stores" or names blinkit/instamart, include them in the comparison so the user can SEE prices, but warn them ADD will only work on BigBasket and Zepto.
+
+Anthropic Claude / GPT-5 will execute these in parallel since they're in one tool_use response. The runner's slot pool handles the parallelism (RUNNER_SLOT_COUNT=5 supports up to 5 concurrent sites).
 
 **Step 2 — Render results in a SINGLE multi_store_carousel widget.** Use ONE `ask_user` call with `input_type: "multi_store_carousel"`, passing all stores' results in the `stores` array. Each store gets its own collapsible carousel section in the rendered UI.
 
@@ -135,10 +135,10 @@ Your `ask_user(multi_store_carousel)` call will block until the user types somet
 
 | Cue | Default stores |
 |---|---|
-| User says "compare" / "cheapest" / "best deal" | bigbasket + zepto |
+| User says "compare" / "cheapest" / "best deal" | bigbasket + zepto (both support ADD) |
 | User explicitly names stores ("bigbasket vs zepto") | exactly those |
-| User says "all stores" or "everywhere" | bigbasket + zepto + blinkit + swiggy_instamart |
-| User says "10-min delivery" / "quick" | zepto + blinkit + swiggy_instamart (skip bigbasket scheduled) |
+| User says "all stores" or "everywhere" | bigbasket + zepto (ADD-capable) + blinkit + swiggy_instamart (price-only) — warn user ADD works on BB/Zepto only |
+| User says "10-min delivery" / "quick" | zepto + blinkit + swiggy_instamart (skip bigbasket scheduled). ADD works on Zepto only — for blinkit/instamart, suggest the user add via that store's app. |
 
 ## Sequencing rules
 

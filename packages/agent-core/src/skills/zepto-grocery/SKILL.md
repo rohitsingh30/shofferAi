@@ -1,11 +1,11 @@
 ---
 name: zepto-grocery
-description: Order groceries from Zepto with 10-15 minute delivery — search items, add to cart, checkout, pay.
+description: Order groceries from Zepto with 10-15 minute quick-commerce delivery — search the catalog at the user's pincode, show products visually, add to cart, view cart. Use this when the user wants to shop on Zepto for fast delivery.
 triggers:
   - zepto
+  - zeptonow
   - order from zepto
   - zepto grocery
-  - zeptonow
   - order on zepto
   - zepto delivery
   - quick grocery zepto
@@ -13,185 +13,125 @@ triggers:
   - buy from zepto
   - zepto order
   - 10 minute grocery
+  - 10 min delivery grocery
   - instant grocery delivery
   - order vegetables on zepto
   - zepto fruits
   - zepto snacks
+  - milk on zepto
+  - bread on zepto
+allowed-tools:
+  - zepto.search
+  - zepto.add_to_cart
+  - zepto.get_cart
+  - zepto.whoami
 siteUrl: https://www.zeptonow.com
 requiresAuth: true
 params:
   - name: items
     required: false
-    hint: List of items to order (e.g. "milk, bread, eggs, tomatoes")
+    hint: List of items the user wants (e.g. "amul milk 500ml, brown bread, eggs")
   - name: address
-    required: false
-    hint: Delivery address or area name
-  - name: payment_method
-    required: false
-    hint: Payment preference (UPI, card, COD)
+    required: true
+    hint: Delivery address — Zepto's prices and serviceability vary heavily by pincode (10-min coverage is metro-only)
 ---
 
-# Zepto Grocery Ordering
+# Zepto Grocery — Tool Map
 
-Chrome profile: rsinghtomar3011@gmail.com. Operator phone: 8109137158.
+Drive Zepto directly via the MCP tools listed above. **Do NOT describe browser actions ("click search bar", "take snapshot") — the tools handle all UI interaction.** A signed-in browser session is opened for you automatically; you only call the verbs.
 
-## Steps
+## MANDATORY FLOW (every shopping task starts here)
 
-### Step 0: Confirm delivery address & phone
-**ALWAYS show the address picker** — even if the user mentioned a location like "Tellapur" or "Koramangala". An area name is NOT a complete delivery address (missing flat/building, street, pincode, phone). The user must pick a saved address or enter a full one. The address widget collects flat/building, street, city, pincode, AND contact phone — all critical for delivery.
+**Step 0 — Always confirm delivery address FIRST.** Zepto only operates in metros and select Tier-2 cities; even within a covered city, prices and product availability change per pincode. ALWAYS ask before searching:
 
-- Call `ask_user` with `input_type: "address"`. Show saved addresses. If the user mentioned an area, pre-fill it in the question:
-  ```json
-  {"input_type": "address", "question": "Confirm your delivery address and phone:", "saved": <use the saved addresses from the system prompt>}
-  ```
-- **Only skip** if the user provided a FULL address with building/flat, street, city, pincode, AND phone number (e.g. "E111, Ridgewood Estate, DLF Garden City, Pune 411032").
-- **Do NOT ask for items** — extract them from the user's message. If truly missing, handoff anyway and let the browser agent figure it out.
-- **Do NOT show product cards, prices, or images** — the cloud LLM has no access to the site's catalog. Only the browser agent can fetch real product data.
-
-**CRITICAL**: Do NOT open the browser until you have a complete delivery address with phone. Without a delivery location, Zepto shows ZERO products.
-
-### 1. Gather ALL Requirements Upfront
-- BEFORE opening the browser, check what the user already provided: items to order, delivery address.
-- If ANY info is missing, use ONE SINGLE `ask_user` call to collect ALL missing info at once.
-  Example: "I need a couple of details to order from Zepto:\n• Delivery address or area name\n• Anything else to add to the order?"
-- Do NOT ask questions one at a time. Batch everything into a single prompt.
-- If user has saved addresses in profile, present them as choices.
-- If user provided both items and address already, skip straight to Step 2.
-
-### 2. Open Zepto & Verify Login
-- Open a NEW tab and navigate to `https://www.zeptonow.com`.
-- **CLEAR PREVIOUS CART FIRST**: Check the cart for leftover items from a previous session. If not empty, remove all items before proceeding. This ensures a clean cart for the new order.
-- Take a snapshot. Check if logged in — look for a profile/account icon in the header area.
-- If Zepto shows a location/address popup or banner, type the user's address in the location search input, wait for autocomplete suggestions, click the best match.
-- If area is not serviceable, tell user and stop.
-- The header shows delivery time (e.g., "10 min delivery") and current address — verify both are correct.
-- If NOT logged in: click the Login/Sign-in button, enter operator phone 8109137158, handle OTP transparently (do NOT ask user for credentials).
-- **If you see a login page or wrong account, STOP and tell the user: "Session expired, please re-login in Chrome Debug."**
-- Take snapshot to confirm location set and products visible on homepage.
-
-### 3. Search & Add Items
-For each item the user requested:
-- Click the search bar/icon in the header area.
-- Type the item name and press Enter or wait for search results to appear.
-- Take snapshot of results. Each product card typically shows:
-  - Product name and brand
-  - Weight/size (e.g., "500 ml", "1 kg")
-  - Price (with ₹ symbol)
-  - "Add" or "ADD" button
-  - Optional discount badge
-  - Delivery time
-- Find the closest match. If multiple variants (different brands, sizes), use `ask_user` (input_type "choice") presenting name, size, and price for each option.
-- Click the "Add" button on the chosen product. After adding, it typically transforms into a quantity counter with `-`/count/`+` buttons.
-- To add more of the same item, click `+`. To remove, click `-`.
-- If out of stock (not in results or greyed out), inform user and suggest alternatives from results.
-- Clear the search input and type the next item name.
-- Repeat for all items. Cart count/total should update in the header.
-
-### 4. Review Cart
-- Click the cart button/icon in the header (usually shows item count and total).
-- Cart may open as a sidebar panel or navigate to a cart page.
-- Take snapshot. The cart should show:
-  - Each item: name, quantity, price
-  - Bill details: Items total, Delivery charge, Handling charge, Grand total
-  - Delivery address
-  - Estimated delivery time
-- Use `confirm_action` to present cart summary to user:
-  - Each item with quantity and price
-  - Full bill breakdown (items total, delivery charge, handling charge, grand total)
-  - Delivery address
-  - Estimated delivery time
-- Do NOT proceed unless user confirms. If cancelled, ask what to change.
-
-### 5. Checkout & Payment
-- Click "Proceed to Pay" or "Checkout" button.
-- Verify delivery address is correct on payment page.
-- Use `collect_payment` to collect via Razorpay:
-  - summary: JSON with items, prices, delivery charge, handling charge, grand total, delivery address, estimated time
-  - amount_inr: grand total amount (number)
-  - description: "Zepto grocery order"
-- STOP and WAIT — payment panel opens for user.
-- Only proceed if payment confirmed. If cancelled, ask what to change.
-
-### 6. Place Order & Confirm
-- After payment is confirmed, handle any payment OTP via `ask_user` if needed.
-- Take snapshot of confirmation page.
-- Report: order number/ID, items ordered, total paid, estimated delivery time, delivery address.
-
-## Site Notes
-
-- **Site URL**: `zeptonow.com` redirects to `zepto.com`. Always navigate to `https://www.zeptonow.com`.
-- **Delivery**: Zepto delivers in 6-15 minutes depending on area — time-sensitive, don't waste time.
-- **Operator Chrome Profile 3** should be logged in. Do NOT ask user for phone or credentials.
-- If session expired, login with operator phone 8109137158. OTP goes to operator.
-
-### Verified Selectors (2026-03-20)
-
-**Header (homepage + search):**
-- Logo: `a[data-testid="zepto-logo"]`
-- Delivery time: `h2[data-testid="delivery-time"]` — shows "X minutes"
-- Address: `h3[data-testid="user-address"]` — shows address or "Select Location"
-- Search: `a[data-testid="search-bar-icon"]` → links to `/search`
-- Login (logged out): `span[data-testid="login-btn"]` with text "login"
-- Profile (logged in): `span[data-testid="my-account"]` with text "profile", links to `/account`
-- Cart: `button[data-testid="cart-btn"]` — shows count badge when items in cart
-
-**Login modal:**
-- Login button: `button[aria-label="login"]`
-- Phone input: `textbox "Enter Phone Number"` in dialog
-- Country code: "+91" (pre-set)
-- Continue: `button "Continue"` (disabled until phone entered)
-
-**Location modal:**
-- Trigger: `button[aria-label="Select Location"]`
-- Search: `textbox "Search a new address"`
-- Saved addresses: List of clickable divs with label (Home/Work/Other) + address text
-- Close: `button "Location modal close Icon"`
-
-**Search page (`/search?query={term}`):**
-- URL pattern: `https://www.zepto.com/search?query={term}` — use direct navigation
-- Search input: `combobox "Search"` (role=combobox)
-- Results heading: `h1` — "Showing results for "{term}""
-- Brand filter buttons: Top row (e.g., "Amul", "Nandini")
-- Price/Brand/Weight filters: Collapsible sections with checkboxes
-
-**Product cards (search results):**
-- Card: `a[href*="/pn/"]` — each product is a link
-- Product image: `img[src*="cdn.zeptonow.com"]`
-- ADD button: `button` with text "ADD" inside card
-- After adding: ADD becomes `button "Decrease quantity"` + qty + `button "Increase quantity"`
-- Price: `span` elements (current price, then MRP strikethrough)
-- Discount: `span` with "₹X OFF"
-- Name: `span`/`div` with product name text
-- Weight: `span` with e.g., "1 pack (1 L)", "1 pc (250 ml)"
-- Rating: star icon + `span` "4.7" + count "(69.6k)"
-- Delivery: `div` "X mins"
-
-**Cart (`[role="dialog"]`):**
-- Open via `button[data-testid="cart-btn"]` — URL gets `&cart=open`
-- Dialog: `[role="dialog"]` (div, not native `<dialog>`)
-- Cart items: image + name (`paragraph`) + size + quantity controls (`button "Remove"` / qty / `button "Add"`)
-- Quantity data-testids: `{id}-minus-btn`, `{id}-cart-qty`, `{id}-plus-btn`
-- Bill summary: `"Bill summary"` heading, then:
-  - `button "Item Total"` → ₹amount
-  - `button "Handling Fee"` → "FREE" or ₹amount
-  - `button "Delivery Fee"` → ₹amount + free delivery threshold text
-  - `button "To Pay"` → final ₹amount
-- Pay button: `button "Click to Pay ₹{amount}"` with class `bg-skin-primary`
-- Paper bag opt-out: checkbox
-- "Add More Items" link → `/search`
-
-**Image CDN pattern:**
-```
-https://cdn.zeptonow.com/production/ik-seo/tr:w-403,ar-{ratio},pr-true,f-auto,q-40,dpr-2/cms/product_variant/{uuid}/{slug}.jpeg
+```json
+{
+  "input_type": "address",
+  "question": "Which address should I use for Zepto delivery?",
+  "saved": "<pass the user's savedAddresses array from USER CONTEXT verbatim>"
+}
 ```
 
-### Operational Notes
-- **Location**: First-time visitors or profile without location see "Select Location". If already set, header shows address + delivery time.
-- **Product availability** varies by area and time of day. Some items may be out of stock.
-- **Minimum order**: Below minimum may incur a small cart/delivery surcharge. Minimum varies by area.
-- Some areas don't have Zepto coverage — site shows "not serviceable" or similar message.
-- **Quantity controls**: After clicking ADD, the button becomes Decrease/count/Increase. Click Increase to add more, Decrease to reduce.
-- Use `confirm_action` for cart review (no money), `collect_payment` for checkout (actual payment).
-- When using confirm_action or collect_payment, WAIT for user response. Do NOT auto-proceed.
-- **Cancellation**: Orders may not be cancellable once packed for delivery.
-- **Coupons**: Cart dialog shows available coupons with "Apply" buttons and "View all coupons" link.
+Wait for the user's response. The operator's Zepto session already has a default address — just acknowledge the user's pick (e.g. *"Got it — delivering to Home. Finding milk on Zepto..."*) and proceed.
+
+**Skip Step 0 ONLY if** the user has **zero** saved addresses — then proceed without asking.
+
+**Step 1 — Search and SHOW PRODUCTS VISUALLY in a CAROUSEL.** Never dump search results as plain text or bullet points. Use `ask_user` with `input_type: "carousel"` and `instant_add: true`. Pull at least **12 results** (`topN: 12`) so the carousel feels rich.
+
+**Step 2 — On per-card ADD, call `zepto.add_to_cart({ product_id, product_url, quantity })`.** The carousel response will be a JSON array `[{"id": "<uuid>", "qty": 1}]` per ADD tap. **`product_url` is REQUIRED** — pass `product.url` from the search result verbatim, otherwise add_to_cart will fail.
+
+**Step 3 — Show cart on demand.** When user asks "what's in my cart" / "show cart", call `zepto.get_cart({})` and render with `report_cart`.
+
+## When to use which tool
+
+| User intent | Tool call(s) |
+|---|---|
+| Start any Zepto shopping | `ask_user(input_type=address, saved=...)` |
+| "Search for X on Zepto" | `zepto.search({ query, topN: 12 })` → `ask_user(input_type=carousel, instant_add=true, cards=...)` |
+| "Add the Amul Gold to Zepto cart" (specific) | `zepto.search({ query: "amul gold milk" })` → pick id+url → `zepto.add_to_cart({ product_id, product_url, quantity })` |
+| "What's in my Zepto cart" | `zepto.get_cart({})` → `report_cart` |
+| "Am I signed in to Zepto?" | `zepto.whoami({})` |
+| "Checkout my Zepto cart" | `zepto.get_cart({})` then tell the user to complete payment in their Zepto browser tab — there's no `place_order` tool. |
+
+## Sequencing rules
+
+1. **Address first**, exactly once. Don't re-ask if the user already confirmed.
+2. **Search responses MUST go in a carousel** — never text bullets. The shopping experience depends on real images.
+3. **Pull at least 12 results** (`zepto.search({ query, topN: 12 })`). If <3 in-stock results, retry once with a broader query (drop the brand).
+4. **`product_url` is REQUIRED on `zepto.add_to_cart`** — never call it with just `product_id`. Always pass both, taking values verbatim from the search result.
+5. **NEVER invent product_ids or urls** — only use values returned by `zepto.search` or `zepto.get_cart`.
+6. **Same item ADD again = increment qty** — `zepto.add_to_cart` is idempotent on retry; the runner detects an existing cart line and clicks the `+` stepper.
+
+## Domain knowledge
+
+- **Search query format:** Best results from `<brand> <product> <size>`, e.g. `"amul gold milk 500 ml"`, `"britannia bread"`. If 0 results, retry without the brand.
+- **Out of stock items:** `zepto.search` returns `inStock: false` — skip those when adding; tell the user and ask if they want a substitute.
+- **Pricing:** Each product has `priceInr` (sale) and optional `mrpInr` (MRP) and `discountPct`. Show sale price; mention discount only if `discountPct >= 5`.
+- **Delivery:** Zepto delivers in 6-15 min in covered metros. Outside coverage, the search returns 0 products.
+- **Common units:** `500g`, `1kg`, `500ml`, `1L`, `pack of N`.
+- **Product IDs are UUIDs** (e.g. `f1b6a9b3-89d9-54e1-9d16-004ac839a8f7`) — pass them back unchanged to `add_to_cart`.
+
+## REQUIRED carousel format for search results
+
+```json
+{
+  "input_type": "carousel",
+  "question": "Here are the top Zepto results — tap ADD on any card:",
+  "instant_add": true,
+  "cards": [
+    {
+      "id": "<product.product_id>",
+      "label": "<product.name>",
+      "image": "<product.imageUrl>",
+      "url": "<product.url>",
+      "subtitle": "₹<product.priceInr> · <product.pack || ''>",
+      "badge": "<discountPct >= 5 ? '<discountPct>% off' : (product.inStock === false ? 'Out of stock' : (product.rating ? '⭐ <product.rating>' : ''))>"
+    }
+  ]
+}
+```
+
+**When `instant_add: true` is set:** the response value is `[{"id": "<uuid>", "qty": 1}]`. For each entry, immediately call `zepto.add_to_cart({ product_id: id, product_url: <the url from your card>, quantity: qty })`. After adding, give a one-line acknowledgement and call `suggest_replies`.
+
+## Error recovery
+
+| Error | What to do |
+|---|---|
+| `signedIn: false` from any tool | Tell user: "Your Zepto session expired — please refresh your Chrome tab and re-login." Don't loop. |
+| `product_not_in_search` from add_to_cart | Re-search with the EXACT query the user used; pass the new `product_id` + `product_url` from that search. |
+| `add_button_not_found` | The product is out of stock OR Zepto isn't serviceable from the operator's address. Tell the user and suggest an alternative. |
+| `Unsupported store` / 0 results | Zepto doesn't deliver to that pincode — tell the user and suggest `cross-store-grocery` to compare on stores that DO deliver. |
+| Tool times out (>30s) | Tell user "Zepto is slow right now" and offer to retry once. Don't auto-retry more than once. |
+
+## Hard rules
+
+- **NEVER skip the address ask** — Zepto's coverage and prices depend on pincode.
+- **NEVER show search results as plain text** — always carousel with real images.
+- **ALWAYS pass `topN: 12`** to `zepto.search` (or higher) so the carousel has enough options.
+- **ALWAYS pass `instant_add: true`** on search-result carousels.
+- **ALWAYS pass `product_url`** on every `zepto.add_to_cart` call — it's required by Zepto's PDP-driven add flow.
+- **ALWAYS call `suggest_replies`** after meaningful responses. Examples after ADD: `["Show my Zepto cart", "Add more items", "Compare prices on BigBasket"]`. After search results: `["Show only ₹50 and under", "Add brown bread too", "Show my cart"]`.
+- **NEVER** describe browser actions in your text response. The user does not see the browser.
+- **NEVER** invent product_ids or urls.
+- **NEVER** call `place_order`, `submit_otp`, or `confirm_payment` — they don't exist on Zepto.
+- **ALWAYS** show real prices and product images from `zepto.search` results — do not paraphrase or fabricate.

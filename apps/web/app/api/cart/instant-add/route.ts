@@ -28,14 +28,28 @@ import { getAuthUser } from '@/lib/auth-helper';
 
 export const dynamic = 'force-dynamic';
 
-/** Display store name → MCP tool prefix. */
+/** Display store name → MCP tool prefix. Returns null for unsupported stores. */
 function siteForStoreName(store: string): string | null {
   const s = store.trim().toLowerCase();
   if (s === 'bigbasket') return 'bigbasket';
-  if (s === 'blinkit') return 'blinkit';
   if (s === 'zepto') return 'zepto';
-  if (s === 'swiggy instamart' || s === 'swiggy_instamart' || s === 'instamart') return 'swiggy_instamart';
-  if (s === 'dmart') return 'dmart';
+  // Blinkit, Swiggy Instamart, DMart don't yet have add_to_cart MCP tools
+  // — return null so we surface a clean error instead of a runner crash.
+  return null;
+}
+
+/** Pretty error for stores where we know add_to_cart is unsupported in v1. */
+function unsupportedReason(store: string): string | null {
+  const s = store.trim().toLowerCase();
+  if (s === 'blinkit') {
+    return "Blinkit ADD isn't wired up yet in v1 — please add the item via the Blinkit app, or compare on BigBasket / Zepto instead.";
+  }
+  if (s === 'swiggy instamart' || s === 'swiggy_instamart' || s === 'instamart') {
+    return "Instamart ADD isn't wired up yet in v1 — please add the item via the Swiggy app, or compare on BigBasket / Zepto instead.";
+  }
+  if (s === 'dmart') {
+    return "DMart ADD isn't supported in v1 — please use the DMart Ready app.";
+  }
   return null;
 }
 
@@ -77,7 +91,11 @@ export async function POST(request: Request) {
 
   const site = siteForStoreName(store);
   if (!site) {
-    return NextResponse.json({ error: `Unsupported store: ${store}` }, { status: 400 });
+    const reason = unsupportedReason(store);
+    return NextResponse.json(
+      { error: reason ?? `Unsupported store: ${store}` },
+      { status: 400 },
+    );
   }
 
   const opsHost = opsHostByTask.get(taskId);
