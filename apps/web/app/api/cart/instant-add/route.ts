@@ -100,11 +100,18 @@ export async function POST(request: Request) {
 
   const opsHost = opsHostByTask.get(taskId);
   if (!opsHost) {
-    // The task's agent loop has already finished. The user can still see
-    // the snapshot of the carousel but can't add new items via this path.
+    // The task's agent loop has already finished. Return 200 with ok:false
+    // so the browser doesn't log a "Failed to load resource: 410" console
+    // error. The frontend treats !ok as a soft warning and rolls back the
+    // optimistic local cart add.
+    console.log('[instant-add] taskId=%s no live host (agent finished) — soft-fail', taskId);
     return NextResponse.json(
-      { error: 'Task no longer running. Send a new message to continue shopping.' },
-      { status: 410 },
+      {
+        ok: false,
+        reason: 'task_finished',
+        message: "That cart session ended. Send a new message to keep shopping.",
+      },
+      { status: 200 },
     );
   }
 

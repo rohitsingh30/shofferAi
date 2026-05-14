@@ -617,10 +617,14 @@ function ChatInterfaceInner() {
             qty: 1,
           }),
         });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string };
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          const msg = (body as { error?: string }).error || `HTTP ${res.status}`;
-          throw new Error(msg);
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        // Soft-fail (200 + ok:false) — task ended; surface the message but
+        // don't log an error.
+        if (body.ok === false) {
+          throw new Error(body.message || 'Task is no longer running.');
         }
       } catch (err) {
         // Roll back the optimistic local add so the cart bar matches the
